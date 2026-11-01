@@ -24,9 +24,9 @@ A transmit datapath, a receive datapath, and the control logic binding them.
 
 <img alt="DLL receive data flow" src="./images/RX_flow.png" width=750 height=330 />
 
-- **TLP handler**: sequence-number assignment and checking, LCRC generation/validation, and the ACK/NAK scheduling logic (`NEXT_RCV_SEQ`, `NAK_SCHEDULED`, `AckNak_LATENCY_TIMER`).
+- **TLP handler**: sequence-number assignment and checking, LCRC generation/validation, and the ACK/NAK scheduling logic (`NEXT_RCV_SEQ`, `NAK_SCHEDULED`).
 - **DLLP handler**: builds and parses ACK/NAK and flow-control DLLPs; on ACK it retires TLPs from the retry buffer, on NAK it triggers a replay.
-- **Retry buffer**: holds unacknowledged TLPs (currently has size of one) for replay, with a replay counter and replay timer.
+- **Retry buffer**: holds unacknowledged TLPs (currently has size of one) for replay. Replay on NAK only; no replay timer or replay number yet ([#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)).
 - **DLL Init FSM**: gates the link through `DL_Inactive → DL_Init → DL_Active`, including flow-control initialization.
 
 ## The Interface
@@ -39,6 +39,8 @@ A transmit datapath, a receive datapath, and the control logic binding them.
 | in        | `tl_tx_tlp_valid`   | Valid flag for the TLP payload               | 1 bit      |
 | in        | `tl_tx_tlp_first`   | First batch of the payload from TL           | 1 bit      |
 | in        | `tl_tx_tlp_last`    | Last batch of the payload from TL            | 1 bit      |
+| in        | `tl_tx_tlp_last_half` | Last batch is half (4 bytes), 64-bit only  | 1 bit      |
+| out       | `tl_tx_tlp_ready`   | Retry buffer can take a TLP                  | 1 bit      |
 | in        | `tl_tx_hdr_credit`  | Header credits of DLLP from TL               | 8 bits     |
 | in        | `tl_tx_data_credit` | Data credits of DLLP from TL                 | 12 bits    |
 | in        | `tl_tx_update_type` | Update type of DLLP from TL                  | 2 bits     |
@@ -53,19 +55,20 @@ A transmit datapath, a receive datapath, and the control logic binding them.
 | out       | `tl_rx_update_type` | Extracted update type forwarded to TL        | 2 bits     |
 | out       | `tl_rx_packet_type` | Extracted packet type forwarded to TL        | 2 bits     |
 | out       | `tl_rx_dllp_valid`  | DLLP rx valid                                | 1 bit      |
+| out       | `o_DL_State`        | DL state of VC0 (debug)                      | 3 bits     |
 
 ### Downstream — Physical Layer
 | Direction | Signal          | Description                                             | Width        |
 | --------- |:--------------- |:------------------------------------------------------ |:------------ |
 | in        | `phy_clk`       | PHY-domain clock                                       | 1 bit        |
 | in        | `phy_reset`     | Async reset from the physical layer                    | 1 bit        |
-| in        | `phy_linkup`    | Link-up indication from the PHY (LTSSM in **L0**)      | 1 bit        |
+| in        | `phy_linkup`    | Link-up indication: set in **L0**, held through Recovery (`pcie_core`) | 1 bit        |
 | in        | `phy_rx_data`   | Receive data stream from the physical layer            | DATA_WIDTH   |
 | in        | `phy_rx_data_k` | K-character (control) markers for `phy_rx_data`        | DATA_WIDTH/8 |
 | out       | `phy_tx_data`   | Transmit data stream to the physical layer             | DATA_WIDTH   |
 | out       | `phy_tx_data_k` | K-character (control) markers for `phy_tx_data`        | DATA_WIDTH/8 |
 
-> The PHY interface is the upstream side of the MAC layer: `phy_tx_data`/`phy_tx_data_k` map to the MAC's `i_TxData`/`i_TxDataK`, `phy_rx_data`/`phy_rx_data_k` to `o_RxData`/`o_RxDataK`, and `phy_linkup` to `o_LinkUp`.
+> The PHY interface is the upstream side of the MAC layer: `phy_tx_data`/`phy_tx_data_k` map to the MAC's `i_TxData`/`i_TxDataK`, `phy_rx_data`/`phy_rx_data_k` to `o_RxData`/`o_RxDataK`, and `phy_linkup` to `o_LinkUp`, raised in L0 and held through Recovery by `pcie_core`.
 
 ## DLL Init FSM
 Tracks whether the link is usable: `DL_Inactive` out of reset, `DL_Active` only once flow-control is initialized.
@@ -75,7 +78,7 @@ Tracks whether the link is usable: `DL_Inactive` out of reset, `DL_Active` only 
 | State         | Meaning / transition |
 | ------------- |:-------------------- |
 | `DL_Inactive` | Reset state; the DLL is idle. Move to `DL_Init` when `phy_linkup = 1`. |
-| `DL_Init`     | Runs flow-control initialization. Contains two sub-states, `DL_FCINIT1 → DL_FCINIT2`. Move to `DL_Active` when flow-control initialization succeeds. |
+| `DL_Init`     | Runs flow-control initialization. Contains two sub-states, `DL_INITFC1 → DL_INITFC2`. Move to `DL_Active` when flow-control initialization succeeds. |
 | `DL_Active`   | Normal operation; TLPs and DLLPs flow. |
 
 Any state returns to `DL_Inactive` on `phy_linkup = 0` or reset.
@@ -83,11 +86,11 @@ Any state returns to `DL_Inactive` on `phy_linkup = 0` or reset.
 ## Flow-control initialization
 While in `DL_Init`, **all TLPs are blocked**. `DL_Init` has two sub-states:
 
-- **`DL_FCINIT1`**
+- **`DL_INITFC1`**
   - Transmit and receive three InitFC1 DLLPs: `InitFC1-P`, `InitFC1-NP`, `InitFC1-Cpl`.
   - Repeat the transmission every **34 µs** while the exit conditions are not met.
-  - Record the FC unit values, then move on to `DL_FCINIT2`.
-- **`DL_FCINIT2`**
+  - Record the FC unit values, then move on to `DL_INITFC2`.
+- **`DL_INITFC2`**
   - Transmit and receive three InitFC2 DLLPs: `InitFC2-P`, `InitFC2-NP`, `InitFC2-Cpl`.
   - Repeat the transmission every **34 µs** while the exit conditions are not met.
   - Ignore the FC unit values, then move on to `DL_Active`.
@@ -105,7 +108,7 @@ While in `DL_Init`, **all TLPs are blocked**. `DL_Init` has two sub-states:
 
 <img alt="DLLP packet structure" src="./images/DLLP_structure.png" width=700 height=300 />
 
-`DLLP Type = {packet_type[1:0], update_type[1:0], 1'b0, VC[2:0]}`. `HdrFC` is forwarded to the TL via `tl_tx_hdr_credit` and `DataFC` via `tl_tx_data_credit`; the `R` (reserved) bytes are not considered.
+`DLLP Type = {packet_type[1:0], update_type[1:0], 1'b0, VC[2:0]}`. `HdrFC` is forwarded to the TL via `tl_rx_hdr_credit` and `DataFC` via `tl_rx_data_credit`; the `R` (reserved) bytes are not considered.
 
 | Code (`byte 1`) | DLLP Type |
 | --------------- |:--------- |
@@ -144,22 +147,21 @@ Field layout: `type | Reserved | AckNak_Seq_Num | 16-bit CRC`.
 
 ### TX
 - The TL indicates the start and end of the TLP payload.
-- The DLL stores the TLP payload in RAM.
+- The DLL stores the TLP payload in a buffer.
 - Each TLP is assigned a **12-bit sequence number**.
 - The TLP is protected by a **32-bit LCRC** (polynomial above); the result is complemented and the bits of each byte are stored in reversed order.
-- **Transmission priority**: TLP/DLLP already in progress → NAK → ACK → FC DLLP → retry-buffer re-transmissions → new TLP from the TL → other DLLPs.
+- **Transmission priority**: TLP/DLLP already in progress → NAK → ACK → UpdateFC DLLP → other DLLPs → TLP (new or replayed).
 
 ### RX
-- The received TLP payload is stored in RAM, awaiting the integrity check.
+- The received TLP payload is stored in a buffer, awaiting the integrity check.
 - `NEXT_RCV_SEQ` holds the expected sequence number of the next TLP.
 - `NAK_SCHEDULED` is asserted when a NAK is scheduled:
   - LCRC mismatch → the TLP is corrupt → `NAK_SCHEDULED` asserted.
   - If the TLP sequence number ≠ expected value:
     - `(NEXT_RCV_SEQ − TLP_Seq_Num) mod 4096 ≤ 2048` → the TLP is a duplicate → an ACK is scheduled.
     - Otherwise the TLP is out of sequence → `NAK_SCHEDULED` asserted.
-- `AckNak_LATENCY_TIMER` counts the time since an ACK or NAK DLLP was scheduled for transmission.
 - If the TLP sequence number **equals** the expected value, the control data is removed and the TLP is forwarded to the TL: the DLL marks the start and end of the TLP, `NEXT_RCV_SEQ` is incremented, `NAK_SCHEDULED` (if set) is cleared, and an ACK is scheduled.
-- An ACK is sent when: in `DL_Active`, an ACK is scheduled, and `AckNak_LATENCY_TIMER` exceeds the Table 3-5 value; `NAK_SCHEDULED` is then cleared.
+- An ACK is sent as soon as it is scheduled; there is no `AckNak_LATENCY_TIMER` yet.
 - Nullification of a TLP with `EDB` is **not** supported in this first version.
 
 ## DLLP Handler
@@ -175,11 +177,10 @@ Field layout: `type | Reserved | AckNak_Seq_Num | 16-bit CRC`.
 
 ### TX
 - `tl_tx_dllp_valid` from the TL starts a DLLP transmission; the DLLP data comes from the TL, the CRC is appended.
-- Received TLP LCRC fails: send a **NAK** with the erroneous packet's sequence number; passes: an **ACK** with the error-free packet's sequence number.
+- Received TLP LCRC fails: send a **NAK** with the sequence number of the last TLP received intact; passes: an **ACK** with the error-free packet's sequence number.
 
 ## Retry Buffer
-- A **2-bit replay number** counts how many times the retry buffer has been re-transmitted; on rollover from `11b` to `00b`, signal the Physical Layer to retrain the link.
-- A **replay timer** counts the time since the last transmission or retransmission.
+- The retry buffer replays on NAK only. There is no replay timer and no replay number yet ([#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)).
 - The first version offers a retry buffer of **size one**; a later version may move to **size two**, implemented as a ping-pong scheme.
 
 <!--## Prerequisites
@@ -192,19 +193,22 @@ The simulation can be run using the pcieVHost model … *TODO*
 The testbench drives the DLL from both sides. On the **upstream** side it plays the Transaction Layer: it injects TLP payload (`tl_tx_*`) and requests DLLP transmissions (`tl_tx_dllp_valid`) to exercise framing, sequence-number assignment, LCRC generation and the transmission-priority logic. On the **downstream** side it models the PHY, feeding framed TLPs/DLLPs on `phy_rx_data`/`phy_rx_data_k` and driving `phy_linkup` so the DLL Init FSM walks through `DL_Inactive → DL_Init → DL_Active`, including flow-control initialization. Fault injection on the received stream (bad CRC/LCRC, out-of-sequence and duplicate sequence numbers) is used to check the ACK/NAK scheduling, the retry buffer and the replay/latency timers.-->
 
 ## Sources and testbench
-The DLL sources are Cologne Chip's, in the gatemate-pipe submodule: [`2.pipe/pipe_src/src/dll_src`](../2.pipe/pipe_src/src/dll_src). Its block testbench there, `sim/tb_dll_logic.v`, drives the DLL from both sides:
+The DLL sources are in the gatemate-pipe submodule: [`2.pipe/pipe_src/src/dll_src`](../2.pipe/pipe_src/src/dll_src). Its block testbench there, `sim/tb_dll_logic.v`, loops the DLL's `phy_tx_data` back into `phy_rx_data`:
 
-| Side | Plays | Exercises |
-|---|---|---|
-| **Upstream** | the Transaction Layer: injects TLP payload (`tl_tx_*`), requests DLLPs (`tl_tx_dllp_valid`) | framing, sequence-number assignment, LCRC generation, transmission priority |
-| **Downstream** | the PHY: feeds framed TLPs/DLLPs on `phy_rx_data`/`phy_rx_data_k`, drives `phy_linkup` | DLL Init FSM `DL_Inactive → DL_Init → DL_Active`, flow-control initialization |
-| Fault injection | bad CRC/LCRC, out-of-sequence and duplicate sequence numbers | ACK/NAK scheduling, retry buffer, replay/latency timers |
+| Step | Exercises |
+|---|---|
+| 1 | DLL Init FSM `DL_Inactive → DL_Init → DL_Active`, flow-control initialization |
+| 2 | three TLPs from the TL, every received word checked |
+| 3 | one TLP with its LCRC corrupted on the loopback: NAK and replay |
+| 4 | an UpdateFC-P DLLP, its received fields checked |
 
-Our own DLL simulation, [`sim/run-dll-phy.sh`](#simulation-over-mac-pipe-and-serdes), runs the same checks with the MAC, PIPE and SerDes BFM below the DLL.
+It does not inject out-of-sequence or duplicate TLPs and checks no timers.
+
+Our own DLL simulation, [`sim/run-dll-phy.sh`](#simulation-over-mac-pipe-and-serdes), runs similar steps between two DLLs, with the MAC, PIPE and SerDes BFM below each.
 
 ## Viewing the DLL in WaveCrux
 
-Ferrite's [PCIe PIPE and Data Link Layer decoders](https://github.com/Ferrite-Engineering/wavecrux-decoders) (`wcx-pcie` 0.1.0) in [WaveCrux](https://wavecrux.app) decode the DLL's PHY-side stream. Source: `sim/tb_dll_wavecrux.v`, a fork of gatemate-pipe's `tb_dll_logic.v` with the same test steps, whose TLPs carry real headers (MWr32, MWr64, CplD) so the decoders can name them.
+Ferrite's [PCIe PIPE and Data Link Layer decoders](https://github.com/Ferrite-Engineering/wavecrux-decoders) (`wcx-pcie` 0.1.0 or later) in [WaveCrux](https://wavecrux.app) decode the DLL's PHY-side stream. Source: `sim/tb_dll_wavecrux.v`, a fork of gatemate-pipe's `tb_dll_logic.v` with the same test steps, whose TLPs carry real headers (MWr32, MWr64, CplD) so the decoders can name them.
 
 To reproduce, from `2.rtl/4.dll`:
 
@@ -256,11 +260,11 @@ Pictures from Cologne Chip's test in the [`dll_test` branch of gatemate-pipe](ht
 
 <img alt="pcieVHost simulation: lane number detection" src="./images/LaneNum_Detection.png" width=900 />
 
-**InitFC1.** With the link up, the DLL enters `DL_FCINIT1` and sends `InitFC1-P`, `InitFC1-NP` and `InitFC1-Cpl`, one DLLP per clock with SDP on lane 0 and END on lane 7 (`LinkUpDataK` = `81`). pcieVHost answers with its own InitFC1 set, not aligned to a lane boundary: its first SDP sits on lane 6 (`LinkDownDataK` = `40`), so each DLLP spans two words. This confirms the DLL detects DLLPs at any SDP position:
+**InitFC1.** With the link up, the DLL enters `DL_INITFC1` and sends `InitFC1-P`, `InitFC1-NP` and `InitFC1-Cpl`, one DLLP per clock with SDP on lane 0 and END on lane 7 (`LinkUpDataK` = `81`). pcieVHost answers with its own InitFC1 set, not aligned to a lane boundary: its first SDP sits on lane 6 (`LinkDownDataK` = `40`), so each DLLP spans two words. This confirms the DLL detects DLLPs at any SDP position:
 
 <img alt="pcieVHost simulation: InitFC1 sequence" src="./images/INITFC1.png" width=900 />
 
-**InitFC2.** Both sides move on to `DL_FCINIT2` and exchange `InitFC2-P`, `InitFC2-NP` and `InitFC2-Cpl`, after which the DLL is in `DL_Active`:
+**InitFC2.** Both sides move on to `DL_INITFC2` and exchange `InitFC2-P`, `InitFC2-NP` and `InitFC2-Cpl`, after which the DLL is in `DL_Active`:
 
 <img alt="pcieVHost simulation: InitFC2 sequence" src="./images/INITFC2.png" width=900 />
 
@@ -286,3 +290,6 @@ bash 2.rtl/4.dll/sim/run-dll-phy.sh
 - [DLL Overview](Doc/DLL_draft_v2.pdf)
 - [openPCIE Controller White Paper](Doc/opensource-PCIE-Controller.applsci-16-03409.pdf)
 - [openPCIE Controller repo](https://github.com/isomoye-msu/pcie_datalink_layer)
+
+--------------------
+#### End of Document

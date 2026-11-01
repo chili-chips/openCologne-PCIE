@@ -15,7 +15,7 @@ Open an [Issue](https://github.com/chili-chips-ba/openCologne-PCIE/issues). For 
    - **[run-format --check](4.build/hw_build/run-format.sh)** passes.
    - Ensure that **[co-sim](5.sim)** and the block-level flows you touched (**[PHY](2.rtl/1.phy/3.sim)**, **[DLL over PHY](2.rtl/4.dll/sim)**) pass
    - and that the **[GateMate build](4.build)** completes.
-   - For a mere cleanup: **[run-leq](4.build/hw_build/run-leq.sh)** to prove that are no functional changes.
+   - For a mere cleanup: **[run-leq](4.build/hw_build/run-leq.sh)** to prove that there are no functional changes.
 
 4. Open a Pull Request against `main`.
 
@@ -36,4 +36,4 @@ GenAI may be used read-only, as [NLnet's GenAI policy v2.0](https://nlnet.nl/fou
 - Say in the Pull Request which tool and model (with version) you used, and for what. Best also in the commit message, as a `GenAI:` line.
 
 -----------
-#### End-of-Document
+#### End of Document

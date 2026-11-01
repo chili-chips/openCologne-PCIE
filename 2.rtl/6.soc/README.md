@@ -29,7 +29,7 @@
 | 0x00 – 0x0C | `tx.header0..2`, `tx.data` | the TLP to send; writing `tx.data` sends it |
 | 0x10 – 0x1C | `rx.header0..2`, `rx.data` | the last TLP received, as it came |
 | 0x20 | `rx.valid` | a TLP is waiting; write 1 to clear |
-| 0x24, 0x28 | `status.err`, `status.phy` | fatal-error message; Tx FSM state and free core buffers |
+| 0x24, 0x28 | `status.err`, `status.phy` | fatal-error message, always 0 on an EP; Tx FSM state and free core buffers |
 | 0x2C | `status.result` | firmware result marker; 0x0000_FACE lights `fw_pass` |
 | 0x30 | `status.cfg_id` | our own Bus/Device/Function |
 

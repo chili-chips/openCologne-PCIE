@@ -33,11 +33,11 @@ bash 2.rtl/4.dll/sim/run-dll-phy.sh --dump    # with a waveform
 
 Build products and the waveform go to `$SERDES_BUILD_DIR/dll` (default `~/.cache/opencologne-pcie`). Tested with Icarus Verilog 13.
 
-The test:
+The test first trains both LTSSMs from Detect.Quiet to L0, every state change is printed. Then:
 
-1. both LTSSMs train from Detect.Quiet to L0, every state change is printed
-2. both DLLs go through InitFC1/InitFC2 to DL_Active
-3. three TLPs EP to RC and two TLPs RC to EP, every word is checked
+1. both DLLs go through InitFC1/InitFC2 to DL_Active
+2. three TLPs EP to RC, every word is checked
+3. two TLPs RC to EP, every word is checked
 4. bits of a TLP are flipped on the EP to RC wire, the RC NAKs it and the EP replays it
 5. an UpdateFC-P DLLP EP to RC
 6. TLPs of 3, 5 and 7 DW in both directions, the last word marked with `tl_tx_tlp_last_half`: each is sent once, with 12, 20 or 28 TLP bytes on the line
@@ -78,5 +78,8 @@ The MAC implements the upstream port. The Root Complex is a second instance of i
 * scrambling is disabled in both MACs, as with `DISABLE_SCRAMBLING` in the MAC's pcievhost test
 * the SerDes is set up and clocked as in Cologne Chip's `ccfpga_pipe_wrapper.v`: `PLL_FCNTRL = 6'h1A`, a 62.5 MHz PLL clock, the SerDes TX and RX core clock on the PIPE logic's `o_tx_clk`, so PCLK and the SerDes word clock are both 31.25 MHz
 * the PIPE reset is released 256 `clk_reg` cycles after the global reset, the MAC and DLL reset once the SerDes reports ready, synchronised to PCLK
-* the DLL gets `phy_linkup` when the MAC reports link up and the LTSSM is in L0
+* the DLL gets `phy_linkup` when the MAC reports link up and the LTSSM is in L0; unlike `pcie_core` ([#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)), `pcie_stack.sv` does not hold it through Recovery
 * the bit errors in steps 4 and 7 are short inversions of the serial pair, starting 176 ns after the STP leaves the EP's MAC, so they hit the TLP; the RC NAKs it only once #24 is fixed
+
+--------------------
+#### End of Document

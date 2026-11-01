@@ -55,8 +55,7 @@ Next to the TL, in this folder because it is its user side:
 - **TLPs**: the TL starts a TLP only while `tx_tlp_ready` is high, sends it in consecutive words, then waits for `tx_tlp_ready` to drop before the next one, matching the one-TLP DLL retry buffer. The last word of a TLP with an odd number of DWs is marked with `tx_tlp_last_half`, the DLL's `tl_tx_tlp_last_half` ([#21](https://github.com/chili-chips-ba/openCologne-PCIE/issues/21)): the DLL then sends only its lower 4 bytes.
 - **DLLPs**: the TL requests UpdateFC DLLPs (`tx_packet_type` is always UpdateFC) and takes the credits of the InitFC1, InitFC2 and UpdateFC DLLPs the DLL receives.
 
-Open DLL gap in [gatemate-pipe](https://github.com/colognechip/gatemate-pipe):
-- [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22): the DLL sends InitFC1 and InitFC2 with fixed credits (P 32/1008, NP 32/1, Cpl infinite); its `INIT_*` parameters set only the UpdateFC values. The TL's `INIT_*` must equal what the DLL sends; until the DLL builds its InitFC DLLPs from them, the two do not match.
+InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)): the DLL used to send InitFC1 and InitFC2 with fixed credits (P 32/1008, NP 32/1, Cpl infinite). It now builds them from the `INIT_*` parameters, which `pcie_core` sets to the TL's. The fix is in [gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17); until it is merged, a fresh clone has the fixed credits.
 
 ### SOC side (trn_if and cfg_if)
 - **TRN RX** carries memory reads and writes that hit BAR0, and all completions.
@@ -223,7 +222,7 @@ Build products and the waveform go to `$SERDES_BUILD_DIR/tl` (default `~/.cache/
 | 15   | TLP with digest                                                                           |
 | 16   | Completions forwarded to the SOC, `err_fwd` for a poisoned CplD                           |
 | 17   | D3hot disables Memory Space                                                                |
-| 18   | SOC requests wait in the TX buffer until Bus Master Enable; with five of them the buffer fills, `tbuf_av` drops to 1 and `trn_bridge` holds the SOC back; all five go out in order |
+| 18   | SOC requests wait in the TX buffer until Bus Master Enable; of five, two enter, `tbuf_av` drops to 1 and `trn_bridge` holds the SOC back; all five go out in order |
 | 19   | 80 random memory writes and reads with random back-pressure from the SOC, credits respected as the DLL would |
 | 20   | DL_Down resets the TL, transmit stops at the completion credit limit and resumes after UpdateFC |
 | 21   | DL_Down in the middle of a TLP on TRN RX: `rsrc_dsc`, `trn_bridge` pads the cut TLP to its length, and the next TLP reaches the SOC whole |
@@ -268,3 +267,6 @@ Its Start column gives the share of the TL and `trn_bridge`: 6 PCLK from `dll_if
 - [UG477, 7 Series FPGAs Integrated Block for PCI Express](../../0.doc/2.rtl/ug477_7Series_IntBlock_PCIe.pdf)
 - [DLL - TL interface](../0.doc/260511-TL_DPLL-gatemate.pdf)
 - [Data Link Layer](../4.dll/README.md)
+
+--------------------
+#### End of Document

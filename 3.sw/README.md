@@ -12,7 +12,7 @@ The EP firmware runs bare-metal on the eduBOS5 core of our GateMate SOC. It is t
 
 | File | What it does |
 |---|---|
-| [`EP/main.c`](EP/main.c) | the PIO target: stores each MemWr DWORD, answers each MemRd with a CplD, any other non-posted request with Unsupported Request |
+| [`EP/main.c`](EP/main.c) | the PIO target: stores the DWORD of each 3-DW MemWr (a 4-DW one is dropped), answers each 1-DW MemRd with a CplD, a longer MemRd or any other non-posted request with Unsupported Request |
 | [`common/pcie.c`](common/pcie.c), [`pcie.h`](common/pcie.h) | the request layer: wait for a TLP in the CSR Rx window, decode its header, build and send the Completion, release the window |
 | [`common/start.S`](common/start.S), [`sections.lds`](common/sections.lds) | set the stack, jump to `main()`; code and data in the 8 KB RAM at 0x0000_0000 |
 
@@ -21,7 +21,7 @@ What a reader should take from it:
 - **The TL does the configuration, not the firmware.** The host's CfgRd0/CfgWr0 (IDs, Command register, BAR0 sizing) are answered by the soft TL, as on the AMD hard macro. Only Memory requests reach the firmware, so enumeration works even before the firmware has started.
 - **One TLP at a time, nothing lost.** The SOC captures the first two beats of each incoming TLP into the Rx window and sets `rx.valid`. While it is set, the link is held off; the firmware clears it once it has answered.
 - **A Completion routes back by the request's IDs.** Requester ID and Tag come from the request, TC and Attr are copied from it, and the Completer ID is our own Bus/Device/Function, read from `status.cfg_id`. That value comes from the host's configuration writes and differs between a direct link and a link behind a switch, so it is never hard-coded.
-- **Byte enables matter even for one DWORD.** A MemWr updates only the enabled bytes; a MemRd's Byte Count and Lower Address follow from its First DW Byte Enables (Base Specification 2.1, tables 2-21 and 2-22). On the TRN interface, payload byte 0 travels in bits [31:24].
+- **Byte enables matter even for one DWORD.** A MemWr updates only the enabled bytes; a MemRd's Byte Count and Lower Address follow from its First DW Byte Enables (Base Specification 2.1, Tables 2-31 and 2-32). On the TRN interface, payload byte 0 travels in bits [31:24].
 - **PASS means the host reached us.** `status.result` reads 0x0000_0001 while the firmware waits, and 0x0000_FACE (the `fw_pass` LED) once it has answered the host's first read.
 
 Build (WSL, with the xPack RISC-V GCC on `PATH`):

@@ -18,7 +18,8 @@
 #   - pcie_vhost_map.v: generated from pcie_vhost_map.h, as upstream's make
 #     files do
 #   - rv32: openPCIE's rv32-openpcie.patch (models/rv32)
-# openPCIE's LTSSM patch is NOT applied (see 5.sim/README.md).
+# pcieVHost's src/ltssm.c is not copied: the make file compiles openPCIE's
+# models/pcievhost/ltssm/ltssm.c, with its LTSSM patch (see 5.sim/README.md).
 #
 # DEPS_WORK (default ~/.cache/opencologne-pcie-deps) holds the upstream
 # clones. Needs git, patch, sed.
@@ -58,7 +59,10 @@ done
 
 # ---- pcieVHost ----------------------------------------------------------------
 P=$D/pcievhost
-for f in "$U"/pcievhost/src/*.c "$U"/pcievhost/src/*.h; do cp_lf "$f" "$P/src/$(basename "$f")"; done
+for f in "$U"/pcievhost/src/*.c "$U"/pcievhost/src/*.h; do
+  [ "$(basename "$f")" = ltssm.c ] && continue   # the make file compiles openPCIE's
+  cp_lf "$f" "$P/src/$(basename "$f")"
+done
 for f in allheaders.v pciedispheader.v pciexpress_header.v timescale.v; do
   cp_lf "$U/pcievhost/verilog/headers/$f" "$P/verilog/headers/$f"
 done

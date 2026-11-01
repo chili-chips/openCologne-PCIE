@@ -33,20 +33,20 @@ The PCB part of the project shall deliver two cards: GateMate in **(i) PCIE "Slo
   <img alt="NiteFury M.2 PCIe FPGA card" width="35%" src="../0.doc/1.pcb/NiteFury-PCIE-M2.JPG">
 </p>
 
-While the "Slot" variant is not critical, and could have been suplanted by one of the ready-made M.2-to-Slot adapters, 
+While the "Slot" variant is not critical, and could have been supplanted by one of the ready-made M.2-to-Slot adapters, 
 
 <p align="center">
   <img alt="PCIe slot to M.2 adapter" width="40%" src="../0.doc/1.pcb/PCIE-Slot-to-M2-adapter.JPG">
 </p>
 
-it is more practical not to have an interposer. "Slot" is still the dominant PCIE form-factor for desktops and servers. The M.2 is typically found in the laptops. Initially, we will use the existing [CM4 ULX4M](https://github.com/intergalaktik/ULX4M) with off-the-shelf I/O boards:
+it is more practical not to have an interposer. "Slot" is still the dominant PCIE form-factor for desktops and servers. The M.2 is typically found in the laptops. The first plan was the [CM4 ULX4M](https://github.com/intergalaktik/ULX4M) with off-the-shelf I/O boards:
 
 <p align="center">
   <img alt="Raspberry Pi CM4 IO board with PCIe slot" width="40%" src="../0.doc/1.pcb/CM4-IO-with-PCIE-Slot.jpg">
   <img alt="Raspberry Pi CM4 IO board with PCIe M.2" width="40%" src="../0.doc/1.pcb/CM4-IO-with-PCIE-M2.jpg">
 </p>
 
-When our two new plug-in boards become available, the plan is to gradually switch thedev platform to our openPCIE backplane, which features:
+With the M.2 RevA card done, the dev platform is now the ULX5M-M2 on our openPCIE backplane, which features:
 - Slots on one side
 - M.2s on the other
 - RootComplex also as a plug-in card (as opposed to the more typical soldered-down), for interoperability testing with [RaspberryPi](https://www.raspberrypi.com) and Xilinx Artix-7 .

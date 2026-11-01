@@ -88,6 +88,7 @@ module pcie_core
   localparam logic [11:0] INIT_NPD = 12'd8;
 
   logic                  mac_link_up;
+  logic                  dll_link_up;  // L0 reached, held through Recovery (#35)
   logic [           4:0] ltssm_state;
   logic [    DATA_W-1:0] mac_rx_data;
   logic [DATA_BYTES-1:0] mac_rx_datak;
@@ -131,6 +132,18 @@ module pcie_core
       .o_LTSSM_State (ltssm_state)
   );
 
+  // The DLL's link up: set on reaching L0, held through Recovery, cleared
+  // when the MAC drops o_LinkUp (back to Detect). The MAC also raises
+  // o_LinkUp in PRE_L0; the DLL starts only in L0
+  always_ff @(posedge pipe.pclk or negedge mac_rst_n) begin
+    if (!mac_rst_n) begin
+      dll_link_up <= 1'b0;
+    end
+    else begin
+      dll_link_up <= mac_link_up && (dll_link_up || (ltssm_state == LTSSM_L0));
+    end
+  end
+
   dll_logic #(
       .DATA_BYTES                (DATA_BYTES),
       .NUMBER_OF_VIRTUAL_CHANNELS(1),
@@ -142,7 +155,7 @@ module pcie_core
   ) u_dll (
       .phy_clk            (pipe.pclk),
       .phy_reset          (~mac_rst_n),
-      .phy_linkup         (mac_link_up && (ltssm_state == LTSSM_L0)),
+      .phy_linkup         (dll_link_up),
       .phy_rx_data        (mac_rx_data),
       .phy_rx_data_k      (mac_rx_datak),                              // K flags for framing (#9)
       .tl_tx_data         (dll.tx_data),

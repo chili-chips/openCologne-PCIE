@@ -6,7 +6,7 @@ This directory contains the integration code for the [rv32](https://github.com/w
 
 The code to integrate the ISS into the virtual processor is in the directory `usercode`. This contains the following files:
 
-* `VUserMain0.cpp` and `VUserMain.h`
+* `VUserMain0.cpp` and `VUserMain0.h`
 * `vuserutils.cpp` and `vuserutils.h`
 * `rv32_timing_config.h`
 * `rv32_cache.cpp` and `rv32_cache.h`
@@ -95,7 +95,7 @@ The two callbacks are used to fetch IRQ state from the HDL (`vproc_irq_callback`
 
 ## Utility Functions
 
-The `vuserutils.cpp` file and its header, provide three utility fuctions for the main integration code. As mentioned above, the ISS and the integration code can be configured with the `parseArgs` function. This takes and arc and argv arguments (as would be for a normal `main` C/C++ entry point) but, since the code is running on the virtual processor which does not have access to the simulator's command line arguments, these initial arguments are set to 0 and `NULL` when called from `VUserMain0`. Instead it will look for a `vusermain.cfg` file and process this. This has a format of `vusermain<X> [options]`, where X is the node number (0 for this test bench) followed by the options that would have been on the command line. The `README.md` file in the repository's top directory has more datils of what options are available. Two configuration structres are passed into `parseArgs` to configure for the ISS and to configure for the VProc integration code, which are updated by the `parseArgs` function.
+The `vuserutils.cpp` file and its header, provide three utility fuctions for the main integration code. As mentioned above, the ISS and the integration code can be configured with the `parseArgs` function. This takes and arc and argv arguments (as would be for a normal `main` C/C++ entry point) but, since the code is running on the virtual processor which does not have access to the simulator's command line arguments, these initial arguments are set to 0 and `NULL` when called from `VUserMain0`. Instead it will look for a `vusermain.cfg` file and process this. This has a format of `vusermain<X> [options]`, where X is the node number (0 for this test bench) followed by the options that would have been on the command line. [The CPU node](../../README.md#the-cpu-node-three-ways-to-run-the-socs-software) in `5.sim/README.md` lists the options. Two configuration structres are passed into `parseArgs` to configure for the ISS and to configure for the VProc integration code, which are updated by the `parseArgs` function.
 
 If and when the ISS exits (and it may be configured to do so for a number of reasons) state may be dumped as part of the post run actions (`post_run_actions` defined in `VUserMain0.cpp`). These include dumping all the register state (`reg_dump`), including the CSR registers (`csr_dump`). 
 
@@ -104,3 +104,6 @@ If the ISS exited execution due to specifying a number of instructions to execut
 ## Test Example
 
 A small RISC-V assembly test example is provide in the `riscvtest` directory as `main.s`. A shell script is provided to build is (`rv_asm.sh`), but a pre-compiled binary is also provide (`main.bin`). This simly write over the HDL bus to memory and reads it back and checks it is valid. The `vusermain.cfg` file can select this binary to run with the `-t` option.
+
+--------------------
+#### End of Document

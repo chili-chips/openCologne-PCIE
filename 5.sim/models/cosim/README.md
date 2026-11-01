@@ -1,6 +1,6 @@
 # _VProc_ and _mem_model_ Co-simulation Components
 
-The _VProc_ virtual processor and the _mem_model_ sparse memory model (part of _pcievhost_) components form the heart of the co-simulation for the _openCologne-PCIE_  top level simulation test bench. The `soc_cpu.VProc` is based on the virtual processor and the memory used by the running programs has access to the memory model's space. Logic can also access the memory model's address space with a provided HDL component. This component is also used in the PCIE interface driver block, and the code running on the _pcievhost_ VIP's _VProc_ also has access to the same memory via the API. Thus, these components are tied together tightly.
+The _VProc_ virtual processor and the _mem_model_ sparse memory model (part of _pcievhost_) components form the heart of the co-simulation for the _openCologne-PCIE_  top level simulation test bench. The `soc_cpu.VProc` is based on the virtual processor and the memory used by the running programs has access to the memory model's space. Logic can also access the memory model's address space with a provided HDL component, and the code running on the _pcievhost_ VIP's _VProc_ also has access to the same memory via the API. Thus, these components are tied together tightly.
 
 ## _VProc_
 
@@ -11,7 +11,7 @@ advancing simulation time.
 
 _VProc_ has a generic memory mapped bus and this would normally be wrapped in a module to convert this to a standard bus or interconnect protocol, such as AXI or Avalon but, for _openCologne-PCIE_, the `soc_cpu.VPROC` wrapper converts it to the SOC's CPU memory bus (`mem_if`: `mem_valid`/`mem_ready`) with some simple logic. Multiple _VProc_ test programs components can be instantiated, each with a unique “node” number.
 
-The connection between software and HDL is the SystemVerilog DPI-C interface under Verilator, and VPI under Icarus; the same VProc sources are built for each. The details of connection between the HDL and running user code won’t be discussed here but suffice it to say that the user program is running in its own thread and the _VProc_ layer software provides both the API and the means to synchronise the user program with the simulation, keeping both in lock-step but allowing the user program to be free flowing code. For each instantiated _VProc_ node the user code has a specific “main” entry point of the form `VUserMain<n>`, where `<n>` is the _VProc_’s node number: e.g. `VUserMain0`, which must have C linkage for DPI requirements. The user programs are compiled into a library and, along with a _VProc_ code library, are linked into a shared object, _VProc.so_, which is loaded by the simulator at run time. There are both C and C++ low level APIs available to user programs and abbreviated versions are shown below.
+The connection between software and HDL is the SystemVerilog DPI-C interface under Verilator, and VPI under Icarus; the same VProc sources are built for each. The details of connection between the HDL and running user code won’t be discussed here but suffice it to say that the user program runs as a coroutine on the simulator's thread (openPCIE's `vproc-coroutine.patch`) and the _VProc_ layer software provides both the API and the means to synchronise the user program with the simulation, keeping both in lock-step but allowing the user program to be free flowing code. For each instantiated _VProc_ node the user code has a specific “main” entry point of the form `VUserMain<n>`, where `<n>` is the _VProc_’s node number: e.g. `VUserMain0`, which must have C linkage for DPI requirements. The user programs are compiled into a library and, along with a _VProc_ code library, are linked into the Verilator executable (`Vtb`) or, for Icarus, into a VPI module, `VProc.vpi`, which is loaded by the simulator at run time. There are both C and C++ low level APIs available to user programs and abbreviated versions are shown below.
 
 <p align="center"><img alt="VProc C and C++ API summary" width=700 src="https://github.com/user-attachments/assets/f8dd88fe-ed63-4a6c-a0eb-55a13d0f845d"></p>
 
@@ -38,7 +38,7 @@ This model can also be accessed from the HDL using the `mem_model` HDL component
 
 This directory holds only our wrapper, `mem_model.sv`, which wraps upstream's `f_mem_model.v` in Verilator `lint_off` pragmas so third-party code stays out of our lint. Everything else, the VProc and mem_model HDL (`f_VProc.v`, `f_mem_model.v` and their headers) and the C libraries, is built from the upstream copies in [`../../vip`](../../vip) by [`../../tools/build-vip.sh`](../../tools/build-vip.sh) into `$VIP_DIR`, and [`../../tb.f`](../../tb.f) lists the files from there.
 
-The software of both models is in `$VIP_DIR/lib`: `libcosimlnx.a` for DPI-C (Verilator), `libcosimica.a` for VPI (Icarus). Their headers are in `$VIP_DIR/include`. To use the models' APIs, the user code must include either the  `VProcClass.h` header for the *VProc* C++ API, or `VUser.h` for the *VProc* C API, and the `mem.h` header for the memory model C API. Note that the `VUser.h` and `mem.h` inclusions must be wrapped as C linkage if included in code that will be compiled as C++. E.g.:
+The software of both models is in `$VIP_DIR/lib`: _VProc_ in `libcosimlnx.a` for DPI-C (Verilator) and `libcosimica.a` for VPI (Icarus); _mem_model_'s C code, part of pcieVHost, in `libpcielnx.a` and `libpcieica.a`. Their headers are in `$VIP_DIR/include`. To use the models' APIs, the user code must include either the  `VProcClass.h` header for the *VProc* C++ API, or `VUser.h` for the *VProc* C API, and the `mem.h` header for the memory model C API. Note that the `VUser.h` and `mem.h` inclusions must be wrapped as C linkage if included in code that will be compiled as C++. E.g.:
 
 ```
 extern "C" {
@@ -53,3 +53,6 @@ This is only applicable when writing natively compiled simulation test code. Whe
 ## More Information
 
 More information on using these co-simulation models can be found in the [*VProc* manual](https://github.com/wyvernSemi/vproc/blob/master/doc/VProc.pdf) and [*mem_model* manual](https://github.com/wyvernSemi/mem_model/blob/main/doc/mem_model_manual.pdf).
+
+--------------------
+#### End of Document

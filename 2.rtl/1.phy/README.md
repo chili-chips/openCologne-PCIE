@@ -13,11 +13,11 @@ Work area for the Cologne Chip PHY PIPE developers.
 - [Yumewatari (whitequark) PHY segments with rudimentary LTSSM](https://github.com/whitequark/Yumewatari/tree/master/yumewatari/gateware)
 
 <p align="center">
-  <img alt="PCIe physical layer sub-blocks" width="60%" src="0.doc/images/PHY-Layers.jpg">
+  <img alt="PCIe physical layer sub-blocks" width="60%" src="0.doc/images/PHY-Layers.drawio.png">
 </p>
 
 <p align="center">
-  <img alt="PCIe physical layer mapped onto GateMate" width="60%" src="0.doc/images/PHY-Layers-GateMate.png">
+  <img alt="PCIe physical layer mapped onto GateMate" width="60%" src="0.doc/images/PHY-Layers-GateMate.drawio.png">
 </p>
 
 ## Implementation Details

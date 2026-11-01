@@ -8,7 +8,7 @@
 [![Lint:WIP](https://badgen.net/badge/Lint/WIP/orange)](2.rtl/README.md#rtl-coding-rules)
 [![Verible:WIP](https://badgen.net/badge/Verible/WIP/orange)](2.rtl/README.md#rtl-coding-rules)
 [![8b10b-Formal:Pass](https://badgen.net/badge/8b10b%20Formal/Pass/green)](https://github.com/chili-chips-ba/openCologne/tree/main/7.SerDes/1.sim-model/formal_8b10b)
-[![DLL+PHY-Sim:Pass](https://badgen.net/badge/DLL%2BPHY%20Sim/Pass/green)](2.rtl/4.dll/sim)
+[![DLL+PHY-Sim:Steps 1-3 Pass](https://badgen.net/badge/DLL%2BPHY%20Sim/Steps%201-3%20Pass/orange)](2.rtl/4.dll/sim)
 [![TopSim:WIP](https://badgen.net/badge/TopSim/WIP/orange)](5.sim)
 [![PCIE:TODO](https://badgen.net/badge/PCIE/TODO/red)](#project-status)
 [![LiteX:TODO](https://badgen.net/badge/LiteX/TODO/red)](6.litex/README.md)
@@ -33,7 +33,11 @@
 | [5.sim](5.sim/README.md) | Test bench and VIP |
 | [6.litex](6.litex/README.md) | LiteX integration |
 
-### Minimal, yet functional PCIE EP core
+<p align="center">
+  <img alt="PCIe EndPoint top-level stack" width="35%" src="0.doc/2.rtl/pcie-ep-top-stack.png">
+</p>
+
+### Design Blueprint: Minimal, yet functional PCIE EP core
 
 PCIE is complex, and most real-life users need little of it. We build a barebones EP that still interoperates with real PCIE HW/SW systems.
 
@@ -51,12 +55,6 @@ PCIE is complex, and most real-life users need little of it. We build a barebone
 ### References:
 
 - **[PCIE Primer](http://www.anita-simulators.org.uk/wyvernsemi/articles/pci_express.pdf) by Simon Southwell**
-
-### Design Blueprint
-
-<p align="center">
-  <img alt="PCIe EndPoint top-level stack" width="50%" src="0.doc/2.rtl/pcie-ep-top-stack.png">
-</p>
 
 --------------------
 
@@ -90,10 +88,10 @@ We then also test with a Raspberry Pi and a PC as the host. Details: [1.pcb/READ
 # PIPE is not a dream!
 
 <p align="center">
-  <img alt="PCIe physical layer sub-blocks" width="60%" src="2.rtl/1.phy/0.doc/images/PHY-Layers.jpg">
+  <img alt="PCIe physical layer sub-blocks" width="60%" src="2.rtl/1.phy/0.doc/images/PHY-Layers.drawio.png">
 </p>
 
-The GateMate SerDes has not been used for PCIE before, so expect PHY issues (signal integrity, jitter). Cologne Chip developers own the PHY up to and including the **P**hysical **I**nterface for **P**CI **E**xpress (PIPE), in its own directory: **`2.rtl/1.phy`**.
+The GateMate SerDes has not been used for PCIE before, so expect PHY issues (signal integrity, jitter). Cologne Chip developers own the PHY and the **P**hysical **I**nterface for **P**CI **E**xpress (PIPE): **`2.rtl/1.phy`** and **`2.rtl/2.pipe`** (`pipe_if.sv`, `pipe_src`).
 
 > PIPE keeps the generic logic apart from FPGA-specific RTL. Not all our RTL is portable to other vendors, but a port only needs to revisit the thin layer behind PIPE.
 
@@ -103,7 +101,7 @@ The GateMate SerDes has not been used for PCIE before, so expect PHY issues (sig
 
 Two major elements:
 - **PCIE-capable SerDes:** Cologne Chip (CC) **proprietary** mixed-signal hard IP, wrapped in a thin soft adaptation layer (_phy_top_) with an industry-standard PIPE interface. An opensource SerDes BFM stands in for it in faster, public-domain simulations.
-- **PCIE protocol stack:** our soft RTL for MAC/LTSSM, DLL and TL, topped by an eduBOS5-based RISC-V SOC as the application layer.
+- **PCIE protocol stack:** soft RTL: MAC/LTSSM by Cologne Chip; DLL, TL, app, test, validation, system, infrastructure and process by Chili.CHIPS (MAC and DLL sources in [gatemate-pipe](https://github.com/colognechip/gatemate-pipe)), topped by an eduBOS5-based RISC-V SOC as the application layer.
 
 > **Plug-and-play:** the TL's user interface, `trn_if`, is a drop-in replacement for the TRN interface of the AMD Artix-7 `PCIE_2_1` hard macro in EndPoint mode: same signals, widths and handshakes. User logic written for that HM, including openPCIE's `trn_bridge` to AXI-Stream, connects unchanged ([details](2.rtl/README.md#compatibility-goal-an-artix-7-endpoint-in-open-source)).
 
@@ -134,10 +132,10 @@ Details: [3.sw/README.md](3.sw/README.md)
 # Simulation Architecture
 
 <p align="center">
-    <img alt="openCologne-PCIE test bench: the host RCPIPEx1__pcieVHost on top, driving our DUT at its PIPE interface below it: MAC, DLL and TL RTL, CSR registers and the SOC CPU socket" width="100%" src="0.doc/5.sim/tb-structure.drawio.png">
+    <img alt="openCologne-PCIE test bench: the host, openPCIE's A7RC driver + checker on RCPIPEx1__pcieVHost, on top, driving our DUT at its PIPE interface below it: MAC, DLL and TL RTL, CSR registers and the SOC CPU socket" width="100%" src="0.doc/5.sim/tb-structure.drawio.png">
 </p>
 
-The [test bench](5.sim/README.md) uses open-source simulators only: Verilator or Icarus Verilog. The host is the [_pcieVHost VIP_](https://github.com/wyvernSemi/pcievhost) in the RC role, `RCPIPEx1__pcieVHost`: it drives our DUT at its PIPE interface, trains the link and enumerates the EP. The same model already ran against the AMD `PCIE_2_1` hard macro on openPCIE, which raises the odds that our EP works first time against a physical Artix-7 RC.
+The [test bench](5.sim/README.md) uses open-source simulators only: Verilator or Icarus Verilog. The host is openPCIE's A7RC driver + checker (59 PCIe 2.1 rules) on the [_pcieVHost VIP_](https://github.com/wyvernSemi/pcievhost) in the RC role, `RCPIPEx1__pcieVHost`: it drives our DUT at its PIPE interface, trains the link and enumerates the EP. The same model already ran against the AMD `PCIE_2_1` hard macro on openPCIE, which raises the odds that our EP works first time against a physical Artix-7 RC.
 
 ### Coverage plan: every layer, against a known-good partner
 

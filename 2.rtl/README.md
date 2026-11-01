@@ -26,7 +26,7 @@ To its user, our EP looks exactly like the AMD Artix-7 EP, the `PCIE_2_1` hard m
 
 | openPCIE (Artix-7 RC) | openCologne-PCIE (GateMate EP) |
 |---|---|
-| `PCIE_2_1` hard macro: TL, DLL, LTSSM, MAC | our soft RTL: TL ([5.tlp](5.tlp)), DLL ([4.dll](4.dll)), MAC/LTSSM ([3.mac](3.mac)) |
+| `PCIE_2_1` hard macro: TL, DLL, LTSSM, MAC | soft RTL: MAC/LTSSM ([3.mac](3.mac)) by Cologne Chip, DLL ([4.dll](4.dll)) and TL ([5.tlp](5.tlp)) by Chili.CHIPS; MAC and DLL sources in the gatemate-pipe submodule |
 | `phy_top`: `mac2phy` + GTP wrapper + `GTPE2` hard macros | `phy_top`: Cologne Chip soft wrapper ([2.pipe](2.pipe)) + GateMate SerDes `CC_SERDES` ([1.phy](1.phy)), with the open [SerDes BFM](1.phy/2.serdes-model) for simulation |
 | `trn_bridge`, `trn_if`, `axis_if`, `cfg_if`, `pcie_pkg` | the same ([5.tlp](5.tlp)); `trn_bridge` unchanged, on the TRN bus of our TL instead of `PCIE_2_1` |
 | SOC `riscv_pcie_soc` + PeakRDL CSR | the same ([6.soc](6.soc)), with the Rx window capturing any TLP, as an EP must see Memory requests |
@@ -38,20 +38,20 @@ Only the C firmware changes role. Everything is open source: no split between ve
 
 ### Simulation, layer by layer
 
-Four test benches cover the EP, each checking its layer against a link partner that does not share its code. Each is described next to its sources.
+These test benches cover the EP, layer by layer, each checking its layer against a link partner that does not share its code. Each is described next to its sources.
 
-| Layer | Simulation | DUT | Checked against | Simulator | pcieVHost | Status (2026-10-18) |
+| Layer | Simulation | DUT | Checked against | Simulator | pcieVHost | Status |
 |---|---|---|---|---|---|---|
-| PIPE + PHY | [`1.phy/3.sim`](1.phy/3.sim) `run-phy.sh pipe64` | Cologne Chip's PIPE logic over the opensource SerDes BFM, 64-bit | the vendor's PIPE test case | Icarus | no | steps 1-3 pass; fails from step 4 until [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
+| PIPE + PHY | [`1.phy/3.sim`](1.phy/3.sim) `run-phy.sh pipe64` | Cologne Chip's PIPE logic over the opensource SerDes BFM, 64-bit | the vendor's PIPE test case | Icarus | no | passes |
 | | `run-phy.sh equiv` | the opensource SerDes BFM | itself, looped back; the vendor model with `--ref` (NDA, not in the repo) | Icarus | no | passes: 400 words, 0 mismatches |
 | | `run-phy.sh pipe16` | the same, 16-bit | the vendor's PIPE test case | Icarus | no | fails: [#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18) |
 | DLL over PIPE + PHY | [`4.dll/sim`](4.dll/sim) `run-dll-phy.sh` | DLL, MAC/LTSSM, PIPE and SerDes BFM, end to end on the serial line | a second copy of the same stack: training to L0, InitFC, TLPs both ways, Nak and replay, UpdateFC | Icarus | no | steps 1-3 pass; fails from step 4 until [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
 | TL | [`5.tlp/sim`](5.tlp/sim) `run-tl.sh` | `pcie_tl` with `trn_bridge`, at `dll_if` and the AXI-Stream ports of `trn_bridge` | a test bench in the roles of the DLL, the host and a PIO application: configuration space, Unsupported Requests, messages, ordering, flow control, random PIO traffic | Verilator | no | passes |
-| MAC + DLL + TL + firmware | [`5.sim`](../5.sim) | the EP at its PIPE; today the EP model (`EP=model`) | `RCPIPEx1__pcieVHost`, the host: enumeration, BARs, PIO | Verilator or Icarus | 1.9.3: RC (host), EP (model) | passes with the EP model |
+| MAC + DLL + TL + firmware | [`5.sim`](../5.sim) | the EP at its PIPE (or on the serial line): the EP RTL + firmware (`EP=rtl`), or the EP model (`EP=model`) | `RCPIPEx1__pcieVHost`, the host: openPCIE's A7RC driver + checker (enumeration, BARs, PIO, faults; 59 PCIe 2.1 rules) | Verilator or Icarus (`EP=rtl`: Verilator) | 1.9.3: RC (host), EP (model) | 2026-11-01: the EP model passes, 100 seeds; `EP=rtl` passes with `A7RC=1` (the lab RC's requests), fails the tester: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), [#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26), [#36](https://github.com/chili-chips-ba/openCologne-PCIE/issues/36) to [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
 
-- A failure is pinned to the layer that shows it: every layer below has passed on its own.
-- The PHY bench is permanent. `run-dll-phy.sh` drives TLPs into the DLL until our TL is in; then [`5.sim`](../5.sim) with `EP=rtl` takes over, against an independent link partner ([why the split](../5.sim/README.md#scope-unit-debug-then-top-level-validation)).
-- Not counted above: [`4.dll/sim/tb_dll_wavecrux.v`](4.dll/sim) makes the [WaveCrux pictures](4.dll/README.md#viewing-the-dll-in-wavecrux) of the DLL; the gatemate-pipe submodule brings Cologne Chip's own test benches.
+- A failure is pinned to the layer that shows it: every layer below has its own bench.
+- The PHY bench is permanent. `run-dll-phy.sh` drives TLPs into the DLL; [`5.sim`](../5.sim) with `EP=rtl` takes over, against an independent link partner ([why the split](../5.sim/README.md#scope-unit-debug-then-top-level-validation)).
+- Not counted above: [`4.dll/sim/tb_dll_wavecrux.v`](4.dll/sim) makes the [WaveCrux pictures](4.dll/README.md#viewing-the-dll-in-wavecrux) of the DLL; [`6.soc/sim`](6.soc/sim) runs the SOC alone, without a checker, for the [WaveCrux CPU view](6.soc/README.md#watching-the-cpu-in-wavecrux); the gatemate-pipe submodule brings Cologne Chip's own test benches.
 
 #### References:
 - [PCIE Primer](../0.doc/pcie-primer.Simon-Southwell.pdf) by Simon Southwell ✔
@@ -86,268 +86,139 @@ Proprietary PCIE Core for Xilinx 7Series FPGA devices
 
 # Quick walkthrough the PIO MemWr, MemRd process
 
-To split the DLL and TL into design blocks, we first work out what happens inside them for a PIO write and read: the minimum per layer that still does something useful and can be simulated. Features and regression tests build on it later.
-
-- **Why:** de-risks and buys time for LTSSM / PHY development, by initially leaving out the configuration space, link training and DLL flow control initialization.
-- **How:** with the right settings, _pcievhost_ exercises [minimum TL + minimum DLL + PHY_MAC] independently of [PHY_PIPE], so both tracks run in parallel and integration is faster.
-- **VIP gain:** _pcievhost_ gets new options: bypass DLL initialization, disable TLP CRC checks (it already works without link training).
-
-Below: (i) receiving a 32-bit `MemWr Request`; (ii) receiving a 32-bit `MemRd Request` and returning a `Completion` with a 32-bit payload. Both the `RX and TX side` of each layer are covered.
+How a PIO write and a PIO read cross today's stack, layer by layer. Details: [MAC](3.mac/README.md), [DLL](4.dll/README.md), [TL](5.tlp/README.md), [SOC](6.soc/README.md).
 
 ## (i) Reception of a `MemWr` Request
 
-A `Posted` transaction: fire-and-forget for the Root Complex, no response.
+A `Posted` transaction: no response.
 
-#### RX data path
-
-`RX_PHY_MAC` 
-   - Pass through PIPE data/K bits to DLL
-
-`RX_DLL`
-   - Remove **STP** and **END** framing on data from PHY
-   - Upon receiving **END**, instruct TX_DLL to return **ACK** (no LCRC check, always assume good)
-       - CRC is kept at 0
-   - No tracking of flow control credits (assume infinite credits for all flow control types)
-   - Pass de-framed data to TLP (with first and last bits)
-
-`RX_TLP`
-   - Check is a _MemWr_ type?
-   - Extract Address, Length, Last_BE (lbe) and First_BE (fbe)
-   - Delete header words
-   - Pass Payload with Addr, fbe and lbe over RX_TLP_IF (which is TBD)
-
-
-#### TX data path: generate ACK
-
-`TX_TLP`
-   - Nothing
-
-`TX_DLL`
-   - Generate **ACK** DLLP to TX_PHY_MAC when told so (which is upon receiving **END**)
-
-`TX_PHY_MAC`
-   - Pass DLLPs through to TX_PHY_PIPE data/K bit interface
-
+| Layer | RX: the MemWr comes in | TX: what goes back |
+|---|---|---|
+| SerDes + PHY | 8b/10b decode, elastic buffer, comma alignment; `ccfpga_pipe_fsm` hands the words to the MAC on `pipe_if` | |
+| MAC | descrambles, strips the ordered sets, passes data and K flags to the DLL | scrambles the DLL's Ack and UpdateFC DLLPs; inserts SKP every 1180-1538 symbol times |
+| DLL | finds STP, checks LCRC and sequence number, strips the framing, hands the TLP to the TL on `dll_if` | schedules an Ack for it |
+| TL | checks the TLP (Malformed, Receiver Overflow), queues it as posted, decodes the BAR0 hit | an UpdateFC-P once the TLP has left its queue |
+| `trn_bridge` | TRN RX to `m_axis_rx`, `tuser.bar_hit` = BAR0 | |
+| SOC | the firmware writes its PIO memory | |
 
 ## (ii) Reception of a `MemRd` Request and Completion
 
-A `Non-posted` transaction: the sender waits for a `Completion`. Slower and more complex than MemWr.
+A `Non-posted` transaction: the requester waits for a `Completion`.
 
-#### RX data path
+| Layer | RX: the MemRd comes in | TX: the CplD goes back |
+|---|---|---|
+| SerDes, PHY, MAC, DLL | as for the MemWr | MAC: scrambling, SKP; SerDes: 8b/10b, serializer |
+| DLL | as for the MemWr | sequence number, LCRC, STP/END; holds the CplD in its retry buffer until Acked, replays it on a Nak |
+| TL | queues it as non-posted; `tlp_order` releases it only after every posted TLP received before it | the TX buffer takes the CplD whole; `tlp_tx_arbiter` sends it when the link partner has the credits |
+| `trn_bridge` | TRN RX to `m_axis_rx` | `s_axis_tx` to TRN TX, throttled by `tbuf_av` |
+| SOC | the firmware reads its PIO memory | builds the CplD: Completer ID from `cfg`, Requester ID and Tag of the MemRd |
 
-`RX_PHY_MAC` [same operations as for the MemWr] 
+Configuration requests stop in the TL: `config_space` answers them and `cpl_gen` builds the completion. So do Unsupported Requests.
 
-`RX_DLL` [same operations as for the MemWr] 
-
-`RX_TLP`
-   - Check is a MemRd type?
-   - [same: Extract Address, Length, Last_BE (lbe) and First_BE (fbe)]
-   - **Extra-for-MemRd**: Extract Requester_ID (RID) and Tag
-   - [same: Delete header words]
-   - [same: Pass Addr, fbe and lbe over RX_TLP_IF]
-   - **Extra-for-MemRd**: Pass RID and Tag
-
-#### Tx data path: Complete _MemRd_ request
-
-`TX_TLP`
-   - Construct completion header with
-      - CPL_TYPE (01010b)
-      - Length in 32-bit words (1)
-      - Completer_ID (CID), fixed at 0
-      - Completion status of Successful Completion (000b)
-      - byte_count (4)
-      - Requester_ID as received with MemRd request
-      - Tag received with MemRd request
-      - Lower address (bottom 7 bits of received MemRd address, aligned to 32-bits)
-   - Send completion data and header over TX_TLP_IF
-
-`TX_DLL`
-   - Frame completion packet from TLP with **STP** and **END** and send to PHY TX data channel
-     
-`TX_PHY_MAC`
-   - Receive completion PIPE data and K bits from DLL and pass through to TX data channel of PIPE
-
-
-## 1) TL_IF
-### Features and Support
+## 1) `trn_if`
+The user side of the TL: the 64-bit TRN bus, drop-in compatible with the Artix-7 `PCIE_2_1` hard macro's.
 
 #### TLP generation and reception
 
-| Feature | RX  support| TX support| Notes |
-|---------|----|----|-------|
-| Memory Reads 32 bit TLPs        | ✔yes     | stage 2  | Must support reception       |
-| Memory Reads 64 bit TLPs        | ✘ no    | stage 2  | Must support reception       |
-| Memory Writes 32 bit TLPs       | ✔yes     | stage 2  | Must support reception       |
-| Memory Writes 64 bit TLPs       | ✘ no   | stage 2  | Must support reception       |
-| Memory Reads Locked 32 bit TLPs | ✘ no      | stage 2? | Might not be required at all |
-| Memory Reads Locked 64 bit TLPs | ✘ no      | stage 2? | Might not be required at all |
-| I/O Reads TLPs                  | ✘ no      | ✘ no       | Legacy                       |
-| I/O Writes TLPs                 | ✘ no      | ✘ no       | Legacy                       |
-| Config Space 0 Reads            | ✔yes     | ✘ no       | Must support reception       |
-| Config Space 0 Writes           | ✔yes     | stage 2  | Must support reception       |
-| Config Space 1 Reads            | ✘ no      | ✘ no       | RCs and Switches only        |
-| Config Space 1 Writes           | ✘ no      | ✘ no       | RCs and Switches only        |
-| Messages                        | yes?    | yes?     | What to do with received power messages? Generation of legacy interrupts messages? Generation of error messages required |
-| Completions                     | stage 2 | ✔ yes      | TX to respond to non-posted requests. TX of "unsupported request" completions for non-supported TLP types received |
-| Completions with data           | stage 2 | ✔ yes      | same as above with data |
-| Part completions with data      | ???     | ???      | Splitting of returned burst data. Uplink may have set a maximum payload, but request a large read |
-| Completions for locked memory   | ✘ no      | ✘ no       | TX to respond to non-posted requests. TX of "unsupported request" completions for non-supported TLP types received |
-| Completions with data           | ✘ no      | ✘ no       | same as above with data |
-
-Note that, when generating a memory request (not first delivery stage) if an address used is &lt; 2^32 a 32-bit TLP _must_ be used.
+| TLP | RX | TX | Notes |
+|---|---|---|---|
+| Memory Read, 32- and 64-bit address | ✔ to the SOC on a BAR0 hit | ✔ from the SOC | a BAR0 miss gets an Unsupported Request completion; SOC requests wait for Bus Master Enable |
+| Memory Write, 32- and 64-bit address | ✔ to the SOC on a BAR0 hit | ✔ from the SOC | a BAR0 miss or poisoned MWr is discarded, Unsupported Request |
+| Memory Read Locked | Unsupported Request | ✘ | |
+| I/O Read, I/O Write | Unsupported Request | ✘ | legacy |
+| Configuration Type 0 | ✔ answered by the TL | — | function 0; another function gets Unsupported Request |
+| Configuration Type 1 | Unsupported Request | — | RCs and switches only |
+| AtomicOp | Unsupported Request | ✘ | |
+| Messages | PME_Turn_Off, Set_Slot_Power_Limit; others discarded or Unsupported Request | PME_TO_Ack, ERR_NONFATAL, ERR_FATAL | no legacy interrupts |
+| Cpl, CplD | ✔ to the SOC, `err_fwd` if poisoned | ✔ from the TL (configuration, Unsupported Request) and the SOC (its reads) | |
 
 #### Other internal features
 
-| Feature | support| Notes |
-|---------|-------|-------|
-| Construction of TLP headers | ✔ yes | 3DW and 4DW |
-| Decode of TLP headers | ✔ yes | |
-| 32-bit CRC generation/check | ✔ yes | |
-| Capture of BUS and Device numbers | ✔ yes | Set on _every_ configurations write. Used to generate requester ID for non-completion TLPs or CID for completion TLPs |
-| Generation on ECRC digest | ✘ no | Requires extended PCIe capabilities structure |
-| Traffic classes           | ✘ no | Fix at 0 |
-| Auto-generation of tags   | ✔ yes | Incrementing count for each outstanding request |
-| ordering and cache coherency | ✘ no | fix attributes bits to 00b in headers |
-| GEN2 address type | ✘ no | Fix at 0 |
-| Error/poisoned TLP | partial | Poisoned received packets must be deleted. Optional to generate. Optional to complete with a "completer abort". |
+| Feature | Support | Notes |
+|---|---|---|
+| TLP header decode and build | ✔ | 3 DW and 4 DW, through the `pcie_pkg` structs |
+| Bus and Device Number capture | ✔ | on every Type 0 configuration write to function 0; Completer ID and Requester ID |
+| Ordering | ✔ | posted TLPs pass a waiting non-posted one, never the reverse |
+| Flow control | ✔ | transmit gating per 2.6.1.1; an UpdateFC on every credit release |
+| ECRC | ✘ | a digest is accounted for in the length, not checked |
+| Traffic Classes, Virtual Channels | ✘ | TC0, VC0 |
+| Error handling | ✔ | without AER: Malformed TLP and Receiver Overflow are Fatal, Unsupported Request Non-Fatal |
 
-## 2) DLL_IF
+## 2) `dll_if`
 
 #### DLLP generation and reception
 
-| Feature | RX  support| TX support| Notes |
-|---------|------------|-----------|-------|
-| DLL link initialisation | ✔ all | ✔ all | |
-| InitFC1  | ✔ all | ✔ all | For all three types: P, NP, Cpl |
-| InitFC2  | ✔ all | ✔ all | For all three types: P, NP, Cpl |
-| UpdateFC | ✔ all | ✔ all | For all three types: P, NP, Cpl |
-| ACK      | ✔ all | ✔ all ||
-| NAK      | ✔ all | ✔ all ||
-| PM_Enter_L1  | ??? | ✘ no  | What to do on reception? |
-| PM_Enter_L23 | ??? | ✘ no  | What to do on reception? |
-| PM_Enter_Active State Request_L1  | ??? | ✘ no  | What to do on reception? |
-| PM_Request_Ack | ✘ no | ??? | required if power higher layer power management supported |
-| Vendor specific | ✘ no | ✘ no | |
+| DLLP | RX | TX | Notes |
+|---|---|---|---|
+| InitFC1, InitFC2 | ✔ | ✔ | P, NP, Cpl; credits from the TL's `INIT_*` ([gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17), [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)) |
+| UpdateFC | ✔ | ✔ | on the TL's request, and every 30 µs |
+| Ack, Nak | ✔ | ✔ | an Ack is sent as soon as it is scheduled: no AckNak latency timer yet |
+| PM_Enter_L1, PM_Enter_L23, PM_Active_State_Request_L1, PM_Request_Ack | ✘ | ✘ | no power management |
+| Vendor specific | ✘ | ✘ | |
 
 #### Other internal features
 
-| Feature | support| Notes |
-|---------|-----|-------|
-| Framing TLPs between STP and END symbols | ✔ yes | |
-| Framing of DLLPs netween SDP and END symbols | ✔ yes | |
-| Nullified TLPs (with EBD in place of END | ??? | Not TX. Delete on RX? |
-| 16-bit CRC generation/check | ✔ yes | |
-| Retry buffering | ✔ yes | Packets held until ACK'd |
-| Error reporting | ✔ yes | TBD on extent. Connections to config space and generating error messages |
-| Flow control and Update FC generation | ✔ yes | |
-| UpdateFC timeout | ✔ yes | Maximum time since last UpdateFC (for a given type) forces an UpdateFC |
+| Feature | Support | Notes |
+|---|---|---|
+| Framing: STP ... END (TLP), SDP ... END (DLLP) | ✔ | |
+| LCRC (32-bit), DLLP CRC (16-bit) | ✔ | |
+| Sequence numbers, duplicates | ✔ | a duplicate TLP is Acked and dropped |
+| Retry buffer | ✔ | one TLP; built from flip-flops ([gatemate-pipe#16](https://github.com/colognechip/gatemate-pipe/issues/16)) |
+| Replay on Nak | ✔ | |
+| Replay timer | ✘ | a lost TLP is never replayed ([#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)) |
+| Nullified TLP (EDB) | ✘ | |
+| DL Init FSM | ✔ | `DL_Inactive` → `DL_Init` (`DL_INITFC1`, `DL_INITFC2`) → `DL_Active` |
 
-#### other notes on DLL interface signalling
+The TL starts a TLP only while `tx_tlp_ready` is high, and marks the last word of an odd-DW TLP with `tx_tlp_last_half` ([#21](https://github.com/chili-chips-ba/openCologne-PCIE/issues/21)).
 
-- **Data:** TX and RX packet interfaces, delimited by a 'last' and/or 'start' signal.
-- **ACK/NAK:** DLLPs generated internally; a status output if NAK'd too often.
-- **Flow control:** DLLPs internal. Retry-buffer size generics show in the InitFC<n>-XXX DLLPs, so the logic needs them. Single virtual channel (VC0).
-- **Control/status:** a signal to start DLL initialisation (e.g. on a 'Link_UP' transition from the PHY); a DLL_down/DLL_up status output.
-- **Errors:** status beyond NAK (e.g. buffer over- or underrun, not expected normally) is design specific.
-- **Power management:** not initially supported, but hooks (control and status) to detect and generate PM DLLPs may help.
-- **Vendor specific DLLP:** optional; at most receive and discard, no external interface.
+## 3) MAC: Physical Layer to PIPE
 
-## 3) Physical Layer to PIPE
+#### Ordered sets
 
-#### OS and Training sequence generation and reception
-
-| Feature | RX  support| TX support| Notes |
-|---------|------------|-----------|-------|
-| TS1 training sequence | ✔ yes | ✔ yes | Variants with Link# and Lane# set to PAD; Link# a number and lane# set to PAD; link# a number lane# a number |
-| TS2 training sequence | ✔ yes | ✔ yes | link# a number lane# a number |
-| Electrical idle OS | ✔ yes | ✔ yes |
-| Fast Training Sequence | ??? | ??? | Might not be needed |
-| Skip OS | ✔ yes | ✔ yes | |
-| IDL | ✔ yes | ✔ yes | 0 character pre-scramble and encoding |
-| Compliance pattern | ✘ no | |
+| Ordered set | RX | TX | Notes |
+|---|---|---|---|
+| TS1, TS2 | ✔ | ✔ | Link and Lane numbers as numbers or PAD |
+| SKP | ✔ | ✔ | sent every 1180-1538 symbol times |
+| Logical idle | ✔ | ✔ | in Configuration.Idle and Recovery.Idle |
+| Electrical Idle (EIOS) | ✘ | ✘ | no speed change, no low-power states |
+| FTS | ✘ | ✘ | no L0s |
+| Compliance pattern | ✘ | ✘ | |
 
 #### Other internal features
 
-| Feature | support| Notes |
-|---------|-----|-------|
-| SKIP OS counter | ✔ yes | needs to be sent at reqular intervals (between a min and max) oonce link is up |
-| NTFS | partial | TS OS needs a value set, so pick a fixed one |
-| Control bits | ??? | No TX requirement. How to respond to RX with bits set? |
-| Lane inversion | yes? | It is valid that a lanes diff pair are wire opposite |
-| Lane reversal | ??? | May not be applicable to a single lane but if connected to a wider link, may beed to set to a deifferemt value other than 0 on training |
-| LTSSM | partial | **Detect**, **polling**, **configuration**, and **L0** required. **Recovery** required to switch from GEN1 to another GEN. What to do if directed to any of the other states? |
-| PIPE interface | ✔ yes | | 
+| Feature | Support | Notes |
+|---|---|---|
+| LTSSM | partial | Detect, Polling (Active, Configuration), Configuration (all substates), L0, Recovery (RcvrLock, RcvrCfg, Idle). No Polling.Compliance, L0s, L1, L2, Disabled, Loopback or Hot Reset |
+| Speed | Gen1 | no Recovery.Speed |
+| Scrambling | ✔ | data symbols only, reset by COM |
+| Lane polarity inversion | ✔ | detected in Polling, `RxPolarity` to the PHY |
+| Lane reversal | — | x1 |
 
-
-## 4) PIPE
-See [2.rtl/1.phy](1.phy/README.md)
+## 4) PIPE (`pipe_if`)
+64-bit PIPE between the MAC and Cologne Chip's soft PHY. See [2.pipe](2.pipe/README.md) and [1.phy](1.phy/README.md).
 
 ## 5) Type 0 Configuration Space
 
-### Strategies for Configuration Space Support
+In the TL (`config_space`), as on the hard macro. Each register is one 32-bit word with a write mask, and an RW1C mask where needed.
 
-A configuration space is required for the device to be enumerated. Not all capabilities structures are required. The table below shows those that are needed.
+| Capability | Implemented | Notes |
+|---|---|---|
+| Type 0 header | ✔ | BAR0 only: 32-bit, non-prefetchable, `2^BAR0_SIZE_BITS` bytes |
+| PCI Power Management | ✔ | D0 and D3hot |
+| PCI Express | ✔ | version 2, Endpoint; Max_Payload_Size 128 bytes; 2.5 GT/s, x1 |
+| MSI | ✘ | no interrupts |
+| AER, other extended capabilities | ✘ | |
 
-| Capability                                 | required?     | Size      | Notes |
-|--------------------------------------------|---------------|-----------|-------|
-| Type 0 PCI compatible capabilities         | ✔ required      | 16 DWORDS | Has some dynamic fields |
-| PCIe capabilities structure                | ✔ required      | 15 DWORDS | Only first 5 need implementing, rest return 0 |
-| Power management capabilities              | ✔ required      |  2 DWORDS | Has some dynamic fields |
-| MSI Capabilities structure                 | ✘ semi-optional |  5 DWORDS | Required if device capable of generating interrupts |
-| All other capabilites/extended capabilties | ✘ optional      | N/A       | |
+To the rest of the logic, through `cfg_if`: Bus and Device Number, Memory Space Enable, Bus Master Enable, Max_Payload_Size. Register list: [5.tlp](5.tlp/README.md#configuration-space).
 
-#### Approaches to implementation.
-
-1. Pass config space transactions out to user logic to handle
-  >- Use same i/f for other TLPs, with config space indicator
-  >- Need a special interface to feedback state and get status
-  >- Perhaps gives user too much to still implement
-2. Fully logic implementation
-  >- Generics for user to set static values and defaults
-  >- Input signals to set dynamic values (need to identify which)
-  >- read-only masking part of logic implementation
-3. Use block RAM for majority of configuration space (896/736 bits for with MSI/without MSI))
-  >- has 64 bits for each 32-bit word: lower DWORD is the value, upper word is a read only mask
-  >- All writes are a read modify write operation to get value and mask and write back using mask
-  >- Default settings either:
-    >>- via a raw mode write sequence (ignoring masks) using default values and user set generics
-    >>- set the initialisation of the RAM as part of synthesis (reset issues?)
-  >- For config space reads from words with dynamic status, relevant fields default to 0 and dynamic bits ORed when reg addressed for config space read
-  >- For config space writable words with control for the logic, mirror in real registers when words selected for update
-    >>- includes BARs (upto 192 bits)
-
-#### List of config space outputs to rest of logic
-  - BARs
-  - Max payload size (DevCtrlReg[7:5])
-  - Memory space enable (CmdReg[1])
-  - Bus Master Enable (CmdReg[2])
-  - Parity Error Response (CmdReg[6])
-  - SERR# (CmdReg[8])
-
-
-
-## 6) 'soc_if' and TL2PIO Bridge
-TBD: how the RTL part of TestApp interacts with the PCIE Core.
+## 6) `axis_if` and TRN2PIO Bridge
+`trn_bridge` (`trn_rx`, `trn_tx`, `trn_tx_throttle`), unchanged from openPCIE, turns the TRN bus into the SOC's two 64-bit AXI-Stream streams (`axis_if`), as the AXI wrapper of `PCIE_2_1` does. Behind it, `riscv_pcie_soc` runs the PIO TestApp firmware on eduBOS5: it serves the MemWr and MemRd to BAR0 from its memory and builds the completions ([6.soc](6.soc/README.md), [3.sw](../3.sw/README.md)).
 
 ## Miscellaneous Notes
 
-### Notes on configuration space in architecture
-
-- Where is the configuration space in the diagram: in the TL, or behind an interface for an external, peripheral-specific implementation?
-- Where are PHY ordered sets generated and detected? If not in the thin PIPE PHY, a partial PHY layer between DLL and PIPE must implement the LTSSM: generate training sequences, count received ones by type, and regularly send skip ordered sets.
-- Link training is not optional, even for x1, and does more than set the link width: the partner starts in the link down state and must be trained to link up.
-
-#### _pcievhost_ new configuration features required
-
-* Disable DLLP CRC checks:  **DONE**
-* Disable TLP CRC checks : **DONE**
-* Configurable initial upstream flow control credits: **Disabling FC already configurable and does the job**
-* Pipex1 updated for wider PIPE interface to match the CologneChip: **DONE**
- 
-
 ### RTL coding rules
 
-IEEE 1800-2009 SystemVerilog, the same rules as on [openPCIE](https://github.com/chili-chips-ba/openPCIE/blob/main/2.rtl/README.md#rtl-coding-rules), for our RTL and the models standing in for it. The Cologne Chip submodule (`2.pipe/pipe_src`: PIPE, MAC/LTSSM, DLL) keeps its own style. [`run-lint`](../4.build/hw_build/run-lint.sh), [`run-format`](../4.build/hw_build/run-format.sh) and [`run-leq`](../4.build/hw_build/run-leq.sh) are in `4.build/hw_build`.
+IEEE 1800-2009 SystemVerilog, the same rules as on [openPCIE](https://github.com/chili-chips-ba/openPCIE/blob/main/2.rtl/README.md#rtl-coding-rules), for our RTL and the models standing in for it. The gatemate-pipe submodule (`2.pipe/pipe_src`: the PIPE, MAC/LTSSM and DLL sources) keeps its own style. [`run-lint`](../4.build/hw_build/run-lint.sh), [`run-format`](../4.build/hw_build/run-format.sh) and [`run-leq`](../4.build/hw_build/run-leq.sh) are in `4.build/hw_build`.
 
 - **One place for bit positions:** TLP header fields and sideband bits are packed structs in a `_pkg` (openPCIE: [`pcie_pkg.sv`](https://github.com/chili-chips-ba/openPCIE/blob/main/2.rtl/0.common.opensource/src/pcie/pcie_pkg.sv)). Use their members, never raw slices like `tdata[30:29]`. Reserved bits `rsvd0`, `rsvd1`, ... make each struct span its full width.
 - **Declare and size once:** widths, constants and types live in a `_pkg` (e.g. `TRN_DATA_W` in openPCIE's `pcie_pkg.sv`); no module redeclares them.
@@ -365,7 +236,7 @@ IEEE 1800-2009 SystemVerilog, the same rules as on [openPCIE](https://github.com
 
   `unique0` (IEEE 1800-2009) is the simulation-aware `parallel_case`; the old work-around, `unique case` with an empty `default`, is not used.
 - **`logic`, not `wire`:** every signal and port is `logic`, every `input`/`output` typed (`input logic ...`), never defaulting to `wire`. Only an `inout` would be a `wire`; there are none. `wire x = expr;` becomes `logic x;` + `assign x = expr;` (`logic x = expr;` is only an initial value).
-- **`initial` blocks:** not in RTL, except `$readmemh` of the firmware into the SOC RAM. Models and test benches may use them freely.
+- **`initial` blocks:** not in RTL, except `$readmemh` of the firmware into the SOC RAM and the register-file clear in `edubos5_rf.sv` (FPGA only). Models and test benches may use them freely.
 - **No `` `timescale `` in RTL:** the test bench sets it (`5.sim/tb.sv`, `2.rtl/1.phy/3.sim/tb_phy.sv`). RTL has no `#` delays; the behavioural SerDes model (`1.phy/2.serdes-model`) keeps its own `` `timescale `` and delays. A directive in only some files is a lint finding (Verilator TIMESCALEMOD).
 - **No initial values on registers:** a register gets its value from the reset branch of its `always_ff`. One exception, instantiated by name so it stands out: the design's reset source. Its initial value asserts reset at configuration, PERST# asserts it later, and every other reset derives from it (openPCIE: `u_rst_sync0/1` in [`clk_rst_gen.sv`](https://github.com/chili-chips-ba/openPCIE/blob/main/2.rtl/0.common.opensource/src/pcie/clk_rst_gen.sv)).
 - **Arrays, not flat buses:** arrays of lanes or structs, no index arithmetic on flat buses.
@@ -381,7 +252,7 @@ IEEE 1800-2009 SystemVerilog, the same rules as on [openPCIE](https://github.com
 - **Models follow the RTL:** a model keeps the ports, interfaces, structs, loops and names of the RTL it replaces.
 - **Formatting:** [`run-format.sh`](../4.build/hw_build/run-format.sh) puts every `if`, `else`, `always`, `for` and `initial` body in `begin` ... `end`, even a single statement, then runs Verible (`verible-verilog-format`) at its defaults plus all alignment options set to `align`, `end` and `else` on separate lines, LF line endings (flags in the script). Max 100 columns; wrap longer lines by hand. Run it last, after lint, before a commit; `--check` only lists unformatted files.
 
-### Quality checks: lint, format, synthesis
+### Quality checks: lint, format, synthesis, simulation
 
 Lint finds what tests miss: undriven signals, truncated widths, unintended latches. The scripts in [`4.build/hw_build`](../4.build/hw_build) check all of `top`:
 
@@ -395,6 +266,39 @@ Lint finds what tests miss: undriven signals, truncated widths, unintended latch
 Example: the first run flagged a latch in the MAC scrambler (128 `CC_DLT` cells): a combinational `always` that skips an assignment on some path must hold the old value. The simulation passed; only lint caught it.
 
 Next: wider `run-lint.sh` coverage. [LintCrux](https://github.com/Ferrite-Engineering/lintcrux) (from the WaveCrux makers) runs several lint engines and tracks waivers and trends; it has been run on eduBOS5 and is a candidate.
+
+#### Simulation: cross-checked
+
+A passing run is believed only when independent checkers agree. Details: [5.sim](../5.sim/README.md), and openPCIE's [5.sim](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim) for the RC model.
+
+| Checker | How | Catches |
+|---|---|---|
+| A7RC driver + checker | openPCIE's Artix-7 RC model drives the EP and checks every TLP, DLLP and ordered set: 59 rules, each with its PCIe 2.1 section. `make mutants` (openPCIE) breaks the EP 5 ways, and each must fail its rule | protocol errors of the EP |
+| Random regression | `make regress SEEDS=100 REGRESS_JOBS=8`: 100 random seeds or more, side by side (100 in about 19 s). Each seed varies the requests, their order and timing, the faults and Recoveries, and the TS counts; `make run SEED=N` reproduces one. It ends with the rules no seed checked | corner cases one fixed test never reaches |
+| WaveCrux Pro decoders | the run's FST through Ferrite's PCIe TLP, Data Link and PIPE decoders; `make wavecrux SEED=N` opens it at the checker's first violation | a second opinion, from code we did not write |
+| Artix-7 hard macro | openPCIE's `PCIE_2_1` simulation model under the same faults and Recoveries (`HM_PROBE=1`); the RC model is calibrated to it | the answer where the spec leaves room |
+
+Where they disagree: the spec text first, then the hard macro, then WaveCrux.
+
+#### Simulation: three simulators
+
+| Simulator | Where | Check |
+|---|---|---|
+| Verilator | here | 2-state, fast: the regression runs on it |
+| Icarus | here | 4-state: must print the same checker lines as Verilator, line for line, on the PIPE and on the serial line |
+| XSIM (Vivado) | openPCIE | the same run with the default scheduling and with `--disable_multi_driver_resolution_scheduling` must give the same trace: no race decides a result |
+
+Comparing them found three bugs in the models that one simulator alone hid: electrical idle unseen on 4-state simulators, a start-up race and a sampling race (openPCIE [issues 53, 55, 56](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#simulation-issues)).
+
+#### C code: VProc, pcieVHost, the checker, host-built firmware
+
+| Check | How | Catches |
+|---|---|---|
+| `-O0` against `-O2` | `OPTFLAG`: both builds must give the same result | undefined behaviour, which the optimiser exploits differently |
+| UBSan, ASan | sanitizer builds, with `-DVPROC_THREADS` (the sanitizers do not follow VProc's coroutine stack switches) | overflows, bad shifts, out-of-bounds accesses |
+| valgrind memcheck | on the XSIM run (`xsim -R`) | uninitialised reads |
+
+Found this way: an array one word short, a signed shift and an uninitialised counter in link training (openPCIE [issues 28 to 30](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#simulation-issues)).
 
 --------------------
 #### End of Document

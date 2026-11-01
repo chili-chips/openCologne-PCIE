@@ -1136,7 +1136,7 @@ module tb_pcie_tl;
         check("DevSta Fatal after overflow", rd_val[18], 1'b1);
         cfg_write(10'h016, 4'b0100, 32'h000F_0000);
 
-        $display("=== Step 15: digest and 64-bit address forms ===");
+        $display("=== Step 15: TLP with digest ===");
         tlp_dw[0] = dw0(3'b000, 5'b00100, 3'd0, 1'b1, 1'b0, 2'b00, 10'd1);
         tlp_dw[1] = dw_req(RC_ID, 8'h13, 4'b0000, 4'b1111);
         tlp_dw[2] = dw_cfg(8'd3, 5'd0, 3'd0, 10'h000);

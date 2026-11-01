@@ -5,11 +5,11 @@
 | Make option | Runs |
 |---|---|
 | `make EP=model` | this EP model |
-| `make EP=rtl` | the real EP, once it exists |
+| `make EP=rtl` | the EP RTL + firmware |
 
 Its name mirrors the host's, `RCPIPEx1__pcieVHost`: the same model, in the other role.
 
-It is a single `pcieVHostPipex1` (the pcieVHost PIPE wrapper), configured as an EP at VProc node 1, running [`../usercode/VUserMain1.cpp`](../usercode/VUserMain1.cpp) against the host, openPCIE's Artix-7 RC model at node 2. Its ports are those the real EP will show the test bench:
+It is our pcieVHost wrapper [`PIPEx1__pcieVHost`](../models/PIPEx1__pcieVHost.sv) (instance `bfm_pcie`), configured as an EP at VProc node 1, running [`../usercode/VUserMain1.cpp`](../usercode/VUserMain1.cpp) against the host, openPCIE's Artix-7 RC model at node 2. Its ports are those the real EP will show the test bench:
 
 - PIPE data out and in, 64 bits wide with one K flag per byte, as Cologne Chip's PIPE
 - `pclk` (the PIPE clock, `pcieclk`/8 for 64 bits) and `pcieclk` (the 250 MHz symbol clock of Gen1)
@@ -20,4 +20,4 @@ Electrical idle is `NOSIG` on the PIPE data (see [From XSIM to Verilator, via Ic
 Why keep a model-against-model run? It proves the test bench and host on their own, before and alongside the RTL: when the real EP fails to train, `EP=model` shows at once whether the fault is on our side.
 
 -----------
-#### End-of-Document
+#### End of Document

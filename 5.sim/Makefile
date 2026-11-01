@@ -3,15 +3,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 # =============================================================================
-# Co-simulation of the openCologne-PCIE test bench, in Verilator
+# Co-simulation of the openCologne-PCIE test bench, in Verilator or Icarus
 #
 # Run FROM THIS FOLDER, on Linux or WSL:
-#   make          build the C/C++ models and the Verilator executable
+#   make          build the C/C++ models and the simulation
 #   make run      build and run
 #   make clean
 #
-# Open-source simulators only: Verilator here (Icarus is used for the block
-# level flows in 2.rtl). The VIP is the same as on openPCIE: VProc, the
+# Open-source simulators only: Verilator (default) or Icarus (SIM). The VIP is the same as on openPCIE: VProc, the
 # pcieVHost PCIE model, mem_model: upstream copies in vip/, built by
 # tools/build-vip.sh into ~/.cache. models/ holds our own wrappers.
 #
@@ -85,12 +84,13 @@ ifeq ($(wildcard $(A7RC_DIR)/usercode/VUserMain2.cpp),)
   $(error no openPCIE checkout at OPENPCIE=$(OPENPCIE): the host is its Artix-7 RC model)
 endif
 # A7RC=0 (default): the host is a tester: the lab RC's sequence, then what its
-# firmware never sends but the spec allows (8 writes and 8 reads to BAR0 back
-# to back, checked). A7RC=1: literal, only what the lab RC sends
+# firmware never sends but the spec allows (README.md, Tester and literal).
+# A7RC=1: literal, only what the lab RC sends
 # SEED: the seed of the tester's random stimulus (default 1), read at run time
 # (A7RC_SEED): no rebuild. make regress SEEDS=N runs seeds 1 to N, each with a
-# time limit of REGRESS_S seconds, again (up to REGRESS_TRIES times) when it
-# hits the limit with no result; REGRESS_JOBS at a time, each in
+# wall-clock limit of REGRESS_S seconds, again (up to REGRESS_TRIES times) after
+# that limit or a crash, not after the test bench's own time limit;
+# REGRESS_JOBS at a time, each in
 # obj/regress/<seed>/, the packet display off (REGRESS_QUIET=0: kept)
 A7RC          ?= 0
 SEED          ?= 1
@@ -154,7 +154,7 @@ OPTFLAG       ?= -O2 -g
 USRSIMFLAGS   ?=
 
 # ---- models -------------------------------------------------------------------
-# VIP_DIR: lib/, include/, ltssm/, hdl/ of the VIP; built once, then reused
+# VIP_DIR: lib/, include/, hdl/ of the VIP; built once, then reused
 VIP_DIR       ?= $(shell $(VIP_ENV) bash $(CURDIR)/tools/build-vip.sh)
 export VIP_DIR
 

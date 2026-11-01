@@ -6,7 +6,7 @@
 |---|---|---|
 | `pipe64` | 64-bit PIPE + SerDes: TS1 ordered sets, test data, error detection and RxStatus | ~14 s |
 | `pipe16` | the same with a 16-bit PIPE: **fails today**, see below | ~14 s |
-| `equiv` | the opensource SerDes BFM alone, looped back: training, alignment, a marker word through, its latency | ~2 s |
+| `equiv` | the opensource SerDes BFM alone, looped back: training, alignment, a marker word, then 400 payload words compared; its latency | ~2 s |
 | `equiv --ref` | the open and the vendor model side by side, same stimulus, outputs and latency compared | ~30 s |
 | `equiv --ref --cross` | each model's TX into the other's RX: the two models talking to each other | ~30 s |
 
@@ -25,7 +25,7 @@ bash 2.rtl/1.phy/3.sim/run-phy.sh equiv --ref --cross
 One file, one `module tb_phy` per test, chosen at compile time:
 
 * **PIPE test** (default): the testbench and testcase of gatemate-pipe (`tb_ccfpga_serdes.v`, `testcase_pipe.v`, merged here). `DATA_BYTES` sets the PIPE width (`-Ptb_phy.DATA_BYTES=2` or `8`). The SerDes bring-up is done with `writeCfg` / `writeRegfile` tasks. The SerDes is set up and clocked as in Cologne Chip's `ccfpga_pipe_wrapper.v` and in `phy_top`: `PLL_FCNTRL = 6'h1A`, a 62.5 MHz PLL clock, and the SerDes TX and RX core clock on the PIPE logic's `o_tx_clk`, the PLL clock divided by 2. testcase_pipe.v waits a fixed `#350` between sending a test packet and checking it; here the first packet measures that latency (13 PCLK cycles with the opensource BFM, 17 with the vendor model) and each of the 100 packets after it must come back with the same latency.
-* **Model check** (`TB_PHY_EQUIV`): the open model with its TX looped back to its RX. Training words (a comma and fillers) until the receiver aligns, then a marker word, which must come out intact; the latency is printed. With `HAVE_VENDOR_SERDES` the vendor model runs beside it, `CROSS_LINK` links the two.
+* **Model check** (`TB_PHY_EQUIV`): the open model with its TX looped back to its RX. Training words (a comma and fillers) until the receiver aligns, then a marker word and 400 payload words, each compared with what was sent; the latency is printed. With `HAVE_VENDOR_SERDES` the vendor model runs beside it, `CROSS_LINK` links the two.
 
 ## Known failure: `pipe16`
 
@@ -39,3 +39,6 @@ The vendor SerDes model is under NDA and is never in this repository. `--vendor`
 export CCFPGA_SERDES_SRC=/path/to/ccfpga_serdes/src
 bash 2.rtl/1.phy/3.sim/run-phy.sh equiv --ref
 ```
+
+--------------------
+#### End of Document
