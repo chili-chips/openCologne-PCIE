@@ -1299,8 +1299,9 @@ module ccfpga_serdes
   end
 
   // Idle: P = N for EI_WINDOW_UI, as a TX in electrical idle (0/0) or power
-  // down (1/1) drives them; X or Z from other drivers read 0 on the pads (DS1001 2.5.6.2 gives no
-  // criterion). Data keeps P and N apart, so no run length looks idle.
+  // down (1/1) drives them; X or Z from other drivers read 0 on the pads
+  // (DS1001 2.5.6.2 gives no criterion). Data keeps P and N apart, so no run
+  // length looks idle.
   // NONE has no bits on the pins: there, idle is no word for EI_WINDOW_UI
   // (rx_none_words).
   localparam real EI_WINDOW_UI = (CDR_MODEL == NONE) ? 200.0 : 20.0;
