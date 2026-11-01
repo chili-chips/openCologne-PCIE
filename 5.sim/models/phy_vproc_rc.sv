@@ -37,14 +37,16 @@
 //              https://opensource.org/license/bsd-3-clause
 //--------------------------------------------------------------------------
 // Description:
-//   phy_vproc_rc: the phy_top socket with PHY=vproc_rc, the host at the PIPE.
+//   phy_vproc_rc: the phy_top socket with IFACE=pipe, the host at the PIPE.
 //   It is the PHY side of pipe_if for our MAC: PCLK from the test bench, the
-//   host's PIPE data in and out, electrical idle both ways (Verilator: the
-//   pcieVHost side-band), and receiver detection: while the MAC asks for it
+//   host's PIPE data in and out, electrical idle both ways (NOSIG, the K flag
+//   and 0xFF, per symbol on the host's data), and receiver detection: while the MAC asks for it
 //   (tx_detect_rx), RxStatus reports a receiver present (3'b011).
 //==========================================================================
 
 `timescale 1ps/1ps
+
+`include "pciexpress_header.v"
 
 module phy_vproc_rc #(
     parameter int DATA_BYTES = 8
@@ -55,12 +57,29 @@ module phy_vproc_rc #(
     output logic                    phy_rdy_n,
     input  logic [DATA_BYTES*8-1:0] host_txdata,
     input  logic [  DATA_BYTES-1:0] host_txdatak,
-    input  logic                    host_elec_idle,
     output logic [DATA_BYTES*8-1:0] host_rxdata,
-    output logic [  DATA_BYTES-1:0] host_rxdatak,
-    output logic                    ep_elec_idle
+    output logic [  DATA_BYTES-1:0] host_rxdatak
 );
   logic [3:0] rdy_cnt;
+
+  // Electrical idle is NOSIG (the K flag and 0xFF: no 8b/10b code) per symbol
+  // on the host's data, on every simulator. The MAC gets 0 under RxElecIdle;
+  // the host gets NOSIG under the MAC's TxElecIdle, never the data the MAC
+  // leaves there. RxValid and RxElecIdle are per word: a word only partly
+  // NOSIG (idle entry after an EIOS, exit before a TS) is valid, its idle
+  // bytes D0.0, which the MAC ignores there, as on a line settling
+  localparam logic [8:0] NOSIG_SYM = {1'b1, `NOSIG};   // {K, byte}
+  logic [  DATA_BYTES-1:0] host_idle;
+  logic [DATA_BYTES*8-1:0] rx_data;
+  logic [  DATA_BYTES-1:0] rx_datak;
+
+  always_comb begin
+    for (int b = 0; b < DATA_BYTES; b++) begin
+      host_idle[b]        = ({host_txdatak[b], host_txdata[8*b +: 8]} == NOSIG_SYM);
+      rx_data [8*b +: 8]  = host_idle[b] ? 8'h00 : host_txdata[8*b +: 8];
+      rx_datak[b]         = host_idle[b] ? 1'b0  : host_txdatak[b];
+    end
+  end
 
   always_ff @(posedge pclk or negedge rst_n) begin
     if (!rst_n) begin
@@ -74,10 +93,10 @@ module phy_vproc_rc #(
   assign phy_rdy_n         = (rdy_cnt != 4'hF);
 
   assign pipe.pclk         = pclk;
-  assign pipe.rx_data      = host_txdata;
-  assign pipe.rx_datak     = host_txdatak;
-  assign pipe.rx_elec_idle = host_elec_idle;
-  assign pipe.rx_valid     = !host_elec_idle;
+  assign pipe.rx_data      = rx_data;
+  assign pipe.rx_datak     = rx_datak;
+  assign pipe.rx_elec_idle = &host_idle;
+  assign pipe.rx_valid     = !(&host_idle);
 
   always_ff @(posedge pclk or negedge rst_n) begin
     if (!rst_n) begin
@@ -90,9 +109,8 @@ module phy_vproc_rc #(
     end
   end
 
-  assign host_rxdata  = pipe.tx_data;
-  assign host_rxdatak = pipe.tx_datak;
-  assign ep_elec_idle = pipe.tx_elec_idle;
+  assign host_rxdata  = pipe.tx_elec_idle ? {DATA_BYTES{NOSIG_SYM[7:0]}} : pipe.tx_data;
+  assign host_rxdatak = pipe.tx_elec_idle ? {DATA_BYTES{NOSIG_SYM[8]}}   : pipe.tx_datak;
 endmodule: phy_vproc_rc
 
 // -----------------------------------------------------------------------------

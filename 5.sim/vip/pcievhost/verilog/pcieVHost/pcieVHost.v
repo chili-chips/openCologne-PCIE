@@ -61,7 +61,7 @@ module PcieVhost
   output      [9:0] LinkOut8,  LinkOut9,  LinkOut10, LinkOut11,
   output      [9:0] LinkOut12, LinkOut13, LinkOut14, LinkOut15,
 
-  // Transaction taps (openCologne-PCIE): each TLP this node sends (Tx) or
+  // Transaction taps (openPCIE): each TLP this node sends (Tx) or
   // receives (Rx), one DW per ClkOut with start/end flags, byte 0 in
   // [31:24]; each DLLP as one word. They follow the link, a few clocks late.
   output reg [31:0] TlpTxData,
@@ -93,7 +93,7 @@ reg          UpdateResponse;
 integer      ClkCount;
 integer      i;
 
-// Transaction tap queues (openCologne-PCIE): {sop, eop, data}, pushed by
+// Transaction tap queues (openPCIE): {sop, eop, data}, pushed by
 // the C model in zero time, popped one entry per clock
 reg   [33:0] TlpTxQ  [$];
 reg   [33:0] TlpRxQ  [$];
@@ -318,7 +318,7 @@ begin
             DataIn = {28'h0000000, ReverseOut, ReverseIn, InvertOut, InvertIn};
         end
 
-        // Transaction taps (openCologne-PCIE)
+        // Transaction taps (openPCIE)
         `TAP_TLP_TX_SOP, `TAP_TLP_TX, `TAP_TLP_TX_EOP:
             if (WE === 1'b1)
                 TlpTxQ.push_back({Addr == `TAP_TLP_TX_SOP, Addr == `TAP_TLP_TX_EOP, DataOut});

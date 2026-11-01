@@ -1,14 +1,14 @@
 # gatemate-pipe
 
 ## Description
-The **PHY Interface for the PCI Express Architecture (PIPE)** is part of the physical layer and serves as an interface between the Media Access Control (MAC) Layer and the Physical Coding Sublayer (PCS). The PIPE interface provides a clear separation between the soft-core RTL development and the FPGA-specific SerDes implementation. This abstraction reduces development effort and enhances portability, making it easier to migrate RTL designs across different FPGA vendors and platforms.
+The **PHY Interface for the PCI Express Architecture (PIPE)** is part of the physical layer, between the Media Access Control (MAC) Layer and the Physical Coding Sublayer (PCS). It separates the soft-core RTL from the FPGA-specific SerDes, which reduces effort and eases porting to other FPGA vendors and platforms.
 
 <img alt="Position of the PIPE layer in the PCIe stack" src="./images/PIPE_Position.png" width=300 height=330 />
 
 ## The Interface
-The schematic below illustrates the configuration for the **64-Bit datapath** case. In this configuration, the `o_PCLK` output operates at the same frequency as the **SERDES TX_clock**. For smaller datapath widths, however,`o_PCLK` runs at a frequency that is a multiple of the **TX_clock** frequency, depending on the datapath ratio. For example, in a **32-Bit datapath**, which is half the width of the **64-Bit SERDES datapath**, the `o_PCLK` frequency is twice that of the **TX_clock**. This is done to assure the synchronization between MAC and PHY layer.
+The schematic shows the **64-Bit datapath**, where `o_PCLK` runs at the **SERDES TX_clock** frequency. Narrower datapaths run `o_PCLK` at a multiple of **TX_clock**, by the datapath ratio, to keep MAC and PHY synchronized: a **32-Bit datapath** (half the **64-Bit SERDES datapath**) runs `o_PCLK` at twice **TX_clock**.
 
-Note that the current setup only supports 32-Bit and 64-Bit datapath. 
+Only 32-Bit and 64-Bit datapaths are supported.
 
 <img alt="PIPE interface signals between MAC and PHY" src="./images/PIPE_Interface.png" width=632 height=457 />
 
@@ -43,7 +43,7 @@ Note that the current setup only supports 32-Bit and 64-Bit datapath.
 | 111             | Disparity Error. Unused if <br>reported together with <br>8b/10b Error (100)              |
 
 ## Power states in PIPE Interface and their relation to power states in LTSSM
-Currently, the PIPE interface supports only two power states: **P0** and **P1**. The **P0** state corresponds to normal operation on the transmission line, while the **P1** state represents the PHY’s powered-off mode. The relationship between these PIPE power states and the LTSSM states is illustrated in the diagram below.
+Only two power states are supported: **P0**, normal operation on the line, and **P1**, the PHY powered off. Their relation to the LTSSM states:
 
 <img alt="PIPE power management process" src="./images/pcie-pipe-power-management-process.webp" width=350 height=362 />
 

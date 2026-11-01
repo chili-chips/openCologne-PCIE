@@ -6,7 +6,7 @@
         <mxCell id="1" parent="0"/>
 
         <!-- containers -->
-        <mxCell id="wrap" value="PIPEx1__pcieVHost  (our wrapper, models/PIPEx1__pcieVHost.sv; both sides: RCPIPEx1__pcieVHost EndPoint=0, mock EP EndPoint=1)" style="rounded=1;arcSize=2;whiteSpace=wrap;html=0;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontStyle=1;fontSize=15;" vertex="1" parent="1">
+        <mxCell id="wrap" value="PIPEx1__pcieVHost  (our wrapper, models/PIPEx1__pcieVHost.sv; both sides: RCPIPEx1__pcieVHost EndPoint=0, EP model EndPoint=1)" style="rounded=1;arcSize=2;whiteSpace=wrap;html=0;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontStyle=1;fontSize=15;" vertex="1" parent="1">
           <mxGeometry x="20" y="20" width="1080" height="820" as="geometry"/>
         </mxCell>
         <mxCell id="pipex1" value="pcieVHostPipex1  (upstream PIPE wrapper)" style="rounded=1;arcSize=2;whiteSpace=wrap;html=0;fillColor=#ccccff;strokeColor=#6666cc;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontStyle=1;fontSize=13;" vertex="1" parent="1">
@@ -23,7 +23,7 @@
         <mxCell id="taptag" value="ours" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="290" y="280" width="50" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="vproc" value="VProc (node 1: RC, node 2: mock EP)&#xa;VWrite(TAP_*, word, delta=1): zero time" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#6666ff;strokeColor=#3333cc;fontColor=#ffffff;fontSize=12;" vertex="1" parent="1">
+        <mxCell id="vproc" value="VProc (node 2: RC, the Artix-7 RC model; node 1: EP model)&#xa;VWrite(TAP_*, word, delta=1): zero time" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#6666ff;strokeColor=#3333cc;fontColor=#ffffff;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="80" y="340" width="270" height="60" as="geometry"/>
         </mxCell>
         <mxCell id="link" value="LinkOut0 / LinkIn0&#xa;8b/10b symbols, x1 lane" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#6666ff;strokeColor=#3333cc;fontColor=#ffffff;fontSize=12;" vertex="1" parent="1">
@@ -74,7 +74,7 @@
         <mxCell id="o_dec" value="tx_*, rx_*, dllp_*&#xa;-&gt; WaveCrux TLP decoder, DLLP rows" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="1140" y="435" width="290" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="o_pipe" value="pipe_dn_*, pipe_up_*&#xa;&lt;-&gt; EP (mock or RTL)&#xa;-&gt; WaveCrux PIPE / DLL decoders" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="o_pipe" value="pipe_dn_*, pipe_up_*&#xa;&lt;-&gt; EP (model or RTL)&#xa;-&gt; WaveCrux PIPE / DLL decoders" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="1140" y="715" width="290" height="70" as="geometry"/>
         </mxCell>
 

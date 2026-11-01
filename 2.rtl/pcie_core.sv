@@ -81,6 +81,12 @@ module pcie_core
 
   localparam int         DATA_W    = DATA_BYTES * 8;
 
+  // The TL's receive buffers, advertised by the DLL's InitFC (Cpl infinite)
+  localparam logic [ 7:0] INIT_PH  = 8'd8;
+  localparam logic [11:0] INIT_PD  = 12'd32;
+  localparam logic [ 7:0] INIT_NPH = 8'd8;
+  localparam logic [11:0] INIT_NPD = 12'd8;
+
   logic                  mac_link_up;
   logic [           4:0] ltssm_state;
   logic [    DATA_W-1:0] mac_rx_data;
@@ -128,7 +134,11 @@ module pcie_core
   dll_logic #(
       .DATA_BYTES                (DATA_BYTES),
       .NUMBER_OF_VIRTUAL_CHANNELS(1),
-      .PATTERN_WIDTH             (64)
+      .PATTERN_WIDTH             (64),
+      .INIT_PH                   (INIT_PH),
+      .INIT_PD                   (INIT_PD),
+      .INIT_NPH                  (INIT_NPH),
+      .INIT_NPD                  (INIT_NPD)
   ) u_dll (
       .phy_clk            (pipe.pclk),
       .phy_reset          (~mac_rst_n),
@@ -162,7 +172,12 @@ module pcie_core
 
   assign trn_link_up = (dll.dl_state == DL_ACTIVE);
 
-  pcie_tl u_tl (
+  pcie_tl #(
+      .INIT_PH (INIT_PH),
+      .INIT_PD (INIT_PD),
+      .INIT_NPH(INIT_NPH),
+      .INIT_NPD(INIT_NPD)
+  ) u_tl (
       .clk  (pipe.pclk),
       .rst_n(core_rst_n),
       .dll  (dll),

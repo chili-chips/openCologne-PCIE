@@ -37,10 +37,10 @@
 //              https://opensource.org/license/bsd-3-clause
 //--------------------------------------------------------------------------
 // Description:
-//   EPPIPEx1__pcieVHost_DUT: the mock of the EP DUT, a pcieVHost in
-//   EP mode at VProc node 2, with the PIPE ports the real EP has. An option
+//   EPPIPEx1__pcieVHost_DUT: the EP model, in place of the EP DUT, a pcieVHost in
+//   EP mode at VProc node 1, with the PIPE ports the real EP has. An option
 //   next to the EP RTL + firmware, kept on purpose: it proves the test bench
-//   and the host on their own (make DUT=mock, the default for now).
+//   and the host on their own (make EP=model, the default for now).
 //==========================================================================
 
 `timescale 1ps/1ps
@@ -54,14 +54,7 @@ module EPPIPEx1__pcieVHost_DUT
    input                     pclk,
    input                     pcieclk,
 
-`ifdef VERILATOR
-   // Electrical idle as a side-band: Verilator has no X/Z on a wire, so
-   // the pcieVHost models tell each other when the line is idle
-   output                    elec_idle_out,
-   input                     elec_idle_in,
-`endif
-
-   // PCIE PIPE data
+   // PCIE PIPE data: electrical idle is NOSIG (K flag, 0xFF) per symbol
    output [DataWidth-1:0]    txdata,
    output [DataWidth/8-1:0]  txdatak,
    input  [DataWidth-1:0]    rxdata,
@@ -69,14 +62,14 @@ module EPPIPEx1__pcieVHost_DUT
 );
 
 //--------------------------------------------------------------
-// The mock EP: a pcieVHost in EP mode at VProc node 2. Its other ports,
+// The EP model: a pcieVHost in EP mode at VProc node 1. Its other ports,
 // left open here, are the link at the PIPE, Data Link and Transaction
 // layers as the EP sees it: tb.dut.bfm_pcie is the EP's decoder page of a
 // dump (see models/PIPEx1__pcieVHost.sv)
 //--------------------------------------------------------------
 
   PIPEx1__pcieVHost #(
-    .NodeNum                           (2),
+    .NodeNum                           (1),
     .EndPoint                          (1'b1),
     .DataWidth                         (DataWidth),
     .DllBytes                          (DataWidth/8)
@@ -85,11 +78,6 @@ module EPPIPEx1__pcieVHost_DUT
     .pclk                              (pclk),
     .pcieclk                           (pcieclk),
     .nreset                            (rst_n),
-
-`ifdef VERILATOR
-    .ElecIdleOut                       (elec_idle_out),
-    .ElecIdleIn                        (elec_idle_in),
-`endif
 
     .TxData                            (txdata),
     .TxDataK                           (txdatak),

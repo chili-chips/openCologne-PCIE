@@ -7,8 +7,8 @@
 //--------------------------------------------------------------------------
 // Description:
 //   ep_wavecrux_view: simulation-only view of our EP's layer boundaries, for
-//   the WaveCrux decoders (make DUT=rtl DUMP=1). Bound into pcie_core as
-//   "wavecrux", so it is the same with PHY=vproc_rc and PHY=rtl. Nothing in
+//   the WaveCrux decoders (make EP=rtl DUMP=1). Bound into pcie_core as
+//   "wavecrux", so it is the same with IFACE=pipe and IFACE=serial. Nothing in
 //   the design reads it.
 //
 //   Each boundary is offered under the names the decoders auto-bind (a

@@ -15,11 +15,13 @@
 # pcieVHost PCIE model, mem_model: upstream copies in vip/, built by
 # tools/build-vip.sh into ~/.cache. models/ holds our own wrappers.
 #
-# Nodes: VProc node 1 is the host, RCPIPEx1__pcieVHost, a pcieVHost in RC mode
-# (usercode/VUserMain1.cpp: IDs, BAR sizing and assignment); node 2 is the DUT.
-# The DUT is selected with DUT: the EP RTL + firmware, or the mock
-# EPPIPEx1__pcieVHost_DUT, a pcieVHost in EP mode (stubs/, usercode/VUserMain2.cpp),
-# which proves the test bench and the host on their own.
+# Nodes: VProc node 2 is the host, RCPIPEx1__pcieVHost, a pcieVHost in RC mode
+# running openPCIE's Artix-7 RC model, from an openPCIE checkout (OPENPCIE):
+# its 5.sim/usercode/VUserMain2.cpp, its ltssm.c, and pcieVHost and VProc built
+# with its pcievhost-speed.patch and vproc-coroutine.patch. What it expects of our EP RTL: usercode/a7rc_ep.h.
+# The EP is selected with EP: the EP RTL + firmware, or the EP model
+# EPPIPEx1__pcieVHost_DUT, a pcieVHost in EP mode at node 1 (stubs/,
+# usercode/VUserMain1.cpp), which proves the test bench and the host on their own.
 # =============================================================================
 
 # ---- simulator ------------------------------------------------------------------
@@ -27,42 +29,91 @@
 #   icarus     Icarus Verilog; the same C/C++ models talk VPI
 SIM           ?= verilator
 
-# ---- DUT ----------------------------------------------------------------------
-#   mock     EPPIPEx1__pcieVHost_DUT (default)
-#   rtl      the EP RTL + firmware: pcie_top (rtl.f), the host in the phy_top
-#            socket (models/phy_vproc_rc.sv), host program VUserMain1_rtl.cpp;
-#            the firmware is copied in for the run
-DUT           ?= mock
-ifeq ($(DUT),rtl)
-  USER_C      ?= VUserMain1_rtl.cpp
-  DUT_FILES    = rtl.f
-  DUT_VLT      = +define+DUT_RTL --timescale 1ps/1ps -F rtl.f
-  DUT_ICA      = -DDUT_RTL
-  DUT_OBJ      = _rtl
+# ---- EP and IFACE: what the endpoint is, and where the host meets it ---------
+#   EP=model    (default) a pcieVHost in EP mode at node 1, program VUserMain1.cpp:
+#               EPPIPEx1__pcieVHost_DUT at the PIPE, PcieVhostSerial on the line
+#   EP=rtl      the EP RTL + firmware: pcie_top (rtl.f); the firmware is copied
+#               in for the run. Verilator only: Icarus 13 parses neither the
+#               interface ports nor the generated csr_pkg.sv (unpacked structs)
+#   IFACE=pipe  (default) the host at the PIPE; with EP=rtl in the phy_top
+#               socket (models/phy_vproc_rc.sv)
+#   IFACE=serial the host on the serial line, 8b/10b and scrambling on. It adds
+#               the PHY: with EP=rtl all of top (phy_top, Cologne Chip's PIPE
+#               logic, the opensource SerDes BFM, phy.f; CDR_MODEL=FAST), with
+#               EP=model pcieVHost's own serialiser
+ifneq ($(origin DUT)$(origin PHY),undefinedundefined)
+  $(error DUT and PHY are now EP=model|rtl and IFACE=pipe|serial (PHY=rtl and PHY=mock become IFACE=serial))
+endif
+ifeq ($(EP),mock)
+  $(error EP=mock is now EP=model)
+endif
+EP            ?= model
+IFACE         ?= pipe
+ifeq ($(EP),model)
+  USER_C      ?= VUserMain1.cpp
+else ifeq ($(EP),rtl)
+  ifneq ($(SIM),verilator)
+    $(error EP=rtl needs SIM=verilator: Icarus 13 parses neither our interface ports nor the generated csr_pkg.sv)
+  endif
+  A7RC_EXPECT  = -DA7RC_EP_EXPECT='"a7rc_ep.h"'
+  EP_FILES     = rtl.f
+  EP_VLT       = +define+EP_RTL --timescale 1ps/1ps -F rtl.f
+  EP_OBJ       = _rtl
   FW_IN        = cp $(CURDIR)/../4.build/sw_build/firmware.hex firmware.hex &&
   FW_OUT       = rm -f firmware.hex;
-else ifneq ($(DUT),mock)
-  $(error DUT must be mock or rtl (got "$(DUT)"))
+else
+  $(error EP must be model or rtl (got "$(EP)"))
+endif
+ifeq ($(IFACE),serial)
+  ifeq ($(EP),rtl)
+    EP_FILES  += phy.f
+    EP_VLT    += +define+CDR_MODEL=FAST -F phy.f
+  endif
+  EP_VLT      += +define+IFACE_SERIAL
+  ICA_IFACE    = -DIFACE_SERIAL
+  EP_OBJ      := $(EP_OBJ)_serial
+else ifneq ($(IFACE),pipe)
+  $(error IFACE must be pipe or serial (got "$(IFACE)"))
 endif
 
-# ---- PHY ----------------------------------------------------------------------
-#   vproc_rc  (default) the host at the PIPE, in the phy_top socket
-#   rtl       the real PHY, with DUT=rtl: top (phy_top, Cologne Chip's PIPE logic,
-#             the opensource SerDes BFM, phy.f); the host on the serial line,
-#             so the BFM puts real bits on it (CDR_MODEL=FAST)
-PHY           ?= vproc_rc
-ifeq ($(PHY),rtl)
-  ifneq ($(DUT),rtl)
-    $(error PHY=rtl needs DUT=rtl)
-  endif
-  DUT_FILES   += phy.f
-  DUT_VLT     += +define+PHY_RTL +define+CDR_MODEL=FAST -F phy.f
-  DUT_ICA     += -DPHY_RTL -DCDR_MODEL=FAST
-  DUT_OBJ      = _rtl_phy
-  PHY_DEFS     = -DPHY_RTL
-else ifneq ($(PHY),vproc_rc)
-  $(error PHY must be vproc_rc or rtl (got "$(PHY)"))
+# ---- host ---------------------------------------------------------------------
+# openPCIE's Artix-7 RC model, from an openPCIE checkout: at the PIPE, or on
+# the serial line (IFACE=serial) with 8b/10b and scrambling on
+OPENPCIE      ?= $(CURDIR)/../../openpcie
+A7RC_DIR       = $(OPENPCIE)/5.sim
+ifeq ($(wildcard $(A7RC_DIR)/usercode/VUserMain2.cpp),)
+  $(error no openPCIE checkout at OPENPCIE=$(OPENPCIE): the host is its Artix-7 RC model)
 endif
+# A7RC=0 (default): the host is a tester: the lab RC's sequence, then what its
+# firmware never sends but the spec allows (8 writes and 8 reads to BAR0 back
+# to back, checked). A7RC=1: literal, only what the lab RC sends
+# SEED: the seed of the tester's random stimulus (default 1), read at run time
+# (A7RC_SEED): no rebuild. make regress SEEDS=N runs seeds 1 to N, each with a
+# time limit of REGRESS_S seconds, again (up to REGRESS_TRIES times) when it
+# hits the limit with no result; REGRESS_JOBS at a time, each in
+# obj/regress/<seed>/, the packet display off (REGRESS_QUIET=0: kept)
+A7RC          ?= 0
+SEED          ?= 1
+SEEDS         ?= 10
+REGRESS_S     ?= 900
+REGRESS_TRIES ?= 3
+REGRESS_JOBS  ?= 1
+REGRESS_QUIET ?= 1
+REGRESS_DUMP  ?= none
+# make wavecrux SEED=N: that seed again with DUMP=1, in obj/wavecrux/<N>/, then
+# its FST in WaveCrux at the checker's first violation (tools/wavecrux.py; WaveCrux
+# runs with --wcp-port 54321). WCX_OPEN=0: the dump only. REGRESS_DUMP=fail: after
+# make regress, every failing seed dumped that way
+WCX_OPEN      ?= 1
+WCX_FST        = $(if $(filter rtl,$(EP)),tb_rtl,tb)$(if $(filter serial,$(IFACE)),_serial).fst
+WCX_SIGNALS    = $(if $(filter serial,$(IFACE)),tb.ser_dn_line tb.ser_up_line,tb.downdata tb.updata \
+                 tb.u_rc.tx_tlp_valid tb.u_rc.tx_tlp_data tb.u_rc.rx_tlp_valid tb.u_rc.rx_tlp_data)
+ifeq ($(filter 0 1,$(A7RC)),)
+  $(error A7RC must be 0 or 1 (got "$(A7RC)"))
+endif
+HOST_DEFS      = -DRC_GEN=2 -DA7RC_LITERAL=$(A7RC) $(A7RC_EXPECT) $(if $(filter serial,$(IFACE)),-DSIM_SERIAL)
+VIP_ENV        = VIP_PATCH=$(A7RC_DIR)/models/pcievhost/pcievhost-speed.patch \
+                 VPROC_PATCH=$(A7RC_DIR)/models/cosim/vproc-coroutine.patch
 
 # ---- CPU ----------------------------------------------------------------------
 #   rtl    (default) the eduBOS5 RTL core, running firmware.hex
@@ -73,13 +124,12 @@ endif
 # Only the module in the riscv_pcie_soc CPU socket changes (SOC_CPU_VPROC).
 CPU           ?= rtl
 ifneq ($(CPU),rtl)
-  ifneq ($(DUT),rtl)
-    $(error CPU=$(CPU) needs DUT=rtl)
+  ifneq ($(EP),rtl)
+    $(error CPU=$(CPU) needs EP=rtl)
   endif
   CPU_SV       = models/soc_cpu.VPROC.sv
-  DUT_VLT     += +define+SOC_CPU_VPROC $(CPU_SV)
-  DUT_ICA     += -DSOC_CPU_VPROC
-  DUT_OBJ     := $(DUT_OBJ)_$(CPU)
+  EP_VLT      += +define+SOC_CPU_VPROC $(CPU_SV)
+  EP_OBJ      := $(EP_OBJ)_$(CPU)
   FW_DIR       = $(CURDIR)/../3.sw
   ifeq ($(CPU),vproc)
     USER_C    += VUserMain0.cpp
@@ -96,16 +146,16 @@ ifneq ($(CPU),rtl)
 endif
 
 # ---- user code ----------------------------------------------------------------
-# ltssm.c, the link-training helper, is part of the Icarus pcieVHost library;
-# for Verilator it is compiled with the user code
-USER_C        ?= VUserMain1.cpp VUserMain2.cpp
+# USER_C: our programs in USRCODEDIR (the EP model, the native CPU). The host,
+# openPCIE's VUserMain2.cpp, its spec checker a7rc_check.cpp and its ltssm.c,
+# the link-training helper, are always compiled with them
 USRCODEDIR    ?= $(CURDIR)/usercode
-OPTFLAG       ?= -g
+OPTFLAG       ?= -O2 -g
 USRSIMFLAGS   ?=
 
 # ---- models -------------------------------------------------------------------
 # VIP_DIR: lib/, include/, ltssm/, hdl/ of the VIP; built once, then reused
-VIP_DIR       ?= $(shell bash $(CURDIR)/tools/build-vip.sh)
+VIP_DIR       ?= $(shell $(VIP_ENV) bash $(CURDIR)/tools/build-vip.sh)
 export VIP_DIR
 
 # ---- tools --------------------------------------------------------------------
@@ -118,26 +168,24 @@ VVP           ?= vvp
 
 CPPSTD         = -std=c++20
 INCLPATHS      = -I$(USRCODEDIR) -I$(VIP_DIR)/include
-OBJDIR         = $(CURDIR)/obj/$(SIM)$(DUT_OBJ)
+OBJDIR         = $(CURDIR)/obj/$(SIM)$(EP_OBJ)$(if $(filter 1,$(A7RC)),_a7rc)$(if $(filter 1,$(DUMP)),_dump)
 USERLIB        = $(OBJDIR)/libuser.a
 
+USER_ALL       = $(USER_C) VUserMain2.cpp a7rc_check.cpp ltssm.c
+
 ifeq ($(SIM),verilator)
-  # LTSSM_ABBREVIATED: 16 TS1 in Polling.Active instead of 1024, as in the
-  # Icarus library (tools/build-vip.sh), so both end at the same time
-  DEFS         = -DVPROC_SV -DVPROC -DEXCLUDE_LTSSM -DLTSSM_ABBREVIATED
-  USER_ALL     = $(USER_C) ltssm.c
+  DEFS         = -DVPROC_SV -DVPROC -DEXCLUDE_LTSSM
   SIMEXE       = $(OBJDIR)/Vtb
 else ifeq ($(SIM),icarus)
   ICA_INC      = $(dir $(shell command -v $(IVERILOG)))../include/iverilog
   ICA_LIB      = $(dir $(shell command -v $(IVERILOG)))../lib
   DEFS         = -DICARUS -DVPROC -DEXCLUDE_LTSSM -I$(ICA_INC)
-  USER_ALL     = $(USER_C)
   SIMEXE       = $(OBJDIR)/sim
   VPROC_SO     = $(OBJDIR)/VProc.vpi
 else
   $(error SIM must be verilator or icarus (got "$(SIM)"))
 endif
-DEFS          += $(PHY_DEFS)
+DEFS          += $(HOST_DEFS)
 
 VOBJS          = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(notdir $(USER_ALL)))))
 VOBJS         += $(addprefix $(OBJDIR)/, $(ISS_C:.cpp=.o) $(FW_HOST_C:=.o))
@@ -156,15 +204,16 @@ LDLIBS         = -Wl,-whole-archive $(USERLIB) -Wl,-no-whole-archive \
 
 # DUMP=1: tb.fst, written natively (Verilator --trace-fst, vvp -fst); depth 3
 # reaches the decoder pages, tb.u_rc (RC) and tb.dut.bfm_pcie (EP); tb.vlt keeps the
-# upstream models out of it. With DUT=rtl: tb_rtl.fst (PHY=rtl: tb_rtl_phy.fst),
-# with the EP's decoder pages (wavecrux.f), 6 levels down with PHY=rtl; eduBOS5
+# upstream models out of it (IFACE=serial: tb_serial.fst, the line; the serial
+# host is upstream's, so its ports are not in it). With EP=rtl: tb_rtl.fst (IFACE=serial: tb_rtl_serial.fst),
+# with the EP's decoder pages (wavecrux.f), 6 levels down with IFACE=serial; eduBOS5
 # drives its RVFI outputs (RISCV_FORMAL) for the CPU's page
 DUMP          ?= 0
 ifeq ($(DUMP),1)
   VLTDUMP      = --trace-fst --trace-depth 3 +define+DUMP tb.vlt
   ICADUMP      = -DDUMP
   VVPDUMP      = -fst
-  ifeq ($(DUT),rtl)
+  ifeq ($(EP),rtl)
     VLTDUMP    = --trace-fst --trace-depth 6 +define+DUMP +define+RISCV_FORMAL tb.vlt -F wavecrux.f
   endif
 endif
@@ -176,7 +225,7 @@ endif
 VLTFLAGS       = --binary -sv --timing --top-module tb -Mdir $(OBJDIR) $(VLTDUMP) \
                  -Wno-fatal -Wno-WIDTH -Wno-lint -Wno-style                     \
                  +define+VPROC_SV +define+VPROC_BYTE_ENABLE                      \
-                 $(DUT_VLT) -F tb.f $(USRSIMFLAGS)                              \
+                 $(EP_VLT) -F tb.f $(USRSIMFLAGS)                              \
                  -MAKEFLAGS "--quiet CFG_LDFLAGS_VERILATED="                    \
                  -CFLAGS "$(CPPSTD) -Wno-attributes"                            \
                  -LDFLAGS "$(LDLIBS)"
@@ -185,13 +234,13 @@ VLTFLAGS       = --binary -sv --timing --top-module tb -Mdir $(OBJDIR) $(VLTDUMP
 # The same file list, with $VIP_DIR filled in; mem_model.sv is left out, as
 # this test bench does not instantiate it
 ICA_FILES      = $(OBJDIR)/tb.icarus.f
-ICAFLAGS       = -g2012 -DVPROC_BYTE_ENABLE $(DUT_ICA) $(ICADUMP) -s tb -c $(ICA_FILES) $(USRSIMFLAGS)
+ICAFLAGS       = -g2012 -DVPROC_BYTE_ENABLE $(ICA_IFACE) $(ICADUMP) -s tb -c $(ICA_FILES) $(USRSIMFLAGS)
 
 # =============================================================================
 # TARGETS
 # =============================================================================
 
-.PHONY: all run clean help FORCE
+.PHONY: all run regress wavecrux wavecrux_run clean help FORCE
 .DEFAULT_GOAL := all
 
 all: $(SIMEXE)
@@ -203,13 +252,13 @@ $(OBJDIR):
 # This rule comes first, so its VUserMain0.o wins over usercode/'s.
 ifneq ($(ISS_C),)
 $(OBJDIR)/%.o: $(ISSCODEDIR)/%.cpp | $(OBJDIR)
-	@$(HOST_CXX) -c -fPIC $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) -I$(ISSCODEDIR) $(INCLPATHS) -I$(RV32SRC) $< -o $@
+	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) -I$(ISSCODEDIR) $(INCLPATHS) -I$(RV32SRC) $< -o $@
 
 $(RV32OBJDIR):
 	@mkdir -p $@
 
 $(RV32OBJDIR)/%.o: $(RV32SRC)/%.cpp $(wildcard $(RV32SRC)/*.h) | $(RV32OBJDIR)
-	@$(HOST_CXX) -c -fPIC $(OPTFLAG) -I$(RV32SRC) -D_REENTRANT $< -o $@
+	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) -I$(RV32SRC) -D_REENTRANT $< -o $@
 
 $(RV32LIB): $(RV32OBJS)
 	@rm -f $@
@@ -224,19 +273,28 @@ FW_HOST_FLAGS  = -x c++ -Dmain=fw_main -Wno-volatile -I$(FW_DIR)/common \
 FW_HOST_DEPS   = $(FW_DIR)/common/pcie.h $(CURDIR)/../4.build/csr_build/csr_regs.h
 
 $(OBJDIR)/fw_pcie.o: $(FW_DIR)/common/pcie.c $(FW_HOST_DEPS) | $(OBJDIR)
-	@$(HOST_CXX) -c -fPIC $(OPTFLAG) $(CPPSTD) $(FW_HOST_FLAGS) $(DEFS) $(INCLPATHS) $< -o $@
+	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) $(FW_HOST_FLAGS) $(DEFS) $(INCLPATHS) $< -o $@
 
 $(OBJDIR)/fw_main.o: $(FW_DIR)/EP/main.c $(FW_HOST_DEPS) | $(OBJDIR)
-	@$(HOST_CXX) -c -fPIC $(OPTFLAG) $(CPPSTD) $(FW_HOST_FLAGS) $(DEFS) $(INCLPATHS) $< -o $@
+	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) $(FW_HOST_FLAGS) $(DEFS) $(INCLPATHS) $< -o $@
 
 $(OBJDIR)/%.o: $(USRCODEDIR)/%.c | $(OBJDIR)
-	@$(HOST_CC) -c -fPIC $(OPTFLAG) $(DEFS) $(INCLPATHS) $< -o $@
+	@$(HOST_CC) -c -fPIC -MMD -MP $(OPTFLAG) $(DEFS) $(INCLPATHS) $< -o $@
 
 $(OBJDIR)/%.o: $(USRCODEDIR)/%.cpp | $(OBJDIR)
-	@$(HOST_CXX) -c -fPIC $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) $(INCLPATHS) $< -o $@
+	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) $(INCLPATHS) $< -o $@
 
-$(OBJDIR)/%.o: $(VIP_DIR)/ltssm/%.c | $(OBJDIR)
-	@$(HOST_CC) -c -fPIC $(OPTFLAG) $(DEFS) $(INCLPATHS) $< -o $@
+# The host: the model, its checker and its ltssm.c, from openPCIE, without
+# LTSSM_ABBREVIATED, as openPCIE compiles them (the model sets its own
+# Polling count)
+$(OBJDIR)/VUserMain2.o: $(A7RC_DIR)/usercode/VUserMain2.cpp $(A7RC_DIR)/usercode/a7rc_check.h | $(OBJDIR)
+	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) $(INCLPATHS) $< -o $@
+
+$(OBJDIR)/a7rc_check.o: $(A7RC_DIR)/usercode/a7rc_check.cpp $(A7RC_DIR)/usercode/a7rc_check.h | $(OBJDIR)
+	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) $(INCLPATHS) $< -o $@
+
+$(OBJDIR)/ltssm.o: $(A7RC_DIR)/models/pcievhost/ltssm/ltssm.c | $(OBJDIR)
+	@$(HOST_CC) -c -fPIC -MMD -MP $(OPTFLAG) $(DEFS) $(INCLPATHS) $< -o $@
 
 $(USERLIB): $(VOBJS)
 	@rm -f $@
@@ -245,6 +303,7 @@ $(USERLIB): $(VOBJS)
 ifeq ($(SIM),verilator)
 # Verilator decides itself what to rebuild; always ask it
 $(SIMEXE): $(USERLIB) $(RV32LIB) FORCE
+	@for l in $(USERLIB) $(RV32LIB); do [ $$l -nt $@ ] && rm -f $@; done; true   # Verilator's make does not track them
 	@$(VERILATOR) $(VLTFLAGS)
 else
 $(VPROC_SO): $(USERLIB) $(RV32LIB)
@@ -252,9 +311,8 @@ $(VPROC_SO): $(USERLIB) $(RV32LIB)
 	    -Wl,-whole-archive $(USERLIB) -Wl,-no-whole-archive $(RV32LIB) -Wl,-whole-archive -L$(VIP_DIR)/lib -lpcieica -lcosimica -Wl,-no-whole-archive \
 	    -L$(ICA_LIB) -lvpi -lrt -ldl
 
-$(ICA_FILES): tb.f $(DUT_FILES) FORCE | $(OBJDIR)
-	@sed -e 's#$$VIP_DIR#$(VIP_DIR)#g' -e '/mem_model\.sv/d' $(DUT_FILES) tb.f > $@
-	@$(if $(CPU_SV),echo $(CPU_SV) >> $@)
+$(ICA_FILES): tb.f $(EP_FILES) FORCE | $(OBJDIR)
+	@sed -e 's#$$VIP_DIR#$(VIP_DIR)#g' -e '/mem_model\.sv/d' $(EP_FILES) tb.f > $@
 
 $(SIMEXE): $(VPROC_SO) $(ICA_FILES) FORCE
 	@$(IVERILOG) -o $@ $(ICAFLAGS)
@@ -262,20 +320,48 @@ endif
 
 FORCE:
 
-run: all
 ifeq ($(SIM),verilator)
-	@cd $(CURDIR) && $(FW_IN) $(SIMEXE); s=$$?; $(FW_OUT) exit $$s
+SIM_CMD        = $(SIMEXE)
 else
-	@cd $(CURDIR) && $(FW_IN) $(VVP) -n -M $(OBJDIR) -m VProc $(SIMEXE) $(VVPDUMP); s=$$?; $(FW_OUT) exit $$s
+SIM_CMD        = $(VVP) -n -M $(OBJDIR) -m VProc $(SIMEXE) $(VVPDUMP)
 endif
 
+run: all
+	@cd $(CURDIR) && $(FW_IN) A7RC_SEED=$(SEED) $(SIM_CMD); s=$$?; $(FW_OUT) exit $$s
+
+# The tester over seeds 1 to SEEDS, each in obj/regress/<seed>/, so seeds can
+# run side by side (tools/regress.sh)
+regress: all
+	@cd $(CURDIR) && $(FW_IN) bash tools/regress.sh $(SEEDS) $(REGRESS_JOBS) $(REGRESS_S) $(REGRESS_TRIES) \
+	    $(REGRESS_QUIET) $(CURDIR)/obj/regress "vusermain.cfg firmware.hex" -- $(SIM_CMD); s=$$?; $(FW_OUT) \
+	$(if $(filter fail,$(REGRESS_DUMP)),for d in obj/regress/*/; do [ ! -e $$d/failed ] || \
+	    $(MAKE) --no-print-directory wavecrux SEED=$$(basename $$d) WCX_OPEN=0; done;) exit $$s
+
+# One seed with its waveform, opened in WaveCrux at the first violation
+wavecrux:
+	@$(MAKE) --no-print-directory DUMP=1 wavecrux_run
+
+wavecrux_run: all
+	@d=$(CURDIR)/obj/wavecrux/$(SEED); rm -rf $$d; mkdir -p $$d/hex; cp hex/ContDisps.hex $$d/hex/; \
+	for f in vusermain.cfg; do if [ -f $$f ]; then cp $$f $$d/; fi; done; \
+	cd $$d && $(FW_IN) A7RC_SEED=$(SEED) $(SIM_CMD) > run.log 2>&1; \
+	echo "seed $(SEED): $$(grep -a -m1 'RC MODEL RESULT' $$d/run.log), $$d/$(WCX_FST)"; \
+	$(if $(filter 1,$(WCX_OPEN)),python3 $(CURDIR)/tools/wavecrux.py $$d/$(WCX_FST) $$d/run.log $(WCX_SIGNALS),echo "  open it: make wavecrux SEED=$(SEED)")
+
 help:
-	@echo "make [SIM=verilator|icarus] [DUT=mock|rtl] [PHY=vproc_rc|rtl]   build the models and the simulation"
-	@echo "make DUT=rtl CPU=vproc|iss run      the SOC CPU: native firmware or the rv32 ISS (default CPU=rtl, eduBOS5)"
+	@echo "make [SIM=verilator|icarus] [EP=model|rtl] [IFACE=pipe|serial]   build the models and the simulation (EP=rtl: Verilator only)"
+	@echo "make A7RC=1 run                    literal host: only what the lab RC sends (default: the tester, also back to back)"
+	@echo "make SEED=N run                    the tester's random stimulus with seed N (default 1), no rebuild"
+	@echo "make regress SEEDS=N               the tester over seeds 1 to N (default 10), in obj/regress/<seed>/"
+	@echo "    REGRESS_JOBS=J                 J seeds side by side (default 1); REGRESS_QUIET=0 keeps the packet display"
+	@echo "    REGRESS_DUMP=fail              dump every failing seed (obj/wavecrux/<seed>/)"
+	@echo "make wavecrux SEED=N               seed N with its waveform, in WaveCrux at the first violation (--wcp-port 54321)"
+	@echo "make EP=rtl CPU=vproc|iss run      the SOC CPU: native firmware or the rv32 ISS (default CPU=rtl, eduBOS5)"
 	@echo "make [SIM=verilator|icarus] run    build and run"
 	@echo "make DUMP=1 run                    also write tb.fst (WaveCrux: tb.DLL-PIPE.wavecrux)"
-	@echo "make DUT=rtl DUMP=1 run            also write tb_rtl.fst, the EP's layers (WaveCrux: tb_rtl.*.wavecrux)"
+	@echo "make EP=rtl DUMP=1 run             also write tb_rtl.fst, the EP's layers (WaveCrux: tb_rtl.*.wavecrux)"
 	@echo "make clean                         remove obj/"
+	@echo "OPENPCIE (default ../../openpcie): the openPCIE checkout with the host, its Artix-7 RC model"
 	@echo "USER_C, USRCODEDIR, OPTFLAG, USRSIMFLAGS (extra simulator flags) can be overridden"
 
 clean:
@@ -287,3 +373,6 @@ clean:
 # Version:     1.0
 # Date:        April 2025
 # -----------------------------------------------------------------------------
+
+# Header dependencies of the user objects (-MMD -MP)
+-include $(wildcard $(OBJDIR)/*.d)

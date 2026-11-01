@@ -39,8 +39,9 @@
 // Description:
 //   RCPIPEx1__pcieVHost: the host of the test bench, a pcieVHost in root
 //   complex mode on an x1 PIPE link, at VProc node NodeNum. Its program is
-//   usercode/VUserMain<NodeNum>.cpp. The same model and PIPE wrapper ran on
-//   openPCIE against the AMD PCIE_2_1 hard macro, there as the EP.
+//   VUserMain<NodeNum>: openPCIE's Artix-7 RC model at node 2. The same
+//   model and PIPE wrapper ran on openPCIE against the AMD PCIE_2_1 hard
+//   macro, there as the EP.
 //
 //   A shell of PIPEx1__pcieVHost with EndPoint fixed to 0, so the role is in
 //   the name and cannot be set wrong. Its ports, the same as there, are the
@@ -56,10 +57,6 @@ module RCPIPEx1__pcieVHost #(
     input  logic                     pcieclk,
     input  logic                     pclk,
     input  logic                     nreset,
-`ifdef VERILATOR
-    output logic                     ElecIdleOut,
-    input  logic                     ElecIdleIn,
-`endif
     input  logic [  DataWidth-1:0]   RxData,
     input  logic [DataWidth/8-1:0]   RxDataK,
     output logic [  DataWidth-1:0]   TxData,

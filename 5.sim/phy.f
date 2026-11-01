@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// Verilator source list of the PHY for make PHY=rtl (with DUT=rtl): top, with
+// Verilator source list of the PHY for make IFACE=serial (with EP=rtl): top, with
 // phy_top, Cologne Chip's PIPE logic and the opensource SerDes BFM, so the host
 // drives the serial line.
 

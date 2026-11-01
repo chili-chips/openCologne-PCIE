@@ -53,7 +53,7 @@
 #define DISABLE_8B10B          208
 #define GEN2_CLK               209
 
-// Transaction taps (openCologne-PCIE): each TLP and DLLP this node sends
+// Transaction taps (openPCIE): each TLP and DLLP this node sends
 // (TX) or receives (RX), written in zero time, one DW per write
 #define TAP_TLP_TX_SOP         210
 #define TAP_TLP_TX             211

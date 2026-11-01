@@ -1,6 +1,6 @@
 {
   "version": 4,
-  "sourceFilePath": "tb_rtl_phy.fst",
+  "sourceFilePath": "tb_rtl_serial.fst",
   "signals": [
     {
       "kind": "signal",

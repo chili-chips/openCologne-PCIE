@@ -34,16 +34,6 @@
     },
     {
       "kind": "signal",
-      "id": "ocpcie-3",
-      "ref": "15",
-      "path": "tb.elec_idle_down",
-      "name": "elec_idle_down",
-      "color": 4283417591,
-      "format": "hexadecimal",
-      "height": 30.0
-    },
-    {
-      "kind": "signal",
       "id": "ocpcie-4",
       "ref": "13",
       "path": "tb.updata",
@@ -58,16 +48,6 @@
       "ref": "14",
       "path": "tb.updatak",
       "name": "updatak",
-      "color": 4294948685,
-      "format": "hexadecimal",
-      "height": 30.0
-    },
-    {
-      "kind": "signal",
-      "id": "ocpcie-6",
-      "ref": "16",
-      "path": "tb.elec_idle_up",
-      "name": "elec_idle_up",
       "color": 4294948685,
       "format": "hexadecimal",
       "height": 30.0

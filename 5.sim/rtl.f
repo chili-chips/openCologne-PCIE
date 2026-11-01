@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// Verilator source list of the EP RTL for make DUT=rtl: pcie_top (MAC, DLL, TL,
+// Verilator source list of the EP RTL for make EP=rtl: pcie_top (MAC, DLL, TL,
 // SOC with firmware) in the order of 4.build/hw_build/sources.sh, without
-// top and phy_top: with PHY=vproc_rc the host sits in the phy_top socket
+// top and phy_top: with IFACE=pipe the host sits in the phy_top socket
 // (models/phy_vproc_rc.sv).
 
 // Packages

@@ -4,7 +4,7 @@
 //
 // Verilator source list of the openCologne-PCIE co-simulation test bench.
 // $VIP_DIR is the VIP that tools/build-vip.sh builds from vip/; the make
-// file sets it. The DUT here is the mock, EPPIPEx1__pcieVHost_DUT.
+// file sets it. The DUT here is the EP model, EPPIPEx1__pcieVHost_DUT.
 
 +incdir+$VIP_DIR/hdl/headers
 +incdir+$VIP_DIR/hdl
@@ -23,7 +23,7 @@ $VIP_DIR/hdl/pcieVHostPipex1.v
 models/PIPEx1__pcieVHost.sv
 models/RCPIPEx1__pcieVHost.sv
 
-// DUT: the mock EP (make DUT=mock)
+// DUT: the EP model (make EP=model)
 stubs/EPPIPEx1__pcieVHost_DUT.sv
 
 // Test bench

@@ -1,14 +1,20 @@
 # PCIe Data Link Layer (DLL)
 
 ## Description
-The **Data Link Layer (DLL)** sits between the **Transaction Layer (TL)** above and the **Physical Layer (MAC + PIPE + PCS)** below. Its job is to make the link *reliable*: it wraps every outgoing TLP with a sequence number and a 32-bit LCRC, holds transmitted TLPs in a retry buffer until they are acknowledged (the retry buffer currently has size of one), and drives the ACK/NAK protocol so corrupted or lost packets are replayed. On the DLLP side it generates and consumes Data Link Layer Packets — ACK/NAK and flow-control — and it runs the **flow-control initialization** handshake before the link is allowed to carry traffic.
+The **Data Link Layer (DLL)** sits between the **Transaction Layer (TL)** above and the **Physical Layer (MAC + PIPE + PCS)** below. It makes the link *reliable*:
 
-In this design the DLL is soft-core RTL in the FPGA fabric. Below it, the logical Physical Layer (MAC) and the GateMate SerDes handle the LTSSM, 8b/10b and the serial link; the DLL reaches them through the PHY interface. The supported `DATA_WIDTH` is **32 or 64 bits**.
+- wraps every outgoing TLP with a sequence number and a 32-bit LCRC;
+- holds transmitted TLPs in a retry buffer (currently size one) until acknowledged;
+- drives the ACK/NAK protocol, so corrupted or lost packets are replayed;
+- generates and consumes DLLPs: ACK/NAK and flow-control;
+- runs the **flow-control initialization** handshake before the link carries traffic.
+
+Soft-core RTL in the FPGA fabric. Below it, the MAC and the GateMate SerDes handle the LTSSM, 8b/10b and the serial link, reached through the PHY interface. `DATA_WIDTH` is **32 or 64 bits**.
 
 <img alt="Position of the Data Link Layer in the PCIe stack" src="./images/DLL_Position.png" width=300 height=330 />
 
 ## Architecture
-The DLL is split into a transmit datapath, a receive datapath, and the control logic that binds them together.
+A transmit datapath, a receive datapath, and the control logic binding them.
 
 - **TX datapath**: takes TLP payload / DLLP fields from the TL, frames them (STP/SDP … END), appends the LCRC (TLP) or 16-bit CRC (DLLP), stores TLPs in the retry buffer, and streams the result to the PHY on `phy_tx_data`/`phy_tx_data_k`.
 
@@ -24,7 +30,7 @@ The DLL is split into a transmit datapath, a receive datapath, and the control l
 - **DLL Init FSM**: gates the link through `DL_Inactive → DL_Init → DL_Active`, including flow-control initialization.
 
 ## The Interface
-The DLL exposes an **upstream** interface to the Transaction Layer and a **downstream** interface to the Physical Layer.
+**Upstream** to the Transaction Layer, **downstream** to the Physical Layer.
 
 ### Upstream — Transaction Layer (TL)
 | Direction | Signal              | Description                                  | Width      |
@@ -59,10 +65,10 @@ The DLL exposes an **upstream** interface to the Transaction Layer and a **downs
 | out       | `phy_tx_data`   | Transmit data stream to the physical layer             | DATA_WIDTH   |
 | out       | `phy_tx_data_k` | K-character (control) markers for `phy_tx_data`        | DATA_WIDTH/8 |
 
-> The PHY interface is the upstream side of the MAC layer — `phy_tx_data`/`phy_tx_data_k` map to the MAC's `i_TxData`/`i_TxDataK`, `phy_rx_data`/`phy_rx_data_k` to `o_RxData`/`o_RxDataK`, and `phy_linkup` to `o_LinkUp`. Currently supported `DATA_WIDTH` is 64 and 32 bits.
+> The PHY interface is the upstream side of the MAC layer: `phy_tx_data`/`phy_tx_data_k` map to the MAC's `i_TxData`/`i_TxDataK`, `phy_rx_data`/`phy_rx_data_k` to `o_RxData`/`o_RxDataK`, and `phy_linkup` to `o_LinkUp`.
 
 ## DLL Init FSM
-The DLL Init FSM tracks whether the link is usable. It is held in `DL_Inactive` out of reset and only reaches `DL_Active` once flow-control has been initialized.
+Tracks whether the link is usable: `DL_Inactive` out of reset, `DL_Active` only once flow-control is initialized.
 
 <img alt="DLL initialization state machine" src="./images/DLL_Init_FSM.png" width=360 height=360 />
 
@@ -159,19 +165,17 @@ Field layout: `type | Reserved | AckNak_Seq_Num | 16-bit CRC`.
 ## DLLP Handler
 
 ### RX
-- The DLL has a set of registers large enough to hold a DLLP; received data is shifted into them.
-- On `SDP` detection, the DLLP is extracted from the registers with alignment.
-- The DLLP data is extracted and its CRC is checked.
+- Received data shifts into registers large enough to hold a DLLP.
+- On `SDP` detection, the DLLP is extracted with alignment and its CRC checked.
   - CRC fail → discard the packet.
   - CRC pass → forward the data to the TL with `tl_rx_dllp_valid` asserted.
 - For ACK / NAK:
-  - **ACK** → release all unacknowledged TLPs in the retry buffer (no more than two — the max retry-buffer size) at and below the sequence number in the ACK, and update `ACKD_SEQ` to `Ack_Seq_Num`.
+  - **ACK** → release all unacknowledged TLPs in the retry buffer (one today; up to two once the ping-pong buffer lands) at and below the sequence number in the ACK, and update `ACKD_SEQ` to `Ack_Seq_Num`.
   - **NAK** → retransmit all unacknowledged TLPs.
 
 ### TX
-- The DLL receives `tl_tx_dllp_valid` from the TL to initiate a DLLP transmission.
-- The data needed to form the DLLP is taken from the TL; the CRC is calculated and appended.
-- On the TLP-integrity result: if the LCRC check of a received TLP fails, send a **NAK** with the erroneous packet's sequence number; if it passes, send an **ACK** with the error-free packet's sequence number.
+- `tl_tx_dllp_valid` from the TL starts a DLLP transmission; the DLLP data comes from the TL, the CRC is appended.
+- Received TLP LCRC fails: send a **NAK** with the erroneous packet's sequence number; passes: an **ACK** with the error-free packet's sequence number.
 
 ## Retry Buffer
 - A **2-bit replay number** counts how many times the retry buffer has been re-transmitted; on rollover from `11b` to `00b`, signal the Physical Layer to retrain the link.
@@ -188,16 +192,19 @@ The simulation can be run using the pcieVHost model … *TODO*
 The testbench drives the DLL from both sides. On the **upstream** side it plays the Transaction Layer: it injects TLP payload (`tl_tx_*`) and requests DLLP transmissions (`tl_tx_dllp_valid`) to exercise framing, sequence-number assignment, LCRC generation and the transmission-priority logic. On the **downstream** side it models the PHY, feeding framed TLPs/DLLPs on `phy_rx_data`/`phy_rx_data_k` and driving `phy_linkup` so the DLL Init FSM walks through `DL_Inactive → DL_Init → DL_Active`, including flow-control initialization. Fault injection on the received stream (bad CRC/LCRC, out-of-sequence and duplicate sequence numbers) is used to check the ACK/NAK scheduling, the retry buffer and the replay/latency timers.-->
 
 ## Sources and testbench
-The DLL sources are Cologne Chip's, in the gatemate-pipe submodule: [`2.pipe/pipe_src/src/dll_src`](../2.pipe/pipe_src/src/dll_src). Its block testbench, `sim/tb_dll_logic.v` there, drives the DLL from both sides. On the **upstream** side it plays the Transaction Layer: it injects TLP payload (`tl_tx_*`) and requests DLLP transmissions (`tl_tx_dllp_valid`) to exercise framing, sequence-number assignment, LCRC generation and the transmission-priority logic. On the **downstream** side it models the PHY, feeding framed TLPs/DLLPs on `phy_rx_data`/`phy_rx_data_k` and driving `phy_linkup` so the DLL Init FSM walks through `DL_Inactive → DL_Init → DL_Active`, including flow-control initialization. Fault injection on the received stream (bad CRC/LCRC, out-of-sequence and duplicate sequence numbers) is used to check the ACK/NAK scheduling, the retry buffer and the replay/latency timers. Our own DLL simulation is [`sim/run-dll-phy.sh`](#simulation-over-mac-pipe-and-serdes): the same checks, with the MAC, PIPE and SerDes BFM below the DLL.
+The DLL sources are Cologne Chip's, in the gatemate-pipe submodule: [`2.pipe/pipe_src/src/dll_src`](../2.pipe/pipe_src/src/dll_src). Its block testbench there, `sim/tb_dll_logic.v`, drives the DLL from both sides:
+
+| Side | Plays | Exercises |
+|---|---|---|
+| **Upstream** | the Transaction Layer: injects TLP payload (`tl_tx_*`), requests DLLPs (`tl_tx_dllp_valid`) | framing, sequence-number assignment, LCRC generation, transmission priority |
+| **Downstream** | the PHY: feeds framed TLPs/DLLPs on `phy_rx_data`/`phy_rx_data_k`, drives `phy_linkup` | DLL Init FSM `DL_Inactive → DL_Init → DL_Active`, flow-control initialization |
+| Fault injection | bad CRC/LCRC, out-of-sequence and duplicate sequence numbers | ACK/NAK scheduling, retry buffer, replay/latency timers |
+
+Our own DLL simulation, [`sim/run-dll-phy.sh`](#simulation-over-mac-pipe-and-serdes), runs the same checks with the MAC, PIPE and SerDes BFM below the DLL.
 
 ## Viewing the DLL in WaveCrux
 
-The pictures below decode the DLL's PHY-side stream with Ferrite's
-[PCIe PIPE and Data Link Layer decoders](https://github.com/Ferrite-Engineering/wavecrux-decoders)
-(`wcx-pcie` 0.1.0) in [WaveCrux](https://wavecrux.app). They come from
-`sim/tb_dll_wavecrux.v`, a fork of gatemate-pipe's `tb_dll_logic.v` whose TLPs carry real
-headers (MWr32, MWr64, CplD) so the decoders can name them; the test steps
-are the same.
+Ferrite's [PCIe PIPE and Data Link Layer decoders](https://github.com/Ferrite-Engineering/wavecrux-decoders) (`wcx-pcie` 0.1.0) in [WaveCrux](https://wavecrux.app) decode the DLL's PHY-side stream. Source: `sim/tb_dll_wavecrux.v`, a fork of gatemate-pipe's `tb_dll_logic.v` with the same test steps, whose TLPs carry real headers (MWr32, MWr64, CplD) so the decoders can name them.
 
 To reproduce, from `2.rtl/4.dll`:
 
@@ -206,65 +213,38 @@ verilator --binary --timing --trace-fst --trace-structs -O0 --top-module tb_dll_
 ./obj_dir/Vtb_dll_wavecrux          # writes sim/dll_wavecrux.fst
 ```
 
-then, once per machine, add the unzipped `wcx-pcie` release under
-**Settings -> Extensions -> Decoder Plugins** in WaveCrux (1.0.1 or later), and
-open [`sim/tb.DLL-PIPE.wavecrux`](sim/tb.DLL-PIPE.wavecrux). It loads
-`dll_wavecrux.fst` from the same directory with all four decoders bound.
+Then, once per machine, add the unzipped `wcx-pcie` release under **Settings -> Extensions -> Decoder Plugins** in WaveCrux (1.0.1 or later), and open [`sim/tb.DLL-PIPE.wavecrux`](sim/tb.DLL-PIPE.wavecrux). It loads `dll_wavecrux.fst` from the same directory with all four decoders bound.
 
-[`sim/dll_wavecrux_view.sv`](sim/dll_wavecrux_view.sv) is attached to the
-testbench with `bind` and presents the stream under the names the decoders
-auto-bind to: **Tx** (orange) is DLL -> PHY, **Rx** (blue) is PHY -> DLL. The
-testbench loops Tx back into Rx through one register, so Rx runs one clock
-behind, and `RxDataK` is `TxDataK` through the same register, as the
-testbench feeds it to the DLL's `phy_rx_data_k`. `-O0` matters: without it Verilator traces these copies as aliases of
-the original signals, and WaveCrux's signal pickers hide them. The four
-decoder rows are, top to bottom: Data Link Layer Tx, Data Link Layer Rx,
-PIPE Tx, PIPE Rx.
+- [`sim/dll_wavecrux_view.sv`](sim/dll_wavecrux_view.sv) is `bind`-attached to the testbench and presents the stream under the names the decoders auto-bind to: **Tx** (orange) is DLL -> PHY, **Rx** (blue) is PHY -> DLL.
+- The testbench loops Tx back into Rx through one register, so Rx runs one clock behind; `RxDataK` is `TxDataK` through the same register, as fed to the DLL's `phy_rx_data_k`.
+- `-O0` matters: without it Verilator traces these copies as aliases of the original signals, and WaveCrux's signal pickers hide them.
+- Decoder rows, top to bottom: Data Link Layer Tx, Data Link Layer Rx, PIPE Tx, PIPE Rx.
 
-**The whole run.** Flow-control initialization, three TLPs each followed by an
-Ack, the TLP whose LCRC is corrupted on the way back (red), its Nak and
-replay, and a final UpdateFC:
+**The whole run.** Flow-control initialization, three TLPs each followed by an Ack, the TLP whose LCRC is corrupted on the way back (red), its Nak and replay, and a final UpdateFC:
 
 <img alt="WaveCrux view of the whole DLL testbench run" src="./images/wavecrux-dll-overview.png" width=900 />
 
-**Flow-control initialization.** One DLLP per clock, each framed by SDP on
-lane 0 and END on lane 7 (`TxDataK` = `81`). The DLL advertises its receive
-credits for Posted, Non-Posted and Completion traffic: `InitFC1-P H=32
-D=1008`, `InitFC1-NP H=32 D=1`, `InitFC1-Cpl H=0 D=0` (0 means infinite). The
-PIPE decoder counts the 6 symbols between SDP and END:
+**Flow-control initialization.** One DLLP per clock, each framed by SDP on lane 0 and END on lane 7 (`TxDataK` = `81`). The DLL advertises its receive credits for Posted, Non-Posted and Completion traffic: `InitFC1-P H=32 D=1008`, `InitFC1-NP H=32 D=1`, `InitFC1-Cpl H=0 D=0` (0 means infinite). The PIPE decoder counts the 6 symbols between SDP and END:
 
 <img alt="WaveCrux view: InitFC1 DLLPs" src="./images/wavecrux-dll-fc-init.png" width=900 />
 
-**A TLP.** `MWr32` with sequence number 0 and a 3-DW payload: STP on lane 0
-(`TxDataK` = `01`), the sequence number, the 3-DW header, the payload, the
-LCRC and END on lane 7 (`80`). The 30 symbols are the 2 sequence bytes, 24
-TLP bytes and 4 LCRC bytes:
+**A TLP.** `MWr32` with sequence number 0 and a 3-DW payload: STP on lane 0 (`TxDataK` = `01`), the sequence number, the 3-DW header, the payload, the LCRC and END on lane 7 (`80`). The 30 symbols are the 2 sequence bytes, 24 TLP bytes and 4 LCRC bytes:
 
 <img alt="WaveCrux view: an MWr32 TLP" src="./images/wavecrux-dll-tlp.png" width=900 />
 
-**A corrupted LCRC.** The testbench flips bit 40 of the last word on the way
-back (`fd2eb881...` sent, `fd2eb981...` received). The Rx Data Link Layer
-decoder reports `LCRC mismatch`, and so does the DLL: it answers with
-`Nak seq=2`, naming the last TLP it received intact (at 1.72 us in the
-overview):
+**A corrupted LCRC.** The testbench flips bit 40 of the last word on the way back (`fd2eb881...` sent, `fd2eb981...` received). The Rx Data Link Layer decoder reports `LCRC mismatch`, and so does the DLL: it answers `Nak seq=2`, naming the last TLP it received intact (at 1.72 us in the overview):
 
 <img alt="WaveCrux view: TLP with a corrupted LCRC" src="./images/wavecrux-dll-lcrc-error.png" width=900 />
 
-**The replay.** The retry buffer sends the same TLP again with the same
-sequence number; the Tx decoder marks it `(replay)`, and this time Rx
-receives it intact and acknowledges it with `Ack seq=3` (at 2.0 us). The Rx
-row does not say `(replay)` because the first copy never arrived in good
-shape:
+**The replay.** The retry buffer resends the TLP with the same sequence number; the Tx decoder marks it `(replay)`. Rx receives it intact and answers `Ack seq=3` (at 2.0 us). The Rx row does not say `(replay)`, as the first copy never arrived intact:
 
 <img alt="WaveCrux view: the replayed TLP" src="./images/wavecrux-dll-replay.png" width=900 />
 
 ## Simulation with pcieVHost
 
-> **pcieVHost is a Root Complex model written in C.** It has a **PIPE interface**, which is connected directly to our **MAC layer**. The traffic therefore passes through our MAC (LTSSM, ordered sets, packet framing) as well as through the DLL, so this simulation tests **both the MAC and the DLL** against an independent link partner.
+> **pcieVHost is a Root Complex model written in C.** Its **PIPE interface** connects directly to our **MAC layer**, so traffic passes through our MAC (LTSSM, ordered sets, packet framing) and the DLL: this tests **both the MAC and the DLL** against an independent link partner.
 
-The pictures come from Cologne Chip's test in the [`dll_test` branch of gatemate-pipe](https://github.com/colognechip/gatemate-pipe/tree/dll_test) (`sim/pcievhost_test`), with scrambling disabled on both sides. Our own runs against pcieVHost are in [`5.sim`](../../5.sim).
-
-The waveforms are decoded with the WaveCrux PCIe decoders described above. The signals are:
+Pictures from Cologne Chip's test in the [`dll_test` branch of gatemate-pipe](https://github.com/colognechip/gatemate-pipe/tree/dll_test) (`sim/pcievhost_test`), scrambling disabled on both sides, decoded with the WaveCrux PCIe decoders above. Our own runs against pcieVHost are in [`5.sim`](../../5.sim). Signals:
 - `LinkDownData`/`LinkDownDataK`: pcieVHost (Root Complex) -> our MAC.
 - `LinkUpData`/`LinkUpDataK`: our MAC -> pcieVHost.
 
@@ -276,7 +256,7 @@ The waveforms are decoded with the WaveCrux PCIe decoders described above. The s
 
 <img alt="pcieVHost simulation: lane number detection" src="./images/LaneNum_Detection.png" width=900 />
 
-**InitFC1.** With the link up, the DLL enters `DL_FCINIT1` and sends `InitFC1-P`, `InitFC1-NP` and `InitFC1-Cpl`, one DLLP per clock with SDP on lane 0 and END on lane 7 (`LinkUpDataK` = `81`). pcieVHost answers with its own InitFC1 set. pcieVHost does not align its packets to a lane boundary: its first SDP sits on lane 6 (`LinkDownDataK` = `40`), so each DLLP spans two words. This also confirms that the DLL can detect DLLP on any SDP positions:
+**InitFC1.** With the link up, the DLL enters `DL_FCINIT1` and sends `InitFC1-P`, `InitFC1-NP` and `InitFC1-Cpl`, one DLLP per clock with SDP on lane 0 and END on lane 7 (`LinkUpDataK` = `81`). pcieVHost answers with its own InitFC1 set, not aligned to a lane boundary: its first SDP sits on lane 6 (`LinkDownDataK` = `40`), so each DLLP spans two words. This confirms the DLL detects DLLPs at any SDP position:
 
 <img alt="pcieVHost simulation: InitFC1 sequence" src="./images/INITFC1.png" width=900 />
 
@@ -294,11 +274,7 @@ The waveforms are decoded with the WaveCrux PCIe decoders described above. The s
 
 ## Simulation over MAC, PIPE and SerDes
 
-`sim/run-dll-phy.sh` runs this DLL over the MAC/LTSSM, the PIPE
-logic and the opensource SerDes BFM, with two link partners over a bit-level serial
-link: LTSSM training to L0, InitFC, TLPs in both directions, NAK and replay of a
-TLP corrupted on the wire, and an UpdateFC DLLP. See
-[sim/README.md](sim/README.md).
+`sim/run-dll-phy.sh` runs this DLL over the MAC/LTSSM, the PIPE logic and the opensource SerDes BFM, two link partners on a bit-level serial link: LTSSM training to L0, InitFC, TLPs both ways, NAK and replay of a TLP corrupted on the wire, and an UpdateFC DLLP. See [sim/README.md](sim/README.md).
 
 ```sh
 bash 2.rtl/4.dll/sim/run-dll-phy.sh

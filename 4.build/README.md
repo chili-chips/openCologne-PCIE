@@ -35,7 +35,7 @@ The versions this repo has been run with so far. "Runs" means the step completes
 |---|---|---|---|
 | PeakRDL | 1.5.0 | CSR RTL, headers, docs (`MakefileCSR`) | generates |
 | xPack RISC-V GCC | 15.2.0-1 | firmware (`sw_build`) | builds |
-| Yosys | 0.69, with `read_slang` | 8b/10b proofs, standalone SerDes test synthesis, `run-synth.sh`, `run-lint.sh` | runs |
+| Yosys | 0.69 (openXC7 v1.0.0), with `read_slang` | 8b/10b proofs, standalone SerDes test synthesis, `run-synth.sh`, `run-lint.sh` | runs |
 | Icarus Verilog | 13.0 | PHY and DLL-over-PHY simulations, co-sim (`make SIM=icarus run`) | runs |
 | Verilator | 5.052 | co-sim (`make run`, default), SOC lint; its FST writer needs `liblz4-dev` | runs, checks |
 | nextpnr-himbaechel (GateMate), gmpack | from the OSS CAD Suite | place and route, bitstream | not yet run here |

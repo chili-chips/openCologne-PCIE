@@ -1,9 +1,9 @@
 # PIPE PHY
 
-This is work area for the CologneChip PHY PIPE developers.
+Work area for the Cologne Chip PHY PIPE developers.
 
 #### References:
-- [GateMate PIPE repo](https://github.com/colognechip/gatemate-pipe) with DLL testbench ✔
+- [GateMate PIPE repo](https://github.com/colognechip/gatemate-pipe) with DLL testbench
 - [GateMate datasheet](https://colognechip.com/docs/ds1001-gatemate1-datasheet-latest.pdf)
 - [CologneChip PHY/PIPE Overview](0.doc/PIPE_overview.pdf)
 - [Unified PIPE Spec, Sept.2025, v7.1](0.doc/Intel.643108_PIPE_Arch_Spec_Rev_7_1.pdf)
@@ -20,11 +20,8 @@ This is work area for the CologneChip PHY PIPE developers.
   <img alt="PCIe physical layer mapped onto GateMate" width="60%" src="0.doc/images/PHY-Layers-GateMate.png">
 </p>
 
-
-
 ## Implementation Details
 See [block diagram](0.doc/Physical_layer_block_diagram.pdf).
-
 
 ### SerDes
 <p align="center">
@@ -35,42 +32,31 @@ See [block diagram](0.doc/Physical_layer_block_diagram.pdf).
   <img alt="PCIe PIPE power management states" width="60%" src="0.doc/images/optimizing-pcie-pipe-pwr-mgmt.png">
 </p>
 
-
 **Hai:**
 > _"... our PIPE interface does not contain any functionality of the so called "MAC layer" which handles the training sequences, OSs and LTSSM..."_
 
-
-**Simon**
-> The LTSSM, I'd suggest, just needs to be the linear power up sequence from Detect.Quiet  to L0 (Link UP) for first functionality (as per the table on page 14 of the PCIe Primer). Not part of the pcievhost proper, but the model comes with some demonstration code to implement the LTSSM to this spec., so we have a means to test this first implementation.
-
+**Simon:**
+> For first functionality, the LTSSM just needs the linear power-up sequence from Detect.Quiet to L0 (Link UP), as per the table on page 14 of the PCIe Primer. Not part of pcievhost proper, but the model comes with demonstration code implementing the LTSSM to this spec, so we can test this first implementation.
 
 **Async RefClock?**
-> Does GateMate PHY support `Async RefClock`? 
-
-That's when your 100MHz reference clock source comes from a different oscillator that the oscillator used by the Root Complex. They are both nominally 100MHz, but they are still different.
-
+> Does GateMate PHY support `Async RefClock`? That is, a 100MHz reference clock from a different oscillator than the Root Complex's: both nominally 100MHz, but still different.
 
 #### DLL TestBench
 
-Hai: Simon has provided x1 PIPE model. All I had to do was to modify the C++ model of the RC for different feature tests and setup my MAC layer design as the EP.
+Hai: Simon provided the x1 PIPE model. I modified the C++ model of the RC for different feature tests and set up my MAC layer design as the EP:
 https://github.com/colognechip/gatemate-pipe/tree/dll_test/sim
 
 --------------------
 ## Open-source SerDes simulation model
 
-`2.serdes-model/` holds a copy of the open-source **SerDes BFM**, a behavioural
-model of the GateMate SerDes hard macro. It lets the PIPE, MAC and DLL be
-simulated with open tools. The master copy, its documentation, tests and 8b/10b
-proofs: [openCologne `7.SerDes/1.sim-model`](https://github.com/chili-chips-ba/openCologne/blob/main/7.SerDes/1.sim-model/README.md).
+`2.serdes-model/` holds a copy of the open-source **SerDes BFM**, a behavioural model of the GateMate SerDes hard macro, so the PIPE, MAC and DLL simulate with open tools. Master copy, documentation, tests and 8b/10b proofs: [openCologne `7.SerDes/1.sim-model`](https://github.com/chili-chips-ba/openCologne/blob/main/7.SerDes/1.sim-model/README.md).
 
 | flow | result |
 |---|---|
 | PIPE test, 64-bit (`3.sim/run-phy.sh pipe64`) | PASSED |
 | DLL, MAC, PIPE and SerDes, two link partners (`4.dll/sim/run-dll-phy.sh`) | fails from step 4 until [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
 
-The PHY flows are described in [3.sim/README.md](3.sim/README.md), the DLL over this PHY in
-[4.dll/sim/README.md](../4.dll/sim/README.md). The test-bench PHY of that flow, SerDes model + PIPE + bring-up FSM,
-is [`phy_model.sv`](../4.dll/sim/phy_model.sv).
+PHY flows: [3.sim/README.md](3.sim/README.md). DLL over this PHY: [4.dll/sim/README.md](../4.dll/sim/README.md); its test-bench PHY (SerDes model + PIPE + bring-up FSM) is [`phy_model.sv`](../4.dll/sim/phy_model.sv).
 
 --------------------
 #### End of Document

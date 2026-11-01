@@ -40,7 +40,7 @@
 //   PIPEx1__pcieVHost: a pcieVHost on an x1 PIPE link, as RC (EndPoint=0) or
 //   EP (EndPoint=1), with the link offered at three layers, all always
 //   present. The test bench uses it for both sides: the host,
-//   RCPIPEx1__pcieVHost, and the mock EP, EPPIPEx1__pcieVHost_DUT.
+//   RCPIPEx1__pcieVHost, and the EP model, EPPIPEx1__pcieVHost_DUT.
 //
 //   TxData/RxData are this node's PIPE link. The other outputs are named by
 //   link direction, the same on both sides (dn = RC -> EP, up = EP -> RC),
@@ -73,13 +73,8 @@ module PIPEx1__pcieVHost #(
     input  logic                     pclk,     // pcieclk / (DataWidth/8)
     input  logic                     nreset,
 
-`ifdef VERILATOR
-    // Electrical idle side-band: Verilator has no Z on a wire
-    output logic                     ElecIdleOut,
-    input  logic                     ElecIdleIn,
-`endif
-
-    // the PIPE link of this node
+    // the PIPE link of this node: electrical idle is NOSIG (K flag, 0xFF) per
+    // symbol, on every simulator (pcieVHostPipex1.v)
     input  logic [  DataWidth-1:0]   RxData,
     input  logic [DataWidth/8-1:0]   RxDataK,
     output logic [  DataWidth-1:0]   TxData,
@@ -147,10 +142,6 @@ module PIPEx1__pcieVHost #(
       .nreset     (nreset),
       .Gen2ClkSel (  /*LINT:OK*/),  // Gen1 only
       .ClkOut     (  /*LINT:OK*/),  // the test bench makes the clocks
-`ifdef VERILATOR
-      .ElecIdleOut(ElecIdleOut),
-      .ElecIdleIn (ElecIdleIn),
-`endif
       .RxData     (RxData),
       .RxDataK    (RxDataK),
       .TxData     (TxData),
@@ -224,9 +215,12 @@ module PIPEx1__pcieVHost #(
   // A TLP that ends mid-beat leaves the rest of its last beat zero; the TL
   // takes the length from the header. Like a DLL, no ready: the TL takes a
   // beat on every clock dll_rx_tlp_valid is high.
-  logic [9:0] dll_q[$];     // whole TLPs
-  logic [9:0] dll_part[$];  // the TLP being tapped
-  int         dll_tlps = 0; // whole TLPs in dll_q
+  bit   [9:0] dll_q[$];     // whole TLPs
+  bit   [9:0] dll_part[$];  // the TLP being tapped
+  int         dll_tlps;     // whole TLPs in dll_q: 0 at time 0
+  // Plain always below: dll_q and dll_tlps are filled on pcieclk and drained
+  // on dll_clk, two processes, which always_ff does not allow (as the taps
+  // in pcieVHost.v)
 
   always @(posedge pcieclk) begin
     if (tlp_dn_valid) begin
@@ -277,7 +271,7 @@ module PIPEx1__pcieVHost #(
   // update_type, 1'b0, VC}, HdrFC, DataFC. Like that DLL, every DLLP raises
   // dll_rx_dllp_valid, Ack/Nak too; for those the credit fields carry the
   // other bytes (the Ack/Nak sequence number is in dll_rx_data_credit).
-  logic [31:0] dllp_q[$];
+  bit   [31:0] dllp_q[$];
 
   always @(posedge pcieclk) begin
     if (dllp_dn_valid) dllp_q.push_back(dllp_dn_data);

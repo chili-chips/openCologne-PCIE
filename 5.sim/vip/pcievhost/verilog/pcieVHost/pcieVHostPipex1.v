@@ -56,7 +56,7 @@ module pcieVHostPipex1
   output reg [DataWidth-1:0]     TxData,
   output reg [(DataWidth/8)-1:0] TxDataK,
 
-  // Transaction taps (openCologne-PCIE), on ClkOut: see pcieVHost.v
+  // Transaction taps (openPCIE), on ClkOut: see pcieVHost.v
   output [31:0]                  TlpTxData,
   output                         TlpTxSop,  TlpTxEop,  TlpTxValid,
   output [31:0]                  TlpRxData,

@@ -3,14 +3,16 @@
 The sources are Cologne Chip's, in the gatemate-pipe submodule: [`2.pipe/pipe_src/src/mac_src`](../2.pipe/pipe_src/src/mac_src).
 
 ## Description
-The **Media Access Control (MAC)** is the logical sub-block of the PCIe **Physical Layer**. It sits between the **Data Link Layer (DLL)** above and the **PIPE interface / SerDes PHY** below. On transmit it turns the byte stream handed down by the DLL into a scrambled symbol stream for the PHY; on receive it does the reverse. In addition, the MAC owns link bring-up and maintenance through the **Link Training and Status State Machine (LTSSM)**.
+The **Media Access Control (MAC)** is the logical sub-block of the PCIe **Physical Layer**, between the **Data Link Layer (DLL)** above and the **PIPE interface / SerDes PHY** below.
 
-In this design the MAC is implemented as soft-core RTL in the FPGA fabric. The PHY-specific work — **8b/10b** encode/decode, the **elastic buffer**, and **word alignment** — is performed by the GateMate SerDes and reached through the PIPE interface. See the PIPE interface documentation for the details of that boundary.
+- **TX:** turns the DLL's byte stream into a scrambled symbol stream for the PHY; **RX** does the reverse.
+- **Link:** owns bring-up and maintenance through the **Link Training and Status State Machine (LTSSM)**.
+- **Soft RTL** in the FPGA fabric. **8b/10b** encode/decode, the **elastic buffer** and **word alignment** are done by the GateMate SerDes, behind [PIPE](../2.pipe/README.md).
 
 <img alt="Position of the MAC layer in the PCIe stack" src="./images/MAC_Position.png" width=300 height=330 />
 
 ## Architecture
-The MAC is split into a transmit datapath, a receive datapath, and the control plane that binds them together.
+A transmit datapath, a receive datapath, and the control plane binding them.
 
 <img alt="MAC block diagram" src="./images/MAC_Block_Diagram.png" width=700 height=457 />
 
@@ -21,7 +23,7 @@ The MAC is split into a transmit datapath, a receive datapath, and the control p
 - **Scrambler/descrambler**: LFSR applied to data symbols only; reset by COM and bypassed for training sequences and control symbols.
 
 ## The Interface
-The MAC exposes two interfaces: an **upstream** interface to the Data Link Layer and a **downstream** interface to the PIPE / PHY.
+**Upstream** to the Data Link Layer, **downstream** to the PIPE / PHY.
 
 ### Upstream — Data Link Layer
 | Signal            | Dir | Description |
@@ -33,10 +35,10 @@ The MAC exposes two interfaces: an **upstream** interface to the Data Link Layer
 | `o_LinkUp`        | out | LTSSM in L0 state, link is active. |
 
 ### Downstream — PIPE / PHY
-The downstream side is the PIPE interface. It carries `PCLK`, `TxData[63:0]`/`TxDataK[7:0]`, `RxData[63:0]`/`RxDataK[7:0]`, the command signals (`i_Reset`, `i_PowerDown[1:0]`, `i_TxElecIdle`, `i_TxDetectRx`, `i_TxCompliance[7:0]`, `i_RxPolarity`) and the status signals (`o_PhyStatus`, `o_RxElecIdle`, `o_RxValid`, `o_RxStatus[2:0]`). Full descriptions, the 32-/64-bit datapath handling and the `RxStatus` encoding are in the PIPE interface documentation and are not repeated here.
+The PIPE interface: `PCLK`, `TxData[63:0]`/`TxDataK[7:0]`, `RxData[63:0]`/`RxDataK[7:0]`, the command signals (`i_Reset`, `i_PowerDown[1:0]`, `i_TxElecIdle`, `i_TxDetectRx`, `i_TxCompliance[7:0]`, `i_RxPolarity`) and the status signals (`o_PhyStatus`, `o_RxElecIdle`, `o_RxValid`, `o_RxStatus[2:0]`). Descriptions, 32-/64-bit datapath handling and `RxStatus` encoding: [PIPE](../2.pipe/README.md).
 
 ## LTSSM
-The LTSSM is the heart of the MAC control plane. The top-level states relevant to endpoint bring-up:
+The heart of the MAC control plane. Top-level states for endpoint bring-up:
 
 | State           | Description |
 | --------------- |:----------- |
@@ -48,7 +50,7 @@ The LTSSM is the heart of the MAC control plane. The top-level states relevant t
 <img alt="LTSSM state diagram" src="./images/MAC_LTSSM.png" width=300 height=400 />
 
 ## Symbols and Ordered Sets
-The MAC works with the PHY's control-symbol flags (`TxDataK`/`RxDataK`); the 8b/10b encoding itself lives in the SerDes. The control symbols (K-codes) it emits and recognises:
+The MAC uses the PHY's control-symbol flags (`TxDataK`/`RxDataK`); 8b/10b lives in the SerDes. Control symbols (K-codes) it emits and recognises:
 
 | Symbol | Code   | Name          | Use |
 | ------ |:------ |:------------- |:--- |
@@ -64,7 +66,7 @@ The MAC works with the PHY's control-symbol flags (`TxDataK`/`RxDataK`); the 8b/
 Ordered sets generated/detected by the MAC: **TS1/TS2** (Polling, Configuration, Recovery), **SKP** (clock compensation — insertion/removal is done by the PHY elastic buffer and reported via `RxStatus`).
 
 ## Scrambling
-Data (D) symbols are scrambled with the standard PCIe LFSR, polynomial **G(x) = x¹⁶ + x⁵ + x⁴ + x³ + 1**, advanced once per symbol. The LFSR is reset on COM, and scrambling is bypassed for all control symbols, TS1/TS2 training sequences and SKP sequences. The receive path runs the identical LFSR to descramble.
+Data (D) symbols are scrambled with the standard PCIe LFSR, **G(x) = x¹⁶ + x⁵ + x⁴ + x³ + 1**, advanced once per symbol and reset on COM. Bypassed for control symbols, TS1/TS2 and SKP. RX descrambles with the identical LFSR.
 
 <!--## Prerequisites
 The simulation can be run using the pcieVHost ... TODO
