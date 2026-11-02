@@ -4,7 +4,7 @@
   <img alt="PCIe EndPoint top-level stack" width="35%" src="../0.doc/2.rtl/pcie-ep-top-stack.png">
 </p>
 
-### Block Diagram: Implementation-centric partitioning
+### Block Diagram: Coding-ready partitioning
 
 <p align="center">
   <img alt="RTL blocks of the EndPoint: SOC, trn_bridge, soft TL+DLL+MAC, phy_top with the Cologne Chip soft wrapper and the GateMate SerDes, its BFM below" src="../0.doc/2.rtl/block-diagram.drawio.png" width="100%">
@@ -35,7 +35,7 @@ The rate is fixed at reset: no dynamic rate change ([Future Development](#future
 
 ### Compatibility goal: an Artix-7 EndPoint, in open source
 
-To its user, our EP looks exactly like the AMD Artix-7 EP, the `PCIE_2_1` hard macro in EndPoint mode.
+To its user, our EP looks exactly like the AMD Artix-7 EP, the `PCIE_2_1` hard macro in the 64-bit EndPoint mode.
 
 - **`trn_if` is plug-and-play, drop-in compatible with the TRN interface of `PCIE_2_1`**: same signals, widths and handshakes. Logic written for the HM connects unchanged; the TRN / AXI-Stream user interface is kept as-is.
 - The soft TL answers configuration requests itself, as the hard macro does.
@@ -86,8 +86,9 @@ Proprietary PCIE Core for Xilinx 7Series FPGA devices
 > - [Alex's wrappers for Xilinx and Altera PCIE HMs, with DMA](https://github.com/alexforencich/verilog-pcie)
 > - [LitePCIE wrappers for vendor (Xilinx, Gowin, Lattice, ...) PCIE HMs](https://github.com/enjoy-digital/litepcie)
 >
-> A common misconception: these are not open-source PCIE cores, but examples of how to use proprietary ones. Ours is currently the only open-source work creating a PCIE core itself.
+> A common misconception: these are not open-source PCIE cores, but examples of how to use proprietary ones. Ours is currently the only open-source work creating a PCIE EP core itself.
 
+---
 # PIO MemWr/Rd signalling flow: a walkthrough
 
 How a PIO write and a PIO read cross today's stack, layer by layer. Details: [MAC](3.mac/README.md), [DLL](4.dll/README.md), [TL](5.tlp/README.md), [SOC](6.soc/README.md).
@@ -119,11 +120,12 @@ A `Non-posted` transaction: the requester waits for a `Completion`.
 
 Configuration requests stop in the TL: `config_space` answers them and `cpl_gen` builds the completion. So do Unsupported Requests.
 
+---
 # Walkthrough Interface Layers
 
 The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.png), from the PIPE up: each interface and the layer above it.
 
-## 1) PIPE (`pipe_if`)
+## 1) PIPE (pipe_if)
 64-bit PIPE between the MAC and Cologne Chip's soft PHY. See [2.pipe](2.pipe/README.md) and [1.phy](1.phy/README.md).
 
 ## 2) MAC: Physical Layer to PIPE
@@ -139,7 +141,7 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 | FTS | ❌ | ❌ | no L0s |
 | Compliance pattern | ❌ | ❌ | |
 
-#### Other internal features
+#### Other
 
 | Feature | Support | Notes |
 |---|---|---|
@@ -149,7 +151,7 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 | Lane polarity inversion | ✅ | detected in Polling, `RxPolarity` to the PHY |
 | Lane reversal | — | x1 |
 
-## 3) DLL (`dll_if`)
+## 3) DLL (dll_if)
 
 #### DLLP generation and reception
 
@@ -161,7 +163,7 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 | PM_Enter_L1, PM_Enter_L23, PM_Active_State_Request_L1, PM_Request_Ack | ❌ | ❌ | no power management |
 | Vendor specific | ❌ | ❌ | |
 
-#### Other internal features
+#### Other
 
 | Feature | Support | Notes |
 |---|---|---|
@@ -176,7 +178,7 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 
 The TL starts a TLP only while `tx_tlp_ready` is high, and marks the last word of an odd-DW TLP with `tx_tlp_last_half` ([#21](https://github.com/chili-chips-ba/openCologne-PCIE/issues/21)).
 
-## 4) TL (`trn_if`)
+## 4) TL (trn_if)
 The user side of the TL: the 64-bit TRN bus, drop-in compatible with the Artix-7 `PCIE_2_1` hard macro's.
 
 #### TLP generation and reception
@@ -193,7 +195,7 @@ The user side of the TL: the 64-bit TRN bus, drop-in compatible with the Artix-7
 | Messages | PME_Turn_Off, Set_Slot_Power_Limit; others discarded or Unsupported Request | PME_TO_Ack, ERR_NONFATAL, ERR_FATAL | no legacy interrupts |
 | Cpl, CplD | ✅ to the SOC, `err_fwd` if poisoned | ✅ from the TL (configuration, Unsupported Request) and the SOC (its reads) | |
 
-#### Other internal features
+#### Other
 
 | Feature | Support | Notes |
 |---|---|---|
@@ -207,7 +209,7 @@ The user side of the TL: the 64-bit TRN bus, drop-in compatible with the Artix-7
 
 ## 5) Type 0 Configuration Space
 
-In the TL (`config_space`), as on the hard macro. Each register is one 32-bit word with a write mask, and an RW1C mask where needed.
+In the TL _config_space_, as on the hard macro. Each register is one 32-bit word with a write mask, and an RW1C mask where needed.
 
 | Capability | Implemented | Notes |
 |---|---|---|
@@ -219,10 +221,10 @@ In the TL (`config_space`), as on the hard macro. Each register is one 32-bit wo
 
 To the rest of the logic, through `cfg_if`: Bus and Device Number, Memory Space Enable, Bus Master Enable, Max_Payload_Size. Register list: [5.tlp](5.tlp/README.md#configuration-space).
 
-## 6) `axis_if` and TRN2PIO Bridge
+## 6) axis_if and TRN2PIO Bridge
 `trn_bridge` (`trn_rx`, `trn_tx`, `trn_tx_throttle`), unchanged from openPCIE, turns the TRN bus into the SOC's two 64-bit AXI-Stream streams (`axis_if`), as the AXI wrapper of `PCIE_2_1` does. Behind it, `riscv_pcie_soc` runs the PIO TestApp firmware on eduBOS5: it serves the MemWr and MemRd to BAR0 from its memory and builds the completions ([6.soc](6.soc/README.md), [3.sw](../3.sw/README.md)).
 
-## 7) CSR, HAL and Software Interface
+## 7) CSR, HAL and SW Interface
 The CSR block (`soc_csr`, at 0x3000_0000 on the CPU bus) is where the firmware meets the PCIE side: the `tx` registers (0x00) for the TLP to send, the `rx` window (0x10) for the received one, and `status` (0x24).
 
 **Handshake:** one TLP at a time each way, the firmware polls.
@@ -232,7 +234,7 @@ The CSR block (`soc_csr`, at 0x3000_0000 on the CPU bus) is where the firmware m
 
 <p align="center"><img src="../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></p>
 
-> **Future feature:** PIO bursts without the CPU, see [Future Development](#future-development).
+> **Food for thought:** PIO bursts without the CPU, see [Future Development](#future-development).
 
 The registers are written once, in SystemRDL ([`csr.rdl`](../4.build/csr_build/csr.rdl)). [PeakRDL](https://peakrdl.readthedocs.io) compiles that one file into the CSR RTL (`csr.sv`, `csr_pkg.sv`), the C header of the HAL (`csr.h`) and the register map docs ([`opencologne_pcie.md`](../4.build/csr_build/generated-files/opencologne_pcie.md)). RTL, firmware and docs cannot drift apart.
 
@@ -240,6 +242,7 @@ The registers are written once, in SystemRDL ([`csr.rdl`](../4.build/csr_build/c
 - **Firmware use:** [3.sw](../3.sw/README.md#ep-firmware)
 - **Co-simulation:** [5.sim](../5.sim/README.md#hal): the same firmware compiled for the host, each CSR access a _VProc_ bus cycle
 
+---
 # Future Development
 
 1. **Dynamic rate change (Gen1 ↔ Gen2).**
@@ -254,6 +257,8 @@ The registers are written once, in SystemRDL ([`csr.rdl`](../4.build/csr_build/c
    - It needs tags and outstanding-request tracking, Completion reassembly and timeouts, and Tx arbitration with the PIO path.
    - Descriptor CSRs for the firmware, and a host driver to hand out buffers.
 
+---
+---
 # Design Process and QA Methodology
 
 ### RTL coding guidelines
@@ -292,6 +297,8 @@ IEEE 1800-2009 SystemVerilog, the same rules as on [openPCIE](https://github.com
 - **Models follow the RTL:** a model keeps the ports, interfaces, structs, loops and names of the RTL it replaces.
 - **Formatting:** [`run-format.sh`](../4.build/hw_build/run-format.sh) puts every `if`, `else`, `always`, `for` and `initial` body in `begin` ... `end`, even a single statement, then runs Verible (`verible-verilog-format`) at its defaults plus all alignment options set to `align`, `end` and `else` on separate lines, LF line endings (flags in the script). Max 100 columns; wrap longer lines by hand. Run it last, after lint, before a commit; `--check` only lists unformatted files.
 
+---
+---
 ### Quality checks: lint, format, synthesis, simulation
 
 Lint finds what tests miss: undriven signals, truncated widths, unintended latches. The scripts in [`4.build/hw_build`](../4.build/hw_build) check all of `top`:
