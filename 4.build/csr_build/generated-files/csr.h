@@ -210,11 +210,24 @@ typedef struct __attribute__ ((__packed__)) {
     csr__status__cfg_id_t cfg_id;
 } csr__status_t;
 
+// mem - csr::rx_payload
+typedef struct __attribute__ ((__packed__)) {
+    uint32_t mem[64];
+} csr__rx_payload_t;
+
+// mem - csr::tx_payload
+typedef struct __attribute__ ((__packed__)) {
+    uint32_t mem[64];
+} csr__tx_payload_t;
+
 // addrmap - csr
 typedef struct __attribute__ ((__packed__)) {
     csr__tx_t tx;
     csr__rx_t rx;
     csr__status_t status;
+    uint8_t RESERVED_34_ff[0xcc];
+    csr__rx_payload_t rx_payload;
+    csr__tx_payload_t tx_payload;
 } csr_t;
 
 // addrmap - opencologne_pcie
@@ -225,7 +238,7 @@ typedef struct __attribute__ ((__packed__)) {
 } opencologne_pcie_t;
 
 
-static_assert(sizeof(opencologne_pcie_t) == 0x30000034, "Packing error");
+static_assert(sizeof(opencologne_pcie_t) == 0x30000300, "Packing error");
 
 #ifdef __cplusplus
 }

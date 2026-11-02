@@ -10,15 +10,15 @@
     <dt>Base Offset:</dt><dd class="address">0x10</dd>
     <dt>Size:</dt><dd class="address">0x14</dd>
     
-    <dt>Source:</dt><dd><a href="https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L136" target="_blank">csr.rdl</a></dd>
+    <dt>Source:</dt><dd><a href="https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L138" target="_blank">csr.rdl</a></dd>
     
 </dl>
 <h2>Description</h2>
 <div id="_Content.desc">
-<p>TLP Receive CSR (PCIe link --&gt; CPU). The first two beats of an
-incoming TLP are captured as they are: the 3 header DWORDs and
-the payload DWORD (or DW3 of a 4-DW header). The firmware decodes
-them, then clears rx.valid to take the next TLP.</p>
+<p>TLP Receive CSR (PCIe link --&gt; CPU). An incoming TLP is captured
+as it is: the 3 header DWORDs here, DW3 in rx.data and, from DW3
+on, every DWORD in rx_payload. The firmware decodes them, then
+clears rx.valid to take the next TLP.</p>
 </div>
 
 <h2>Contents</h2>

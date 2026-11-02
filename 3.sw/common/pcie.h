@@ -44,7 +44,9 @@
 //   The TL answers the host's Configuration requests itself, as the AMD
 //   PCIE_2_1 hard macro does; only Memory requests (and anything the TL
 //   passes on) reach the firmware, one TLP at a time through the CSR Rx
-//   window.
+//   window: the header in rx.header0..2, the DWORDs from DW3 on in
+//   rx_payload. A Completion goes out the same way, through tx.header0..2,
+//   tx.data and tx_payload.
 //==========================================================================
 
 #ifndef OPENCOLOGNE_PCIE_H
@@ -73,6 +75,12 @@
 #define PCIE_PHY_STATUS      CSR_REG32(status.phy)
 #define PCIE_RESULT          CSR_REG32(status.result)
 #define PCIE_CFG_ID          CSR_REG32(status.cfg_id)
+
+// The DWORDs of a TLP from DW3 on: entry i is DW 3+i (entry 0 is rx.data,
+// and on Tx tx.data stands for entry 0)
+#define PCIE_RX_PAYLOAD(i)   CSR_REG32(rx_payload.mem[i])
+#define PCIE_TX_PAYLOAD(i)   CSR_REG32(tx_payload.mem[i])
+#define PAYLOAD_DW           (sizeof(((csr_t *)0)->rx_payload.mem) / sizeof(uint32_t))
 
 // Field masks come from the generated csr.h
 #define TX_STATE_MASK        CSR__STATUS__PHY__TX_STATE_bm
@@ -103,6 +111,7 @@
 #define REQ_REQUESTER_ID(dw1) (((dw1) >> 16) & 0xFFFF)
 #define REQ_TAG(dw1)          (((dw1) >> 8) & 0xFF)
 #define REQ_FIRST_BE(dw1)     ((dw1) & 0xF)
+#define REQ_LAST_BE(dw1)      (((dw1) >> 4) & 0xF)
 
 // Completion headers
 #define TLP_CPLD           0x4A000000  // Fmt 10 (3 DW, data), Type 01010
@@ -111,12 +120,13 @@
 #define CPL_STAT_SC        0  // Successful Completion
 #define CPL_STAT_UR        1  // Unsupported Request
 
-// One TLP as the Rx window captured it
+// One TLP as the Rx window captured it; the DWORDs after data stay in
+// rx_payload until release_request()
 typedef struct {
     uint32_t dw0;
     uint32_t dw1;
     uint32_t dw2;   // 3-DW request: the address
-    uint32_t data;  // 3-DW MemWr: the payload; 4-DW request: the low address
+    uint32_t data;  // 3-DW MemWr: the 1st payload DWORD; 4-DW request: the low address
 } tlp_t;
 
 __attribute__((noreturn)) void halt(uint32_t marker);
@@ -125,6 +135,10 @@ void     wait_for_request(tlp_t *req);
 void     release_request(void);
 uint32_t completer_id(void);
 void     send_completion(const tlp_t *req, uint32_t status, int with_data, uint32_t data);
+void     send_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
+                   const uint32_t *data, uint32_t n);
+uint32_t tlp_length(const tlp_t *req);
+uint32_t req_addr(const tlp_t *req);
 int      is_posted(const tlp_t *req);
 uint32_t be_mask(uint32_t first_be);
 

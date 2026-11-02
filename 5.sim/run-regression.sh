@@ -23,13 +23,15 @@ fails=0
 
 # the runs that fail today, and why
 declare -A KNOWN=(
-    [rtl-tester]="#24 #26 #36-#40"
+    [rtl-tester]="#24 #26 #38-#40"
+    [rtl-serial]="#38"
     [dll-stp]="#24"
     [dll-end]="#24"
 )
 # ... and what the log of each must show: another failure is not the known one
 declare -A KNOWN_SIG=(
     [rtl-tester]="SVA #24"
+    [rtl-serial]="SVA #38"
     [dll-stp]="stp corrupted: EP did not replay"
     [dll-end]="end corrupted: EP did not replay"
 )

@@ -8,8 +8,8 @@
 package csr_pkg;
 
     localparam CSR_DATA_WIDTH = 32;
-    localparam CSR_MIN_ADDR_WIDTH = 6;
-    localparam CSR_SIZE = 'h34;
+    localparam CSR_MIN_ADDR_WIDTH = 10;
+    localparam CSR_SIZE = 'h300;
 
     typedef struct {
         logic [31:0] next;
@@ -99,8 +99,22 @@ package csr_pkg;
     } csr__status__in_t;
 
     typedef struct {
+        logic rd_ack;
+        logic [31:0] rd_data;
+        logic wr_ack;
+    } csr__rx_payload__external__in_t;
+
+    typedef struct {
+        logic rd_ack;
+        logic [31:0] rd_data;
+        logic wr_ack;
+    } csr__tx_payload__external__in_t;
+
+    typedef struct {
         csr__rx__in_t rx;
         csr__status__in_t status;
+        csr__rx_payload__external__in_t rx_payload;
+        csr__tx_payload__external__in_t tx_payload;
     } csr__in_t;
 
     typedef struct {
@@ -168,8 +182,26 @@ package csr_pkg;
     } csr__status__out_t;
 
     typedef struct {
+        logic req;
+        logic [7:0] addr;
+        logic req_is_wr;
+        logic [31:0] wr_data;
+        logic [31:0] wr_biten;
+    } csr__rx_payload__external__out_t;
+
+    typedef struct {
+        logic req;
+        logic [7:0] addr;
+        logic req_is_wr;
+        logic [31:0] wr_data;
+        logic [31:0] wr_biten;
+    } csr__tx_payload__external__out_t;
+
+    typedef struct {
         csr__tx__out_t tx;
         csr__rx__out_t rx;
         csr__status__out_t status;
+        csr__rx_payload__external__out_t rx_payload;
+        csr__tx_payload__external__out_t tx_payload;
     } csr__out_t;
 endpackage

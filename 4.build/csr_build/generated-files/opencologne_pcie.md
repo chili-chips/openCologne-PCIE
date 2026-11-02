@@ -15,7 +15,7 @@ Don't override. Generated from: opencologne_pcie
 
 - Absolute Address: 0x0
 - Base Offset: 0x0
-- Size: 0x30000034
+- Size: 0x30000300
 
 |  Offset  |Identifier|Name|
 |----------|----------|----|
@@ -37,15 +37,17 @@ No supported members.
 
 - Absolute Address: 0x30000000
 - Base Offset: 0x30000000
-- Size: 0x34
+- Size: 0x300
 
 <p>openCologne-PCIE EndPoint CSR</p>
 
-|Offset|Identifier|   Name   |
-|------|----------|----------|
-| 0x00 |    tx    |  csr.tx  |
-| 0x10 |    rx    |  csr.rx  |
-| 0x24 |  status  |csr.status|
+|Offset|Identifier|     Name     |
+|------|----------|--------------|
+| 0x000|    tx    |    csr.tx    |
+| 0x010|    rx    |    csr.rx    |
+| 0x024|  status  |  csr.status  |
+| 0x100|rx_payload|csr.rx_payload|
+| 0x200|tx_payload|csr.tx_payload|
 
 ## tx register file
 
@@ -124,9 +126,11 @@ No supported members.
 
 #### payload field
 
-<p>Payload DWORD of the outgoing TLP. A software write to this
-register is what launches the Tx FSM, so it must be written
-LAST, after the three header registers. The write strobe is
+<p>4th DWORD of the outgoing TLP: the 1st payload DWORD of a
+3-DW TLP, or DW3 of a 4-DW header. Further DWORDs come from
+tx_payload. A software write to this register is what
+launches the Tx FSM, so it must be written LAST, after the
+three header registers and tx_payload. The write strobe is
 exported to logic as the 'swmod' output of this field.</p>
 
 ## rx register file
@@ -135,10 +139,10 @@ exported to logic as the 'swmod' output of this field.</p>
 - Base Offset: 0x10
 - Size: 0x14
 
-<p>TLP Receive CSR (PCIe link --&gt; CPU). The first two beats of an
-incoming TLP are captured as they are: the 3 header DWORDs and
-the payload DWORD (or DW3 of a 4-DW header). The firmware decodes
-them, then clears rx.valid to take the next TLP.</p>
+<p>TLP Receive CSR (PCIe link --&gt; CPU). An incoming TLP is captured
+as it is: the 3 header DWORDs here, DW3 in rx.data and, from DW3
+on, every DWORD in rx_payload. The firmware decodes them, then
+clears rx.valid to take the next TLP.</p>
 
 |Offset|Identifier|     Name     |
 |------|----------|--------------|
@@ -210,8 +214,9 @@ them, then clears rx.valid to take the next TLP.</p>
 
 #### payload field
 
-<p>4th DWORD of the received TLP: the payload of a 3-DW
-MemWr, or the low address of a 4-DW request</p>
+<p>4th DWORD of the received TLP: the 1st payload DWORD of a
+3-DW MemWr, or the low address of a 4-DW request. The same
+DWORD is entry 0 of rx_payload.</p>
 
 ### valid register
 
@@ -283,8 +288,9 @@ writes 1 to clear it once it has read the TLP.</p>
 #### tx_state field
 
 <p>State of the Tx FSM: 0 = IDLE, 1 = SEND_CYCLE_1,
-2 = SEND_CYCLE_2. Software polls for 0 before it starts
-loading the next TLP.</p>
+2 = SEND_CYCLE_2, 3 = SEND_REST (beats out of tx_payload).
+Software polls for 0 before it starts loading the next
+TLP.</p>
 
 ### result register
 
@@ -326,3 +332,29 @@ Completer ID of every Completion it sends. It is 0 until
 the host has configured the EP, and its bus number depends
 on the topology: behind a switch it is not the same as on
 a direct link.</p>
+
+## rx_payload memory
+
+- Absolute Address: 0x30000100
+- Base Offset: 0x100
+- Size: 0x100
+
+<p>DWORDs of the received TLP from DW3 on, captured with rx.valid:
+entry i is DW 3+i, so entry 0 is rx.data. DWORDs past the last
+entry are dropped.</p>
+
+No supported members.
+
+
+## tx_payload memory
+
+- Absolute Address: 0x30000200
+- Base Offset: 0x200
+- Size: 0x100
+
+<p>DWORDs of the outgoing TLP from DW4 on: entry i is DW 3+i. DW3
+is tx.data, written last to launch the transfer, so entry 0 is
+not sent. The TLP's Fmt and Length say how many entries go out.</p>
+
+No supported members.
+

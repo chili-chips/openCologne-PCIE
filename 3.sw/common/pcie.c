@@ -53,11 +53,15 @@ __attribute__((noreturn)) void halt(uint32_t marker) {
 #endif
 }
 
-// Waits until the Tx FSM is idle and the core has a free buffer, then loads
-// the three header DWORDs. Writing tx.data last is what sends the TLP.
-void send_tlp(uint32_t h0, uint32_t h1, uint32_t h2, uint32_t data) {
+// Waits until the Tx FSM is idle and the core has a free buffer
+static void wait_tx_ready(void) {
     while (((PCIE_PHY_STATUS & TX_STATE_MASK) != 0) ||
            ((PCIE_PHY_STATUS & TX_BUF_MASK) == 0));
+}
+
+// Loads the three header DWORDs. Writing tx.data last is what sends the TLP.
+void send_tlp(uint32_t h0, uint32_t h1, uint32_t h2, uint32_t data) {
+    wait_tx_ready();
 
     PCIE_TX_HEADER0 = h0;
     PCIE_TX_HEADER1 = h1;
@@ -87,6 +91,18 @@ void release_request(void) {
 // so it is read here, never hard-coded.
 uint32_t completer_id(void) {
     return PCIE_CFG_ID & CFG_ID_MASK;
+}
+
+// Length in DWORDs, 0 standing for 1024
+uint32_t tlp_length(const tlp_t *req) {
+    uint32_t len = TLP_LENGTH(req->dw0);
+
+    return (len == 0) ? 1024 : len;
+}
+
+// 3-DW request: the address is DW2; 4-DW (64-bit) request: the low half is DW3
+uint32_t req_addr(const tlp_t *req) {
+    return (TLP_FMT(req->dw0) & 0x1) ? req->data : req->dw2;
 }
 
 // Posted requests get no Completion: Memory Writes and Messages
@@ -130,7 +146,7 @@ static uint32_t cpl_byte_count(uint32_t be) {
 
 static uint32_t cpl_lower_addr(const tlp_t *req) {
     uint32_t be    = REQ_FIRST_BE(req->dw1);
-    uint32_t addr  = (TLP_FMT(req->dw0) & 0x1) ? req->data : req->dw2;  // 4-DW: low address in DW3
+    uint32_t addr  = req_addr(req);
     uint32_t first = 0;
 
     if (be != 0) {
@@ -150,6 +166,28 @@ void send_completion(const tlp_t *req, uint32_t status, int with_data, uint32_t 
                    cpl_lower_addr(req);
 
     send_tlp(dw0, dw1, dw2, data);
+}
+
+// A Completion with Data of n DWORDs (1 to PAYLOAD_DW), Successful: the
+// caller gives the Byte Count and Lower Address, as a read longer than 1 DW
+// may take several Completions. data[0] goes into tx.data, the rest into
+// tx_payload, before tx.data launches it.
+void send_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
+               const uint32_t *data, uint32_t n) {
+    uint32_t dw0 = TLP_CPLD | (n & 0x3FF) | TLP_TC_ATTR(req->dw0);
+    uint32_t dw1 = (completer_id() << 16) | (byte_count & 0xFFF);
+    uint32_t dw2 = (REQ_REQUESTER_ID(req->dw1) << 16) | (REQ_TAG(req->dw1) << 8) |
+                   (lower_addr & 0x7F);
+
+    wait_tx_ready();
+
+    for (uint32_t i = 1; i < n; i++) {
+        PCIE_TX_PAYLOAD(i) = data[i];
+    }
+    PCIE_TX_HEADER0 = dw0;
+    PCIE_TX_HEADER1 = dw1;
+    PCIE_TX_HEADER2 = dw2;
+    PCIE_TX_DATA    = data[0];
 }
 
 // -----------------------------------------------------------------------------

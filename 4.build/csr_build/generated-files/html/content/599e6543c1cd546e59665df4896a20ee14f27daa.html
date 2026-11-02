@@ -10,7 +10,7 @@
     <dt>Base Offset:</dt><dd class="address">0xc</dd>
     <dt>Size:</dt><dd class="address">0x4</dd>
     
-    <dt>Source:</dt><dd><a href="https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L182" target="_blank">csr.rdl</a></dd>
+    <dt>Source:</dt><dd><a href="https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L184" target="_blank">csr.rdl</a></dd>
     
 </dl>
 <h2>Description</h2>
@@ -63,7 +63,8 @@
     <a class="headerlink" href="#payload.desc" title="Permalink to this headline"></a>
 </h3>
 <div id="_Content.payload.desc">
-<p>4th DWORD of the received TLP: the payload of a 3-DW
-MemWr, or the low address of a 4-DW request</p>
+<p>4th DWORD of the received TLP: the 1st payload DWORD of a
+3-DW MemWr, or the low address of a 4-DW request. The same
+DWORD is entry 0 of rx_payload.</p>
 </div>
 </div>

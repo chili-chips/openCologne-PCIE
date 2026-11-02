@@ -297,7 +297,8 @@ module riscv_pcie_soc
   typedef enum logic [1:0] {
     IDLE         = 2'd0,
     SEND_CYCLE_1 = 2'd1,
-    SEND_CYCLE_2 = 2'd2
+    SEND_CYCLE_2 = 2'd2,
+    SEND_REST    = 2'd3   // beats from the 3rd on, out of tx_payload
   } tx_state_e;
   tx_state_e tx_state;
 
@@ -349,6 +350,55 @@ module riscv_pcie_soc
   assign tx_data    = csr_out.tx.data.payload.value;
   assign tx_start   = csr_out.tx.data.payload.swmod;
 
+  // A TLP is a stream of DWORDs: DW0..DW2 from tx.header0..2, DW3 from
+  // tx.data, DW 3+i from tx_payload entry i. Two DWORDs a beat: beat k from 2
+  // on carries DW 2k (entry 2k-3) and DW 2k+1 (entry 2k-2). tx_payload is two
+  // banks, odd and even entries, so that both DWORDs of a beat are read in one
+  // clock, a cycle ahead (tx_ra) as the RAMs have a registered read.
+  localparam int PAYLOAD_DW = 64;  // csr.rdl: tx_payload, rx_payload entries
+
+  logic [31:0] tx_pl_even_q;
+  logic [31:0] tx_pl_odd_q;
+  logic [10:0] tx_dws;  // DWORDs in the TLP
+  logic [ 9:0] tx_beats;  // beats in the TLP
+  logic [ 9:0] tx_nb;  // next beat to load, from 2 on
+  logic [ 9:0] tx_ra;  // beat whose two DWORDs are read from the banks
+  logic        tx_take;
+  logic        tx_load;
+  logic [10:0] tx_len_c;
+  logic [10:0] tx_dws_c;
+  logic [ 4:0] tx_pl_widx;
+
+  // Fmt[0]: 4-DW header; Fmt[1]: with data, Length DWORDs (0: 1024)
+  assign tx_len_c   = (tx_dw0.length == '0) ? 11'd1024 : 11'(tx_dw0.length);
+  assign tx_dws_c   = 11'd3 + 11'(tx_dw0.fmt[0]) + (tx_dw0.fmt[1] ? tx_len_c : 11'd0);
+
+  assign tx_take    = s_axis_tx.tvalid && s_axis_tx.tready;
+  assign tx_load    = tx_take && (tx_state inside {SEND_CYCLE_2, SEND_REST}) && (tx_nb < tx_beats);
+  assign tx_ra      = tx_load ? tx_nb + 10'd1 : tx_nb;
+  assign tx_pl_widx = csr_out.tx_payload.addr[7:3];
+
+  // the two banks: even entries 0, 2, 4 ..., odd entries 1, 3, 5 ...
+  logic [31:0] tx_pl_even[PAYLOAD_DW/2];
+  logic [31:0] tx_pl_odd [PAYLOAD_DW/2];
+
+  always_ff @(posedge clk) begin
+    if (csr_out.tx_payload.req && csr_out.tx_payload.req_is_wr) begin
+      if (csr_out.tx_payload.addr[2]) begin
+        tx_pl_odd[tx_pl_widx] <= csr_out.tx_payload.wr_data;
+      end
+      else begin
+        tx_pl_even[tx_pl_widx] <= csr_out.tx_payload.wr_data;
+      end
+    end
+    tx_pl_odd_q  <= tx_pl_odd[5'(tx_ra-10'd2)];
+    tx_pl_even_q <= tx_pl_even[5'(tx_ra-10'd1)];
+  end
+
+  assign csr_in.tx_payload.wr_ack  = csr_out.tx_payload.req && csr_out.tx_payload.req_is_wr;
+  assign csr_in.tx_payload.rd_ack  = 1'b0;  // write-only
+  assign csr_in.tx_payload.rd_data = '0;
+
   always_ff @(posedge clk or negedge resetn) begin
     if (!resetn) begin
       tx_state          <= IDLE;
@@ -357,11 +407,17 @@ module riscv_pcie_soc
       s_axis_tx.tkeep   <= '0;
       s_axis_tx.tlast   <= 1'b0;
       tx_packet_counter <= '0;
+      tx_dws            <= '0;
+      tx_beats          <= '0;
+      tx_nb             <= 10'd2;
     end
     else begin
       if (tx_start) begin
         tx_state          <= SEND_CYCLE_1;
         tx_packet_counter <= tx_packet_counter + 32'd1;
+        tx_dws            <= tx_dws_c;
+        tx_beats          <= 10'((tx_dws_c + 11'd1) >> 1);
+        tx_nb             <= 10'd2;
       end
 
       unique case (tx_state)
@@ -371,8 +427,8 @@ module riscv_pcie_soc
         SEND_CYCLE_1: begin
           if (s_axis_tx.tvalid && s_axis_tx.tready) begin
             s_axis_tx.tdata <= {tx_data, tx_header2};
-            s_axis_tx.tkeep <= tx_dw0.fmt[1] ? 8'hFF : 8'h0F;  // with data: DW2 + payload
-            s_axis_tx.tlast <= 1'b1;
+            s_axis_tx.tkeep <= (tx_dws > 11'd3) ? 8'hFF : 8'h0F;  // DW2, and DW3 if there is one
+            s_axis_tx.tlast <= (tx_beats == 10'd2);
             tx_state        <= SEND_CYCLE_2;
           end
           else begin
@@ -382,8 +438,15 @@ module riscv_pcie_soc
             s_axis_tx.tlast  <= 1'b0;
           end
         end
-        SEND_CYCLE_2: begin
-          if (s_axis_tx.tvalid && s_axis_tx.tready) begin
+        SEND_CYCLE_2, SEND_REST: begin
+          if (tx_load) begin
+            s_axis_tx.tdata <= {tx_pl_even_q, tx_pl_odd_q};
+            s_axis_tx.tkeep <= ({tx_nb, 1'b1} < tx_dws) ? 8'hFF : 8'h0F;  // DW 2k, DW 2k+1 if any
+            s_axis_tx.tlast <= (tx_nb == tx_beats - 10'd1);
+            tx_nb           <= tx_nb + 10'd1;
+            tx_state        <= SEND_REST;
+          end
+          else if (tx_take) begin
             s_axis_tx.tvalid <= 1'b0;
             s_axis_tx.tlast  <= 1'b0;
             tx_state         <= IDLE;
@@ -393,19 +456,31 @@ module riscv_pcie_soc
     end
   end
 
-  // ---- Rx: the first two beats of any TLP, written into the CSR as-is -----
-  // 1st beat carries header DW0/DW1, the 2nd one DW2 and the payload DWORD (or
-  // DW3 of a 4-DW header); later beats are taken and dropped. rx.valid is set
-  // at the end of the TLP and holds the link off until the firmware clears it.
-  logic rx_valid;
-  logic rx_beat;
-  logic rx_dw0;
-  logic rx_dw2;
+  // ---- Rx: a TLP written into the CSR as-is -------------------------------
+  // 1st beat carries header DW0/DW1, the 2nd one DW2 and DW3 (the 1st payload
+  // DWORD, or DW3 of a 4-DW header), beat k from 2 on DW 2k and DW 2k+1.
+  // From DW3 on, DW 3+i goes into rx_payload entry i, two banks as in Tx;
+  // DWORDs past the last entry are dropped. rx.valid is set at the end of the
+  // TLP and holds the link off until the firmware clears it.
+  logic        rx_valid;
+  logic        rx_beat;
+  logic        rx_dw0;
+  logic        rx_dw2;
+  logic        rx_rest;
+  logic [ 9:0] rx_k;  // beat k - 2 while in RX_REST
+
+  logic [31:0] rx_pl_even_q;
+  logic [31:0] rx_pl_odd_q;
+  logic        rx_pl_odd_sel;
+  logic        rx_pl_rd;
+  logic        rx_pl_ack;
+  logic [ 4:0] rx_pl_ridx;
 
   assign rx_valid = csr_out.rx.valid.valid.value;
   assign rx_beat  = m_axis_rx.tvalid & m_axis_rx.tready;
   assign rx_dw0   = rx_beat & (rx_phase == RX_HDR0);
   assign rx_dw2   = rx_beat & (rx_phase == RX_HDR2);
+  assign rx_rest  = rx_beat & (rx_phase == RX_REST);
 
   always_ff @(posedge clk or negedge resetn) begin
     if (!resetn) begin
@@ -421,6 +496,53 @@ module riscv_pcie_soc
       rx_phase <= RX_REST;
     end
   end
+
+  always_ff @(posedge clk or negedge resetn) begin
+    if (!resetn) begin
+      rx_k <= '0;
+    end
+    else if (rx_dw2) begin
+      rx_k <= '0;
+    end
+    else if (rx_rest && (rx_k != '1)) begin
+      rx_k <= rx_k + 10'd1;
+    end
+  end
+
+  assign rx_pl_rd   = csr_out.rx_payload.req && !csr_out.rx_payload.req_is_wr;
+  assign rx_pl_ridx = csr_out.rx_payload.addr[7:3];
+
+  // the two banks: even entries 0, 2, 4 ..., odd entries 1, 3, 5 ...
+  logic [31:0] rx_pl_even[PAYLOAD_DW/2];
+  logic [31:0] rx_pl_odd [PAYLOAD_DW/2];
+
+  always_ff @(posedge clk) begin
+    if (rx_dw2) begin
+      rx_pl_even[0] <= m_axis_rx.tdata[63:32];
+    end
+    else if (rx_rest && (rx_k < 10'(PAYLOAD_DW / 2 - 1))) begin
+      rx_pl_even[5'(rx_k+10'd1)] <= m_axis_rx.tdata[63:32];
+    end
+    if (rx_rest && (rx_k < 10'(PAYLOAD_DW / 2))) begin
+      rx_pl_odd[5'(rx_k)] <= m_axis_rx.tdata[31:0];
+    end
+    rx_pl_even_q  <= rx_pl_even[rx_pl_ridx];
+    rx_pl_odd_q   <= rx_pl_odd[rx_pl_ridx];
+    rx_pl_odd_sel <= csr_out.rx_payload.addr[2];
+  end
+
+  always_ff @(posedge clk or negedge resetn) begin
+    if (!resetn) begin
+      rx_pl_ack <= 1'b0;
+    end
+    else begin
+      rx_pl_ack <= rx_pl_rd;
+    end
+  end
+
+  assign csr_in.rx_payload.rd_ack = rx_pl_ack;
+  assign csr_in.rx_payload.rd_data = rx_pl_odd_sel ? rx_pl_odd_q : rx_pl_even_q;
+  assign csr_in.rx_payload.wr_ack = 1'b0;  // read-only
 
   assign csr_in.rx.header0.hdr.we = rx_dw0;
   assign csr_in.rx.header0.hdr.next = m_axis_rx.tdata[31:0];

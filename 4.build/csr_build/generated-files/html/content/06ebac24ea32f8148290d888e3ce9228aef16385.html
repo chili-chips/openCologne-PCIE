@@ -63,9 +63,11 @@
     <a class="headerlink" href="#payload.desc" title="Permalink to this headline"></a>
 </h3>
 <div id="_Content.payload.desc">
-<p>Payload DWORD of the outgoing TLP. A software write to this
-register is what launches the Tx FSM, so it must be written
-LAST, after the three header registers. The write strobe is
+<p>4th DWORD of the outgoing TLP: the 1st payload DWORD of a
+3-DW TLP, or DW3 of a 4-DW header. Further DWORDs come from
+tx_payload. A software write to this register is what
+launches the Tx FSM, so it must be written LAST, after the
+three header registers and tx_payload. The write strobe is
 exported to logic as the 'swmod' output of this field.</p>
 </div>
 </div>

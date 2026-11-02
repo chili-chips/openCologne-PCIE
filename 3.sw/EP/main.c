@@ -39,21 +39,22 @@
 // Description:
 //   EP firmware: a PIO target. The host (openPCIE Artix-7 RC, Raspberry Pi or
 //   PC) enumerates the EP and gives BAR0 an address -- the TL handles all of
-//   that -- then reads and writes DWORDs inside BAR0. Each Memory request
-//   reaches the firmware here:
-//     - MemWr: the payload DWORD is stored, byte enables honoured; posted,
-//       so no answer
-//     - MemRd: the stored DWORD goes back in a Completion with Data
+//   that -- then reads and writes inside BAR0. Each Memory request reaches
+//   the firmware here:
+//     - MemWr, 3-DW or 4-DW header: every payload DWORD is stored, First and
+//       Last DW Byte Enables honoured; posted, so no answer
+//     - MemRd: the stored DWORDs go back in Completions with Data, split at
+//       the Read Completion Boundary
 //     - any other non-posted request: a Completion with Unsupported Request
-//   The PIO window is a small array in the SOC RAM, PIO_WORDS DWORDs; BAR0
-//   offsets wrap around it. Only single-DWORD requests are served: a MemWr
-//   stores its first DWORD, a longer MemRd gets Unsupported Request.
+//   The PIO window is an array in the SOC RAM as large as BAR0, PIO_WORDS
+//   DWORDs; an access past the end of BAR0 wraps around to its start.
 //==========================================================================
 
 #include "pcie.h"
 
-#define PIO_WORDS    256          // 1 KB of the 8 KB RAM
+#define PIO_WORDS    1024         // 4 KB of the 8 KB RAM: all of BAR0 (config_space BAR0_SIZE_BITS)
 #define PIO_INDEX(a) (((a) >> 2) & (PIO_WORDS - 1))
+#define RCB_BYTES    64           // Read Completion Boundary (Link Control RCB = 0)
 
 // Result markers written to PCIE_RESULT
 #define RESULT_RUNNING 0x00000001 // waiting for the host
@@ -61,17 +62,78 @@
 
 static uint32_t pio_mem[PIO_WORDS];
 
-// 3-DW request: the address is DW2; 4-DW (64-bit) request: the low half is DW3
-static uint32_t req_addr(const tlp_t *req) {
-    return (TLP_FMT(req->dw0) & 0x1) ? req->data : req->dw2;
+// First and last enabled byte of a DWORD's Byte Enables; none enabled counts
+// as byte 0
+static uint32_t be_first(uint32_t be) {
+    uint32_t i = 0;
+
+    while (i < 3 && !(be & (1u << i))) i++;
+    return i;
+}
+
+static uint32_t be_last(uint32_t be) {
+    uint32_t i = 3;
+
+    while (i > 0 && !(be & (1u << i))) i--;
+    return i;
+}
+
+// MemWr: payload DWORD i is rx_payload entry i, or i+1 behind a 4-DW header
+static void mem_write(const tlp_t *req) {
+    uint32_t len   = tlp_length(req);
+    uint32_t first = TLP_FMT(req->dw0) & 0x1;
+    uint32_t idx   = PIO_INDEX(req_addr(req));
+
+    for (uint32_t i = 0; i < len && first + i < PAYLOAD_DW; i++) {
+        uint32_t be   = (i == 0) ? REQ_FIRST_BE(req->dw1) : (i == len - 1) ? REQ_LAST_BE(req->dw1) : 0xF;
+        uint32_t mask = be_mask(be);
+        uint32_t data = PCIE_RX_PAYLOAD(first + i);
+        uint32_t w    = (idx + i) & (PIO_WORDS - 1);
+
+        pio_mem[w] = (pio_mem[w] & ~mask) | (data & mask);
+    }
+}
+
+// MemRd: one Completion per RCB block the read touches. Byte Count is what is
+// left of the read from the Completion's first byte on, Lower Address that
+// first byte (Base Specification 2.1, 2.3.1.1 and 2.2.9)
+static void mem_read(const tlp_t *req) {
+    uint32_t data[RCB_BYTES / 4];
+    uint32_t len  = tlp_length(req);
+    uint32_t addr = req_addr(req) & ~0x3u;
+    uint32_t fbe  = REQ_FIRST_BE(req->dw1);
+    uint32_t lbe  = (len == 1) ? fbe : REQ_LAST_BE(req->dw1);
+    uint32_t lo   = be_first(fbe);
+    uint32_t hi   = (fbe == 0 && len == 1) ? 0 : be_last(lbe);
+    uint32_t left = len * 4 - lo - (3 - hi);  // Byte Count of the whole read
+    uint32_t dw   = 0;
+
+    while (dw < len) {
+        uint32_t a = addr + dw * 4;
+        uint32_t n = (RCB_BYTES - (a & (RCB_BYTES - 1))) / 4;
+
+        if (n > len - dw) {
+            n = len - dw;
+        }
+        for (uint32_t i = 0; i < n; i++) {
+            data[i] = pio_mem[PIO_INDEX(a + i * 4)];
+        }
+        send_cpld(req, left, (dw == 0) ? (a | lo) : a, data, n);
+
+        left -= n * 4 - ((dw == 0) ? lo : 0);
+        dw   += n;
+    }
 }
 
 int main() {
 
     PCIE_RESULT = RESULT_RUNNING;
 
-    for (int i = 0; i < PIO_WORDS; i++) {
-        pio_mem[i] = 0;
+    // 8 DWORDs a turn: the firmware is built without -O, and a plain loop
+    // over all of BAR0 keeps the host's first read waiting about 1 ms
+    for (uint32_t *p = pio_mem; p < pio_mem + PIO_WORDS; p += 8) {
+        p[0] = 0; p[1] = 0; p[2] = 0; p[3] = 0;
+        p[4] = 0; p[5] = 0; p[6] = 0; p[7] = 0;
     }
 
     while (1) {
@@ -82,26 +144,17 @@ int main() {
         uint32_t fmt  = TLP_FMT(req.dw0);
         uint32_t type = TLP_TYPE(req.dw0);
 
-        if (type == TYPE_MEM && fmt == FMT_3DW_DATA) {
-            // A 4-DW MemWr carries its payload in the 3rd beat, outside the
-            // Rx window; with a 32-bit BAR0 the host sends 3-DW ones
-            uint32_t idx  = PIO_INDEX(req.dw2);
-            uint32_t mask = be_mask(REQ_FIRST_BE(req.dw1));
-
-            pio_mem[idx] = (pio_mem[idx] & ~mask) | (req.data & mask);
+        if (type == TYPE_MEM && (fmt == FMT_3DW_DATA || fmt == FMT_4DW_DATA)) {
+            mem_write(&req);
 
         } else if (type == TYPE_MEM && (fmt == FMT_3DW_NODATA || fmt == FMT_4DW_NODATA)) {
-            if (TLP_LENGTH(req.dw0) == 1) {
-                send_completion(&req, CPL_STAT_SC, 1, pio_mem[PIO_INDEX(req_addr(&req))]);
-                PCIE_RESULT = RESULT_PASS;
-            } else {
-                send_completion(&req, CPL_STAT_UR, 0, 0);
-            }
+            mem_read(&req);
+            PCIE_RESULT = RESULT_PASS;
 
         } else if (!is_posted(&req)) {
             send_completion(&req, CPL_STAT_UR, 0, 0);
         }
-        // anything else posted (a 4-DW MemWr, a Message) is dropped
+        // anything else posted (a Message) is dropped
 
         release_request();
     }

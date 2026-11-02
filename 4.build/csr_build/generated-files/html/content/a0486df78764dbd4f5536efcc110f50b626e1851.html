@@ -10,7 +10,7 @@
     <dt>Base Offset:</dt><dd class="address">0x4</dd>
     <dt>Size:</dt><dd class="address">0x4</dd>
     
-    <dt>Source:</dt><dd><a href="https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L232" target="_blank">csr.rdl</a></dd>
+    <dt>Source:</dt><dd><a href="https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L235" target="_blank">csr.rdl</a></dd>
     
 </dl>
 <h2>Description</h2>
@@ -93,8 +93,9 @@
 </h3>
 <div id="_Content.tx_state.desc">
 <p>State of the Tx FSM: 0 = IDLE, 1 = SEND_CYCLE_1,
-2 = SEND_CYCLE_2. Software polls for 0 before it starts
-loading the next TLP.</p>
+2 = SEND_CYCLE_2, 3 = SEND_REST (beats out of tx_payload).
+Software polls for 0 before it starts loading the next
+TLP.</p>
 </div>
 
 <h3 id="tx_buf_avail.desc">tx_buf_avail - csr.status.phy.tx_buf_avail[5:0]

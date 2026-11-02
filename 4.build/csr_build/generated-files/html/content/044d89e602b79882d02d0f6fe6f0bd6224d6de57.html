@@ -8,7 +8,7 @@
     <dt>Absolute Address:</dt><dd id="_AbsAddr" class="address"></dd>
     <div id="_AbsAddrDetails"></div>
     <dt>Base Offset:</dt><dd class="address">0x30000000</dd>
-    <dt>Size:</dt><dd class="address">0x34</dd>
+    <dt>Size:</dt><dd class="address">0x300</dd>
     
     <dt>Source:</dt><dd><a href="https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L63" target="_blank">csr.rdl</a></dd>
     
@@ -28,7 +28,7 @@
         <th></th>
     </tr>
     <tr id="tx">
-        <td class="address">0x00</td>
+        <td class="address">0x000</td>
         <td><a href="?p=opencologne_pcie.csr.tx" data-id="3" onclick="onClickNodeLink(event); return(false)">tx</a></td>
         <td>csr.tx</td>
         <td>
@@ -36,7 +36,7 @@
         </td>
     </tr>
     <tr id="rx">
-        <td class="address">0x10</td>
+        <td class="address">0x010</td>
         <td><a href="?p=opencologne_pcie.csr.rx" data-id="8" onclick="onClickNodeLink(event); return(false)">rx</a></td>
         <td>csr.rx</td>
         <td>
@@ -44,11 +44,33 @@
         </td>
     </tr>
     <tr id="status">
-        <td class="address">0x24</td>
+        <td class="address">0x024</td>
         <td><a href="?p=opencologne_pcie.csr.status" data-id="14" onclick="onClickNodeLink(event); return(false)">status</a></td>
         <td>csr.status</td>
         <td>
             <a class="headerlink" href="#status" title="Permalink to this row"></a>
+        </td>
+    </tr>
+    <tr class="reserved-addr">
+    <td class="address">0x034</td>
+    <td>-</td>
+    <td>-</td>
+    <td></td>
+</tr>
+    <tr id="rx_payload">
+        <td class="address">0x100</td>
+        <td><a href="?p=opencologne_pcie.csr.rx_payload" data-id="19" onclick="onClickNodeLink(event); return(false)">rx_payload</a></td>
+        <td>csr.rx_payload</td>
+        <td>
+            <a class="headerlink" href="#rx_payload" title="Permalink to this row"></a>
+        </td>
+    </tr>
+    <tr id="tx_payload">
+        <td class="address">0x200</td>
+        <td><a href="?p=opencologne_pcie.csr.tx_payload" data-id="20" onclick="onClickNodeLink(event); return(false)">tx_payload</a></td>
+        <td>csr.tx_payload</td>
+        <td>
+            <a class="headerlink" href="#tx_payload" title="Permalink to this row"></a>
         </td>
     </tr>
 </table>

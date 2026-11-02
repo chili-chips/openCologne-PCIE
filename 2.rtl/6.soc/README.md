@@ -26,19 +26,22 @@
 
 | Offset | Register | Use |
 |---|---|---|
-| 0x00 – 0x0C | `tx.header0..2`, `tx.data` | the TLP to send; writing `tx.data` sends it |
-| 0x10 – 0x1C | `rx.header0..2`, `rx.data` | the last TLP received, as it came |
+| 0x00 – 0x0C | `tx.header0..2`, `tx.data` | the TLP to send, DW0 to DW3; writing `tx.data` sends it |
+| 0x10 – 0x1C | `rx.header0..2`, `rx.data` | the last TLP received, as it came, DW0 to DW3 |
 | 0x20 | `rx.valid` | a TLP is waiting; write 1 to clear |
 | 0x24, 0x28 | `status.err`, `status.phy` | fatal-error message, always 0 on an EP; Tx FSM state and free core buffers |
 | 0x2C | `status.result` | firmware result marker; 0x0000_FACE lights `fw_pass` |
 | 0x30 | `status.cfg_id` | our own Bus/Device/Function |
+| 0x100 – 0x1FC | `rx_payload` | the received TLP from DW3 on, 64 DWORDs: entry i is DW 3+i |
+| 0x200 – 0x2FC | `tx_payload` | the TLP to send from DW4 on, 64 DWORDs: entry i is DW 3+i (DW3 is `tx.data`) |
 
 Things worth knowing:
 
-- **The Rx window takes any TLP as-is.** The RC version decoded only Completions; an EP must see Memory requests. The first two beats of every incoming TLP land in `rx.header0..2` and `rx.data`, and the firmware decodes them. So the window is generic: the same RTL could serve the RC too.
+- **The Rx window takes any TLP as-is.** The RC version decoded only Completions; an EP must see Memory requests. Every incoming TLP lands in `rx.header0..2`, `rx.data` and `rx_payload`, up to a MemWr of Max_Payload_Size (128 bytes) behind a 4-DW header, and the firmware decodes it. So the window is generic: the same RTL could serve the RC too.
+- **The payload windows are RAMs.** `rx_payload` and `tx_payload` are PeakRDL external memories, each two banks of 32 DWORDs, odd and even entries, so that a 64-bit beat writes (Rx) or reads (Tx) both its DWORDs in one clock. Their read is registered, so they fit block RAM.
 - **`rx.valid` is the flow control.** Set at the end of a TLP, it holds `m_axis_rx.tready` low until the firmware clears it: a slow CPU never loses a request; the PCIE core waits.
 - **Configuration requests never get here.** The TL answers them itself, as the AMD hard macro does. `status.cfg_id` is the Bus/Device/Function the host gave us, captured from its Type 0 Configuration Writes (UG477 `cfg_bus_number`, `cfg_device_number`, `cfg_function_number`); every Completion carries it as the Completer ID.
-- **`tx.data` is a trigger.** PeakRDL's `swmod` strobe on that field starts the Tx FSM, so the firmware writes the three headers first and the data last.
+- **`tx.data` is a trigger.** PeakRDL's `swmod` strobe on that field starts the Tx FSM, so the firmware writes `tx_payload` and the three headers first and `tx.data` last. The Tx FSM sends as many DWORDs as the header's Fmt and Length say.
 
 Lint: [`4.build/hw_build/run-lint.sh`](../../4.build/hw_build/run-lint.sh) checks the SOC as part of `top`.
 
