@@ -56,8 +56,7 @@ Receiver:
 | `RX_AFE_OFFSET` | 8 | Front-end offset, when not adapted |
 | `RX_EI_BIAS` / `RX_EI_BW_SEL` | 4 / 4 | Electrical-idle detector bias and bandwidth |
 
-PCIe asks for Tx de-emphasis (spec 4.3.3); this test runs without it.
-
+PCIe asks for Tx de-emphasis (spec 4.3.3); this test runs without it. For comparison, see the [ULX5M-M2 Ver1 settings](https://github.com/chili-chips-ba/openCologne-PCIE/tree/main/1.pcb#ver1) used for SerDes PRBS speed tests.
 
 --------------------
 #### End of Document
