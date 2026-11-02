@@ -16,7 +16,7 @@ This is work area for the PCB-related thoughts and explanations, including the s
 For additional detail, check the source repo:
 - https://github.com/intergalaktik/ulx5m-m2
 
-While not the direct outcome of our project, the CologneChip PCIE card is also a good refrence
+While not the direct outcome of our project, the CologneChip PCIE card is also a good reference
 - https://github.com/colognechip/gatemate-pcie-evb
 
   
