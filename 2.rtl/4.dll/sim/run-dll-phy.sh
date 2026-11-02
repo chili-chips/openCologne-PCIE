@@ -7,7 +7,10 @@
 # Complex, each DLL + MAC/LTSSM + PIPE + opensource SerDes BFM (pcie_stack.sv),
 # connected by a bit-level serial link in both directions.
 #
-# usage:  bash run-dll-phy.sh [--dump] [--scramble]
+# usage:  bash run-dll-phy.sh [--dump] [--scramble] [--inject=stp|end]
+#
+# --inject: a TLP with its STP or END corrupted at the RC's receiver, in place
+# of steps 4 to 7. Fails until #24 is fixed (no REPLAY_TIMER).
 #
 # Build products and the waveform go to $SERDES_BUILD_DIR/dll (default
 # ~/.cache/opencologne-pcie).
@@ -28,11 +31,13 @@ VVP=${VVP:-vvp}
 
 DUMP=""
 DEFS=""
+PLUS=""
 for arg in "$@"; do
   case "$arg" in
     --dump)     DUMP="-DDUMP" ;;
     --scramble) DEFS="${DEFS} -DSCRAMBLE" ;;
-    -h|--help)  echo "usage: $0 [--dump] [--scramble]"; exit 0 ;;
+    --inject=*) PLUS="+inject=${arg#--inject=}" ;;
+    -h|--help)  echo "usage: $0 [--dump] [--scramble] [--inject=stp|end]"; exit 0 ;;
     *) echo "unknown option: $arg"; exit 1 ;;
   esac
 done
@@ -64,7 +69,7 @@ ${IVL} -g2012 -gspecify -Ttyp ${DUMP} ${DEFS} \
        "${HERE}/tb_dll_phy.sv"
 
 cd "${BUILD}"
-${VVP} -N dll_phy.vvp ${DUMP:+-fst}
+${VVP} -N dll_phy.vvp ${DUMP:+-fst} ${PLUS}
 if [ -n "${DUMP}" ]; then
   echo "waveform: ${BUILD}/sim/dll_phy.fst"
 fi

@@ -9,10 +9,6 @@ module tb_dll_phy;
    localparam real CLKPERIOD_REG   =  8.0;
    localparam real CLKPERIOD_CFG   = 40.0;
    localparam real WIRE_DELAY_NS   = 10.0;
-   localparam real GLITCH_DELAY_NS = 176.0;
-   localparam real GLITCH_PULSE_NS = 0.8;
-   localparam real GLITCH_GAP_NS   = 3.2;
-   localparam      GLITCH_PULSES   = 16;
 
    localparam EP = 0;
    localparam RC = 1;
@@ -80,7 +76,6 @@ module tb_dll_phy;
 
    logic ep_tx_p, ep_tx_n, rc_tx_p, rc_tx_n;
    logic  ep2rc_p, ep2rc_n, rc2ep_p, rc2ep_n;
-   logic  serial_glitch;
 
    always @(ep_tx_p) ep2rc_p <= #(WIRE_DELAY_NS) ep_tx_p;
    always @(ep_tx_n) ep2rc_n <= #(WIRE_DELAY_NS) ep_tx_n;
@@ -190,8 +185,8 @@ module tb_dll_phy;
       .tl_rx_update_type ( rx_upd[RC]     ),
       .tl_rx_packet_type ( rx_pkt[RC]     ),
       .tl_rx_dllp_valid  ( rx_dllp[RC]    ),
-      .RX_SERIO_P        ( ep2rc_p ^ serial_glitch ),
-      .RX_SERIO_N        ( ep2rc_n ^ serial_glitch ),
+      .RX_SERIO_P        ( ep2rc_p        ),
+      .RX_SERIO_N        ( ep2rc_n        ),
       .TX_SERIO_P        ( rc_tx_p        ),
       .TX_SERIO_N        ( rc_tx_n        )
    );
@@ -247,12 +242,6 @@ module tb_dll_phy;
                $display("[%10.1f ns] %s LTSSM : %0s", $realtime, g == EP ? "EP" : "RC", ltssm_name(ltssm[g]));
       end
    endgenerate
-
-   integer sym_err_cnt;
-   initial sym_err_cnt = 0;
-   always @(posedge pclk[RC])
-      if (link_up[RC] && ((|dec_err[RC]) || (|disp_err[RC])))
-         sym_err_cnt <= sym_err_cnt + 1;
 
    localparam [7:0] STP = 8'hFB;
    localparam [7:0] END = 8'hFD;
@@ -491,13 +480,108 @@ module tb_dll_phy;
       end
    endtask
 
-   integer t;
-   integer s;
+   // One byte corrupted at the RC's receiver, at its DLL's input, for one
+   // PCLK: the byte OFF bytes after the start of the next TLP (STP) or UpdateFC-P
+   // (SDP, then 8'h80) the RC receives. A K symbol becomes a data byte, a data
+   // byte gets bit 0 flipped: to the DLL, a symbol that decoded wrong.
+   localparam [7:0] SDP = 8'h5C;
+   logic [DATA_WIDTH-1:0] inj_d;
+   logic [DATA_BYTES-1:0] inj_k;
+
+   task inject_rc(input logic dllp, input integer off);
+      integer pos, b, n;
+      logic   hit;
+      begin
+         pos = -1;
+         hit = 1'b0;
+         n   = 0;
+         while (!hit && n < 4000) begin
+            @(posedge pclk[RC]); #1;
+            n     = n + 1;
+            inj_d = rc.mac_rx_data;
+            inj_k = rc.mac_rx_datak;
+            for (b = 0; b < DATA_BYTES; b = b + 1) begin
+               if (pos < 0 && inj_k[b] && inj_d[8*b +: 8] == (dllp ? SDP : STP))
+                  pos = 0;
+               else if (pos >= 0)
+                  pos = pos + 1;
+               if (dllp && pos == 1 && inj_d[8*b +: 8] != 8'h80)
+                  pos = -1;                     // not an UpdateFC-P
+               if (pos == off && !hit) begin
+                  hit         = 1'b1;
+                  inj_d[8*b]  = !inj_d[8*b];
+                  inj_k[b]    = 1'b0;
+               end
+            end
+         end
+         if (!hit) begin
+            errors = errors + 1;
+            $display("[%10.1f ns] ERROR: no %s for the RC's receiver to corrupt", $realtime, dllp ? "UpdateFC-P" : "TLP");
+         end
+         else begin
+            force rc.dll.phy_rx_data   = inj_d;
+            force rc.dll.phy_rx_data_k = inj_k;
+            @(posedge pclk[RC]); #1;
+            release rc.dll.phy_rx_data;
+            release rc.dll.phy_rx_data_k;
+         end
+      end
+   endtask
+
    integer stp_before;
 
+   // EP -> RC, the byte OFF of the frame corrupted: the RC must Nak, the EP replay
+   task tlp_nak(input integer n, input logic half, input integer off, input string what);
+      begin
+         stp_before = ep_stp_cnt;
+         fork
+            send_tlp(EP, n, half);
+            inject_rc(1'b0, off);
+         join
+         check_tlp_rx(RC, n, half, 8000);
+         wait_tx_ready(EP);
+         repeat (40) tick(EP);
+         if (ep_stp_cnt - stp_before < 2) begin
+            errors = errors + 1;
+            $display("[%10.1f ns] ERROR: %0s corrupted: EP did not replay the TLP", $realtime, what);
+         end
+         else
+            $display("[%10.1f ns]   %0s corrupted: EP sent the TLP %0d times, NAK and replay worked", $realtime,
+                     what, ep_stp_cnt - stp_before);
+      end
+   endtask
+
+   // The DLLP must not arrive within 400 PCLK (12.8 us): the DLL sends the same
+   // UpdateFC again, with a good CRC, every 30 us
+   task check_dllp_none(input integer s, input [7:0] hdr, input [11:0] dcr,
+                        input [1:0] upd, input [1:0] pkt);
+      integer t;
+      logic   got;
+      begin
+         got = 1'b0;
+         for (t = 0; t < 400; t = t + 1) begin
+            tick(s);
+            if (rx_dllp[s] && rx_hdr[s] == hdr && rx_dcr[s] == dcr && rx_upd[s] == upd && rx_pkt[s] == pkt)
+               got = 1'b1;
+         end
+         if (got) begin
+            errors = errors + 1;
+            $display("[%10.1f ns] ERROR: %s took a DLLP with a bad CRC, hdr=%0d data=%0d", $realtime,
+                     s == EP ? "EP" : "RC", hdr, dcr);
+         end
+         else
+            $display("[%10.1f ns]   %s dropped the UpdateFC with a bad CRC", $realtime, s == EP ? "EP" : "RC");
+      end
+   endtask
+
+   integer t;
+   integer s;
+   string  inject;
+
    initial begin
-      errors        = 0;
-      serial_glitch = 1'b0;
+      errors = 0;
+      if (!$value$plusargs("inject=%s", inject))
+         inject = "";
       for (s = 0; s < 2; s = s + 1) begin
          tx_data[s]  = {DATA_WIDTH{1'b0}};
          tx_valid[s] = 1'b0;
@@ -581,36 +665,35 @@ module tb_dll_phy;
       send_tlp(RC, 4, 1'b0);
       check_tlp_rx(EP, 4, 1'b0, 4000);
 
-      $display("=== Step 4: TLP corrupted on the EP -> RC wire, expect NAK and replay ===");
       tlp_words[0] = 64'h5555AAAA5555AAAA;
       tlp_words[1] = 64'h1234567890ABCDEF;
       tlp_words[2] = 64'hFEDCBA0987654321;
-      stp_before = ep_stp_cnt;
-      fork
-         send_tlp(EP, 3, 1'b0);
-         begin
-            @(posedge pclk[EP]);
-            while (!stp_in_word(ep.mac_tx_data, ep.mac_tx_datak)) @(posedge pclk[EP]);
-            #(GLITCH_DELAY_NS);
-            repeat (GLITCH_PULSES) begin
-               serial_glitch = 1'b1;
-               #(GLITCH_PULSE_NS);
-               serial_glitch = 1'b0;
-               #(GLITCH_GAP_NS);
-            end
+      if (inject != "") begin
+         // A TLP whose framing is hit: the RC drops it without a Nak, and the
+         // EP, with no REPLAY_TIMER, never replays it (#24)
+         $display("=== Step 4: TLP with its %0s corrupted at the RC's receiver (#24) ===", inject);
+         if (inject != "stp" && inject != "end") begin
+            errors = errors + 1;
+            $display("ERROR: +inject=%0s, expected stp or end", inject);
          end
-      join
-      check_tlp_rx(RC, 3, 1'b0, 8000);
-      wait_tx_ready(EP);
-      $display("[%10.1f ns]   RC 8b/10b decoder flagged %0d symbol beats", $realtime, sym_err_cnt);
-      if (ep_stp_cnt - stp_before < 2) begin
-         errors = errors + 1;
-         $display("[%10.1f ns] ERROR: EP did not replay the TLP", $realtime);
+         else
+            tlp_nak(3, 1'b0, (inject == "stp") ? 0 : 31, inject);
       end
-      else
-         $display("[%10.1f ns]   EP sent the TLP %0d times, NAK and replay worked", $realtime, ep_stp_cnt - stp_before);
+      else begin
 
-      $display("=== Step 5: UpdateFC-P DLLP, EP -> RC ===");
+      // Byte offsets from STP: STP 0, sequence number 1-2, TLP 3-26, LCRC 27-30, END 31
+      $display("=== Step 4: TLP with one field corrupted at the RC's receiver, expect NAK and replay ===");
+      tlp_nak(3, 1'b0,  1, "sequence number");
+      tlp_nak(3, 1'b0, 15, "TLP byte");
+      tlp_nak(3, 1'b0, 28, "LCRC");
+
+      $display("=== Step 5: UpdateFC-P DLLPs, EP -> RC: its CRC corrupted, dropped; then clean ===");
+      // Byte offsets from SDP: SDP 0, DLLP 1-4, CRC 5-6, END 7
+      fork
+         send_dllp(EP, 8'd11, 12'd201, 2'b00, 2'b10);
+         inject_rc(1'b1, 5);
+      join
+      check_dllp_none(RC, 8'd11, 12'd201, 2'b00, 2'b10);
       send_dllp(EP, 8'd10, 12'd200, 2'b00, 2'b10);
       check_dllp_rx(RC, 8'd10, 12'd200, 2'b00, 2'b10);
 
@@ -639,34 +722,12 @@ module tb_dll_phy;
       tlp_words[2] = 64'hC0C1C2C3C4C5C6C7;
       tlp_once(EP, 3, 1'b0);
 
-      $display("=== Step 7: odd-DW TLP corrupted on the EP -> RC wire, expect NAK and replay ===");
+      $display("=== Step 7: odd-DW TLP, its last TLP byte corrupted at the RC's receiver, expect NAK and replay ===");
       tlp_words[0] = 64'h5555AAAA5555AAAA;
       tlp_words[1] = 64'h1234567890ABCDEF;
       tlp_words[2] = 64'h77777777_FEDCBA09;
-      stp_before = ep_stp_cnt;
-      fork
-         send_tlp(EP, 3, 1'b1);
-         begin
-            @(posedge pclk[EP]);
-            while (!stp_in_word(ep.mac_tx_data, ep.mac_tx_datak)) @(posedge pclk[EP]);
-            #(GLITCH_DELAY_NS);
-            repeat (GLITCH_PULSES) begin
-               serial_glitch = 1'b1;
-               #(GLITCH_PULSE_NS);
-               serial_glitch = 1'b0;
-               #(GLITCH_GAP_NS);
-            end
-         end
-      join
-      check_tlp_rx(RC, 3, 1'b1, 8000);
-      wait_tx_ready(EP);
-      repeat (40) tick(EP);
-      if (ep_stp_cnt - stp_before < 2) begin
-         errors = errors + 1;
-         $display("[%10.1f ns] ERROR: EP did not replay the TLP", $realtime);
+      tlp_nak(3, 1'b1, 22, "last TLP byte");
       end
-      else
-         $display("[%10.1f ns]   EP sent the TLP %0d times, NAK and replay worked", $realtime, ep_stp_cnt - stp_before);
 
       $display("[%10.1f ns] LINE : %0d TLPs, LCRC checked, %0d wrong", $realtime, line_tlps, line_lcrc_err);
       errors = errors + line_lcrc_err;

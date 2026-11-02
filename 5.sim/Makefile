@@ -56,7 +56,7 @@ else ifeq ($(EP),rtl)
   endif
   A7RC_EXPECT  = -DA7RC_EP_EXPECT='"a7rc_ep.h"'
   EP_FILES     = rtl.f
-  EP_VLT       = +define+EP_RTL --timescale 1ps/1ps -F rtl.f
+  EP_VLT       = +define+EP_RTL --timescale 1ps/1ps -F rtl.f --assert models/ep_sva.sv
   EP_OBJ       = _rtl
   FW_IN        = cp $(CURDIR)/../4.build/sw_build/firmware.hex firmware.hex &&
   FW_OUT       = rm -f firmware.hex;
@@ -326,7 +326,7 @@ endif
 FORCE:
 
 ifeq ($(SIM),verilator)
-SIM_CMD        = $(SIMEXE)
+SIM_CMD        = $(SIMEXE) $(SIM_ARGS)
 else
 SIM_CMD        = $(VVP) -n -M $(OBJDIR) -m VProc $(SIMEXE) $(VVPDUMP)
 endif

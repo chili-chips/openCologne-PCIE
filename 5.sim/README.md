@@ -194,6 +194,7 @@ The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/is
 | `REGRESS_QUIET` | `1` (default), `0` | the packet display off in `regress` (`0`: as `hex/ContDisps.hex`) | |
 | `REGRESS_S`, `REGRESS_TRIES` | `900`, `3` (default) | the wall-clock limit of a seed in seconds, and how often a seed runs again after hitting it or a crash (not after the test bench's own time limit) | |
 | `REGRESS_DUMP` | `none` (default), `fail` | after `make regress`: every failing seed run again with its waveform, in `obj/wavecrux/<seed>/` | |
+| `SIM_ARGS` | e.g. `+verilator+error+limit+100` | run-time arguments for the simulation: with that one, our EP's assertions report and the run goes on | |
 | `WCX_OPEN` | `1` (default), `0` | `make wavecrux SEED=N`: that seed with its waveform, opened in WaveCrux at the checker's first violation ([`tools/wavecrux.py`](tools/wavecrux.py); WaveCrux started with `--wcp-port 54321`); `0`: the waveform only | cursor and view set over WCP |
 | `OPTFLAG` | `-O2 -g` (default) | the C/C++ of the models and our user code; the VIP libraries are built `-O2 -g` too | `-O0` and `-O2` give the same result |
 | `DUMP` | `0` (default), `1` | write the FST: `tb.fst`, `tb_serial.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst`, by `EP` and `IFACE` | |
@@ -222,7 +223,7 @@ diff <(grep -a '===>' v.log) <(grep -a '===>' i.log)  #   the same lines, PIPE a
 make EP=rtl run                                       # our EP against the tester
 make EP=rtl IFACE=serial A7RC=1 run                   # our EP with the real PHY
 (cd ../2.rtl/1.phy/3.sim && bash run-phy.sh pipe64 && bash run-phy.sh equiv)
-(cd ../2.rtl/4.dll/sim && bash run-dll-phy.sh)
+(cd ../2.rtl/4.dll/sim && bash run-dll-phy.sh && bash run-dll-phy.sh --inject=stp && bash run-dll-phy.sh --inject=end)
 (cd ../2.rtl/5.tlp/sim && bash run-tl.sh)
 ```
 
@@ -230,13 +231,22 @@ make EP=rtl IFACE=serial A7RC=1 run                   # our EP with the real PHY
 |---|---|---|
 | `make regress SEEDS=100 REGRESS_JOBS=8 DMA=1` | 20 s | 0 of 100 failed; every rule checked in some seed (the EP model answers CRS in one seed in four), but `PL.SPEED` and `PL.EIOS`: not applicable, our EP and the EP model are Gen1 |
 | Verilator against Icarus | 3 min (Icarus serial) | the same `===>` lines, PIPE and serial |
-| `make EP=rtl run` | 20 s | FAIL: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), [#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26), [#36](https://github.com/chili-chips-ba/openCologne-PCIE/issues/36) to [#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40); can end at the time limit, waiting for a read lost in Recovery (#24) |
-| `make EP=rtl IFACE=serial A7RC=1 run` | 35 s | FAIL: [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38), one SKP dropped (2384 Symbol Times apart) |
+| `make EP=rtl run` | 20 s | FAIL: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), [#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26), [#36](https://github.com/chili-chips-ba/openCologne-PCIE/issues/36) to [#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40); `SVA #24` at 2.86 ms, a TLP neither Acked nor replayed; the regression lets it go on (`SIM_ARGS=+verilator+error+limit+100`), to the TL issues |
+| `make EP=rtl IFACE=serial A7RC=1 run` | 35 s | FAIL: [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38), stops at 216.0 µs on `SVA #38`: the MAC drops an SKP Ordered Set |
 | `run-phy.sh pipe64`, `equiv` | 5 s | PASS |
-| `run-dll-phy.sh` | 6 s | PASS; the step-4 flips hit the TLP, not its END, so [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) is not reached |
+| `run-dll-phy.sh` | 6 s | PASS: a corrupted sequence number, TLP byte or LCRC is Naked and replayed, a DLLP with a bad CRC dropped |
+| `run-dll-phy.sh --inject=stp`, `--inject=end` | 10 s each | FAIL: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), a TLP with its STP or END hit is never replayed |
 | `run-tl.sh` | 20 s | PASS |
 
 `make DMA=1 run` adds the DMA stage: the EP model passes it.
+
+**Assertions inside our EP** ([`models/ep_sva.sv`](models/ep_sva.sv), `EP=rtl`, Verilator `--assert`), bound into `pcie_core`, simulation only. Each stops the run at the clock an open issue happens, so it is reached whatever the timing; the host's checker sees the effect only later, if at all:
+
+| Assertion | Fails when | Issue |
+|---|---|---|
+| `a_skp` | in L0, no SKP Ordered Set on the PIPE for 1538 + 128 + 28 Symbol Times (4.2.7.1) | [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
+| `a_skp_mux` | the MAC's SKP generator sends its SKP word in a cycle its output mux gives to data, an OS or IDLE: the SKP is lost | [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
+| `a_replay` | a TLP in the retry buffer is neither Acked nor replayed within the REPLAY_TIMER limit, 2 × 711 Symbol Times (3.5.2.1), in L0 | [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
 
 ### WaveCrux decoders
 

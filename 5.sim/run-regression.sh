@@ -24,12 +24,22 @@ fails=0
 # the runs that fail today, and why
 declare -A KNOWN=(
     [rtl-tester]="#24 #26 #36-#40"
+    [dll-stp]="#24"
+    [dll-end]="#24"
+)
+# ... and what the log of each must show: another failure is not the known one
+declare -A KNOWN_SIG=(
+    [rtl-tester]="SVA #24"
+    [dll-stp]="stp corrupted: EP did not replay"
+    [dll-end]="end corrupted: EP did not replay"
 )
 
 report() {  # name, seconds, pass (0/1), what, result
     local n=$1 t=$2 ok=$3 what=$4 r=$5 st
     if [ -n "${KNOWN[$n]:-}" ]; then
         if [ $ok = 1 ]; then st="PASS, known ${KNOWN[$n]}: update KNOWN"; fails=$((fails + 1))
+        elif ! grep -a -q -F "${KNOWN_SIG[$n]}" $LOG/$n.log; then
+            st="FAIL, not as known ${KNOWN[$n]}: no \"${KNOWN_SIG[$n]}\""; fails=$((fails + 1))
         else st="known: ${KNOWN[$n]}"; fi
     elif [ $ok = 1 ]; then st="PASS"
     else st="FAIL"; fails=$((fails + 1)); fi
@@ -64,12 +74,15 @@ if diff -q <(grep -a '===>' $LOG/serial.log) <(grep -a '===>' $LOG/serial-icarus
 else
     report sim-match 0 0 "Verilator = Icarus, serial" "diff the ===> lines of serial.log and serial-icarus.log"
 fi
-run rtl-tester     EP=rtl "$@"
+# SVA #24 stops the run at 2.86 ms; going on, it also reaches the TL issues
+run rtl-tester     EP=rtl SIM_ARGS=+verilator+error+limit+100 "$@"
 run rtl-serial     EP=rtl IFACE=serial A7RC=1 "$@"
 
 bench pipe64  ../2.rtl/1.phy/3.sim "run-phy.sh pipe64" '^ ####    ###    ####  ####  #####  ####'  # the PASSED banner
 bench equiv   ../2.rtl/1.phy/3.sim "run-phy.sh equiv"  'RESULT: PASSED'
 bench dll-phy ../2.rtl/4.dll/sim   "run-dll-phy.sh"    'TEST PASSED'
+bench dll-stp ../2.rtl/4.dll/sim   "run-dll-phy.sh --inject=stp" 'TEST PASSED'
+bench dll-end ../2.rtl/4.dll/sim   "run-dll-phy.sh --inject=end" 'TEST PASSED'
 bench tl      ../2.rtl/5.tlp/sim   "run-tl.sh"         'TEST PASSED'
 
 echo "regression: $fails unexpected"
