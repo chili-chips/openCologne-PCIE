@@ -1,7 +1,7 @@
 # gatemate-pipe
 
 ## Submodule
-`pipe_src` is [Cologne Chip's gatemate-pipe](https://github.com/colognechip/gatemate-pipe) (`dll_test`) plus two open pull requests: [#17](https://github.com/colognechip/gatemate-pipe/pull/17) (InitFC credits) and [#19](https://github.com/colognechip/gatemate-pipe/pull/19) (64-bit PCLK straight from `PLL_CLK_O`). Until they are merged, it points at branch `ocp-integration` of [our fork](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration); then back to Cologne Chip's repo.
+`pipe_src` is [Cologne Chip's gatemate-pipe](https://github.com/colognechip/gatemate-pipe) (`dll_test`) plus our changes, on branch `ocp-integration` of [our fork](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration). We offer each change to Cologne Chip as a pull request: [#17](https://github.com/colognechip/gatemate-pipe/pull/17) (InitFC credits), [#19](https://github.com/colognechip/gatemate-pipe/pull/19) (64-bit PCLK straight from `PLL_CLK_O`).
 
 ## Description
 The **PHY Interface for the PCI Express Architecture (PIPE)** is part of the physical layer, between the Media Access Control (MAC) Layer and the Physical Coding Sublayer (PCS). It separates the soft-core RTL from the FPGA-specific SerDes, which reduces effort and eases porting to other FPGA vendors and platforms.

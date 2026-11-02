@@ -19,7 +19,7 @@ Open an [Issue](https://github.com/chili-chips-ba/openCologne-PCIE/issues). For 
 
 4. Open a Pull Request against `main`.
 
-RTL changes go to [2.rtl](2.rtl). Code from [gatemate-pipe](https://github.com/colognechip/gatemate-pipe) (the `2.rtl/2.pipe/pipe_src` submodule: PIPE, MAC/LTSSM, DLL) changes upstream first. Observe our [RTL coding guidelines](2.rtl/README.md#rtl-coding-guidelines).
+RTL changes go to [2.rtl](2.rtl). Code in the `2.rtl/2.pipe/pipe_src` submodule (PIPE, MAC/LTSSM, DLL) changes on [our fork of gatemate-pipe](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration), branch `ocp-integration`, and is offered to [Cologne Chip](https://github.com/colognechip/gatemate-pipe) as a pull request. Observe our [RTL coding guidelines](2.rtl/README.md#rtl-coding-guidelines).
 
 ## License
 
