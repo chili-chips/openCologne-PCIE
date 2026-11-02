@@ -52,7 +52,6 @@ module EPPIPEx1__pcieVHost_DUT
    // Clocks and reset
    input                     rst_n,
    input                     pclk,
-   input                     pcieclk,
 
    // PCIE PIPE data: electrical idle is NOSIG (K flag, 0xFF) per symbol
    output [DataWidth-1:0]    txdata,
@@ -76,7 +75,6 @@ module EPPIPEx1__pcieVHost_DUT
   ) bfm_pcie
   (
     .pclk                              (pclk),
-    .pcieclk                           (pcieclk),
     .nreset                            (rst_n),
 
     .TxData                            (txdata),

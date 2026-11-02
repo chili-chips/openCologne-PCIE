@@ -63,14 +63,15 @@
 //   of an alias from 1.1.
 //==========================================================================
 
+`timescale 1ps/1ps
+
 module PIPEx1__pcieVHost #(
     parameter int NodeNum   = 1,
     parameter bit EndPoint  = 0,   // 0: RC, 1: EP
     parameter int DataWidth = 64,  // 8, 16, 32 or 64
     parameter int DllBytes  = 8    // dll_rx_data width, in bytes
 ) (
-    input  logic                     pcieclk,  // 250 MHz symbol clock, Gen1
-    input  logic                     pclk,     // pcieclk / (DataWidth/8)
+    input  logic                     pclk,     // the symbol clock / (DataWidth/8)
     input  logic                     nreset,
 
     // the PIPE link of this node: electrical idle is NOSIG (K flag, 0xFF) per
@@ -125,6 +126,23 @@ module PIPEx1__pcieVHost #(
     output logic                     rx_peer_eop,
     output logic                     rx_peer_valid
 );
+
+  // The symbol clock, made here from PCLK, as in openPCIE's PIPExN__pcieVHost:
+  // 250 MHz (Gen1), DataWidth/8 cycles per PCLK, started from each PCLK
+  // rising edge with its edges a quarter symbol (1 ns) away from it. Its
+  // falling edge, where the model samples RX, never meets a PCLK edge, where
+  // the PIPE word changes
+  localparam int SYMCLK_HALF_PS = 2000;  // 250 MHz
+
+  bit pcieclk;
+
+  initial pcieclk = 1'b0;
+
+  always begin
+    @(posedge pclk);
+    #((SYMCLK_HALF_PS / 2) * 1ps) pcieclk = 1'b0;
+    repeat (DataWidth / 4 - 1) #(SYMCLK_HALF_PS * 1ps) pcieclk = ~pcieclk;
+  end
 
   // The model's taps, as this node sees them: Tx = sent, Rx = received
   logic [31:0] tap_tx_data, tap_rx_data, tap_dllp_tx, tap_dllp_rx;

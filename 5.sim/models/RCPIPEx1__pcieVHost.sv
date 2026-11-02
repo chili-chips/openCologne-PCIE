@@ -54,7 +54,6 @@ module RCPIPEx1__pcieVHost #(
     parameter int DataWidth = 64,  // 8, 16, 32 or 64
     parameter int DllBytes  = 8    // dll_rx_data width, in bytes
 ) (
-    input  logic                     pcieclk,
     input  logic                     pclk,
     input  logic                     nreset,
     input  logic [  DataWidth-1:0]   RxData,

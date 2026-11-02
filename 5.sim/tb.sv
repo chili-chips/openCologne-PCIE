@@ -57,7 +57,7 @@ module tb #(
 
   // Generate clocks and run sim for the specified amount of time
   localparam  HALF_CLK_P_PERIOD_PS      = 2_500; // 200MHz, reset timing
-  localparam  HALF_PCIE_PERIOD_PS       = 2_000; // 250MHz (GEN1)
+  localparam  HALF_PCIE_PERIOD_PS       = 2_000; // 250MHz (GEN1): the symbol clock
   localparam  HALF_PIPE_PERIOD_PS       = HALF_PCIE_PERIOD_PS*PIPE_DATAWIDTH/8;
   localparam  RST_CYLES                 = 10;
 
@@ -67,26 +67,17 @@ module tb #(
   logic       clk_p;
   wire        clk_n;
   logic       rst_n;
-  bit         pcieclk;
   bit         pclk;
 
   initial begin
     clk_p      = 1'b0;
     //clk_n      = 1'b0;
     rst_n      = 1'b0;
-    pcieclk    = 1'b0;
     pclk       = 1'b0;
   end
 
-  // The symbol clock, as in openPCIE's tb_rc.sv: PIPE_DATAWIDTH/8 symbols per
-  // PCLK, started from each PCLK rising edge with its edges a quarter symbol
-  // (1 ns) away from it. Its falling edge, where the models sample RX, never
-  // meets a PCLK edge, where the PIPE word changes
-  always begin
-    @(posedge pclk);
-    #(HALF_PCIE_PERIOD_PS / 2) pcieclk = 1'b0;
-    repeat (PIPE_DATAWIDTH / 4 - 1) #(HALF_PCIE_PERIOD_PS) pcieclk = ~pcieclk;
-  end
+  // One clock: PCLK. Each model makes its symbol clock from it
+  // (models/PIPEx1__pcieVHost.sv)
 
   initial begin
     fork
@@ -309,7 +300,6 @@ module tb #(
   (
     .rst_n                             (rst_n),
     .pclk                              (pclk),
-    .pcieclk                           (pcieclk),
 
     // PCIE PIPE data
     .txdata                            (updata),
@@ -387,7 +377,6 @@ module tb #(
     .DllBytes                          (PIPE_DATAWIDTH/8)
   ) u_rc
   (
-    .pcieclk                           (pcieclk),
     .pclk                              (pclk),
     .nreset                            (rst_n),
 
