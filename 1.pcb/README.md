@@ -14,7 +14,7 @@ This is work area for the PCB-related thoughts and explanations, including the s
 #### Ver1
 ✅ Error-free data transfer at 1.25Gbps
 
-⬜ Almost error-free (BER in the order of 10^-11) at 2.5Gbps, but with some additional power filtering. These filter adjustment are going into Ver2 board 
+🟠 Almost error-free (BER in the order of 10^-11) at 2.5Gbps, but with some additional power filtering. These filter adjustment are going into Ver2 board 
 
 ❌ We did not manage to get higher than 2.5Gbps connections between v005 GS and M2 Ver1
  
