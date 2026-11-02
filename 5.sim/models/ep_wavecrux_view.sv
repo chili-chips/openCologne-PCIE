@@ -379,7 +379,7 @@ bind pcie_core ep_wavecrux_view wavecrux (
     .mac_rx_data (mac_rx_data),
     .mac_rx_datak(mac_rx_datak),
     .ltssm       (ltssm_state),
-    .link        (trn_link_up)
+    .link        (dll_up)
 );
 
 // The SOC CPU's retired instructions under the RVFI names, for WaveCrux's

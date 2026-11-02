@@ -5,8 +5,8 @@
 [![eduBOS5:YES](https://badgen.net/badge/eduBOS5/YES/green)](https://github.com/chili-chips-ba/openPCIE/blob/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/README.md)
 [![pcievhost:YES](https://badgen.net/badge/pcievhost/YES/green)](5.sim/models/pcievhost/README.md)
 [![WaveCrux:YES](https://badgen.net/badge/WaveCrux/YES/green)](2.rtl/4.dll/README.md#viewing-the-dll-in-wavecrux)
-[![Lint:WIP](https://badgen.net/badge/Lint/WIP/orange)](2.rtl/README.md#rtl-coding-rules)
-[![Verible:WIP](https://badgen.net/badge/Verible/WIP/orange)](2.rtl/README.md#rtl-coding-rules)
+[![Lint:WIP](https://badgen.net/badge/Lint/WIP/orange)](2.rtl/README.md#rtl-coding-guidelines)
+[![Verible:WIP](https://badgen.net/badge/Verible/WIP/orange)](2.rtl/README.md#rtl-coding-guidelines)
 [![8b10b-Formal:Pass](https://badgen.net/badge/8b10b%20Formal/Pass/green)](https://github.com/chili-chips-ba/openCologne/tree/main/7.SerDes/1.sim-model/formal_8b10b)
 [![DLL+PHY-Sim:Steps 1-3 Pass](https://badgen.net/badge/DLL%2BPHY%20Sim/Steps%201-3%20Pass/orange)](2.rtl/4.dll/sim)
 [![TopSim:WIP](https://badgen.net/badge/TopSim/WIP/orange)](5.sim)
@@ -81,14 +81,14 @@ The card plugs into the [openPCIE backplane](https://github.com/chili-chips-ba/o
 
 > Why test both: the EP takes its bus and device number from the Type 0 configuration writes it receives, and must return it in the Completer ID of every Completion. Direct, the bus number is often 1; behind the switch it is higher. A TL that hard-codes the bus number passes Direct and fails Behind Switch.
 
-We then also test with a Raspberry Pi and a PC as the host. Details: [1.pcb/README.md](1.pcb/README.md).
+We then also test with a PC and a Raspberry Pi as the host. Details: [1.pcb/README.md](1.pcb/README.md).
 
 --------------------
 
 # PIPE is not a dream!
 
 <p align="center">
-  <img alt="PCIe physical layer sub-blocks" width="60%" src="2.rtl/1.phy/0.doc/images/PHY-Layers.drawio.png">
+  <img alt="PCIe physical layer sub-blocks" width="90%" src="2.rtl/1.phy/0.doc/images/PHY-Layers.drawio.png">
 </p>
 
 The GateMate SerDes has not been used for PCIE before, so expect PHY issues (signal integrity, jitter). Cologne Chip developers own the PHY and the **P**hysical **I**nterface for **P**CI **E**xpress (PIPE): **`2.rtl/1.phy`** and **`2.rtl/2.pipe`** (`pipe_if.sv`, `pipe_src`).
@@ -163,6 +163,12 @@ Waveforms decode as transactions in the [WaveCrux PCIE decoders](https://github.
 
 Details: [5.sim/README.md](5.sim/README.md)
 
+<p align="center">
+  <img alt="WaveCrux: the whole EP=rtl run, every layer from the PIPE to the eduBOS5 firmware, from link training to firmware PASS" src="0.doc/5.sim/wavecrux-ep-overview.png" width="100%">
+</p>
+
+One run in [WaveCrux](https://wavecrux.app), every layer from the PIPE to the firmware: link training, enumeration, PIO, firmware PASS. The [walkthrough](5.sim/README.md#viewing-the-ep-in-wavecrux) zooms in, layer by layer.
+
 --------------------
 
 # Implementation Workflow
@@ -178,20 +184,18 @@ See [4.build/README.md](4.build/README.md)
 # Bringup, Debug and Lab Validation
 
 1) **openPCIE backplane:** the ULX5M-M2 card in an M.2 slot, the openPCIE Artix-7 as the RC: link up, enumeration, PIO write-read-validate, (a) Direct and (b) Behind Switch
-2) **Raspberry Pi:** enumeration and PIO from the Pi as the host
-3) **PC:** the same with a PC as the host
+2) **PC:** enumeration and PIO from a Linux PC as the host
+3) **Raspberry Pi:** the same with a Raspberry Pi as the host
 
 #### References:
 - [PCIE Utils](https://mj.ucw.cz/sw/pciutils)
 - [Debug PCIE issues using 'lspci' and 'setpci'](https://adaptivesupport.amd.com/s/article/1148199?language=en_US)
 - [fpgas.online: PCIE enumeration test](https://github.com/fpgas-online/fpgas.online-test-designs/blob/main/docs/tests/pcie-enumeration.md)
 
-## PCIE Protocol Analyzer
-
-#### References
+#### PCIE Protocol Analyzers:
 - [PCIE Sniffing](https://ctf.re/pcie/experiment/linux/keysight/protocol-analyzer/2024/03/26/pcie-experiment-1)
 - [Stark 75T Card](https://www.ebay.com/itm/396313189094?var=664969332633)
-- [ngpscope](http://www.ngscopeclient.org/protocol-analysis)
+- [ngscopeclient](http://www.ngscopeclient.org/protocol-analysis)
 - [PCI Leech](https://github.com/ufrisk/pcileech)
 - [PCI Leech/ZDMA](https://github.com/ufrisk/pcileech-fpga/tree/master/ZDMA)
 - [LiteX PCIE Screamer](https://github.com/enjoy-digital/pcie_screamer)

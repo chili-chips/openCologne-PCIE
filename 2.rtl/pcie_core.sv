@@ -52,8 +52,9 @@
 //   - trn_bridge (openPCIE): AXI-Stream to and from TRN, and the SOC's TX
 //     throttle. There is no power management: the link state it sees is L0.
 //
-//   The data link is up (trn_link_up, UG477 trn_lnk_up) when the DLL is in
-//   DL_Active.
+//   The data link is up (dll_up, UG477 trn_lnk_up) when the DLL is in
+//   DL_Active. core_rst_n, the reset of the TL, trn_bridge and the SOC,
+//   follows it one PCLK later; a link drop or mac_rst_n asserts it again.
 //==========================================================================
 
 module pcie_core
@@ -61,13 +62,13 @@ module pcie_core
 #(
     parameter int DATA_BYTES = 8
 ) (
-    input logic pipe_rst_n,  // PIPE Reset#
+    input logic rst_pipe_n,  // PIPE Reset#
     input logic mac_rst_n,   // PCLK: MAC and DLL
-    input logic core_rst_n,  // PCLK: TL and trn_bridge
 
     pipe_if.mac pipe,
 
-    output logic trn_link_up,  // data link up, PCLK
+    output logic dll_up,      // PCLK: data link up (DL_Active)
+    output logic core_rst_n,  // PCLK: TL, trn_bridge and the SOC, follows dll_up
 
     axis_if.slave  s_axis_tx,  // TLPs from the SOC (tuser: pcie_tx_tuser_t)
     axis_if.master m_axis_rx,  // TLPs to the SOC   (tuser: pcie_rx_tuser_t)
@@ -103,7 +104,7 @@ module pcie_core
   ) trn ();
 
   // The MAC drives PIPE Reset#
-  assign pipe.reset_n = pipe_rst_n;
+  assign pipe.reset_n = rst_pipe_n;
 
   ccfpga_LTSSM_logic #(
       .DATA_BYTES   (DATA_BYTES),
@@ -183,7 +184,17 @@ module pcie_core
       .o_DL_State         (dll.dl_state)
   );
 
-  assign trn_link_up = (dll.dl_state == DL_ACTIVE);
+  assign dll_up = (dll.dl_state == DL_ACTIVE);
+
+  // core_rst_n: the TL, trn_bridge and SOC reset, follows the data link
+  always_ff @(posedge pipe.pclk or negedge mac_rst_n) begin
+    if (!mac_rst_n) begin
+      core_rst_n <= 1'b0;
+    end
+    else begin
+      core_rst_n <= dll_up;
+    end
+  end
 
   pcie_tl #(
       .INIT_PH (INIT_PH),

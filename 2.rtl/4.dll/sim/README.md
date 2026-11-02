@@ -43,7 +43,7 @@ The test first trains both LTSSMs from Detect.Quiet to L0, every state change is
 6. TLPs of 3, 5 and 7 DW in both directions, the last word marked with `tl_tx_tlp_last_half`: each is sent once, with 12, 20 or 28 TLP bytes on the line
 7. step 4 with a 5 DW TLP
 
-**Known failure:** fails from step 4 until [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) is fixed (upstream [gatemate-pipe#15](https://github.com/colognechip/gatemate-pipe/issues/15)): the DLL has no REPLAY_TIMER, so a TLP whose END is hit is never Naked or replayed, and the EP stops sending TLPs. Steps 1 to 3 pass. The run below predates the SerDes model update, when the step-4 flips passed by chance.
+**Known gap:** [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) (upstream [gatemate-pipe#15](https://github.com/colognechip/gatemate-pipe/issues/15)): the DLL has no REPLAY_TIMER, so a TLP whose END is hit is never Naked or replayed, and the EP stops sending TLPs. Whether a run reaches it depends on where the step-4 flips land. Since PCLK comes straight from the SerDes PLL (2026-11-01), they hit the TLP and the test passes; with the old divided PCLK they hit END and it failed from step 4.
 
 Every TLP the two DLLs send has its LCRC checked on the way out against a CRC-32 the testbench computes over the sequence number and TLP bytes; in step 6 also its length.
 
@@ -76,8 +76,8 @@ The MAC implements the upstream port. The Root Complex is a second instance of i
 ### Settings
 
 * scrambling is disabled in both MACs, as with `DISABLE_SCRAMBLING` in the MAC's pcievhost test
-* the SerDes is set up and clocked as in Cologne Chip's `ccfpga_pipe_wrapper.v`: `PLL_FCNTRL = 6'h1A`, a 62.5 MHz PLL clock, the SerDes TX and RX core clock on the PIPE logic's `o_tx_clk`, so PCLK and the SerDes word clock are both 31.25 MHz
-* the PIPE reset is released 256 `clk_reg` cycles after the global reset, the MAC and DLL reset once the SerDes reports ready, synchronised to PCLK
+* the SerDes is set up and clocked as in `phy_top`: `PLL_FCNTRL = 6'h3A`, the PLL clock at the word rate, used as PCLK and as the SerDes TX and RX core clock, all 31.25 MHz
+* the PIPE reset is released 256 `clk_aon` cycles after the global reset, the MAC and DLL reset once the SerDes reports ready, synchronised to PCLK
 * the DLL gets `phy_linkup` when the MAC reports link up and the LTSSM is in L0; unlike `pcie_core` ([#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)), `pcie_stack.sv` does not hold it through Recovery
 * the bit errors in steps 4 and 7 are short inversions of the serial pair, starting 176 ns after the STP leaves the EP's MAC, so they hit the TLP; the RC NAKs it only once #24 is fixed
 

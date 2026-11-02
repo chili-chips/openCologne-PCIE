@@ -86,6 +86,8 @@ endif
 # A7RC=0 (default): the host is a tester: the lab RC's sequence, then what its
 # firmware never sends but the spec allows (README.md, Tester and literal).
 # A7RC=1: literal, only what the lab RC sends
+# DMA=0 (default): the tester skips its EP DMA stage (our EP has no DMA, #41);
+# DMA=1: runs it
 # SEED: the seed of the tester's random stimulus (default 1), read at run time
 # (A7RC_SEED): no rebuild. make regress SEEDS=N runs seeds 1 to N, each with a
 # wall-clock limit of REGRESS_S seconds, again (up to REGRESS_TRIES times) after
@@ -93,6 +95,7 @@ endif
 # REGRESS_JOBS at a time, each in
 # obj/regress/<seed>/, the packet display off (REGRESS_QUIET=0: kept)
 A7RC          ?= 0
+DMA           ?= 0
 SEED          ?= 1
 SEEDS         ?= 10
 REGRESS_S     ?= 900
@@ -111,7 +114,11 @@ WCX_SIGNALS    = $(if $(filter serial,$(IFACE)),tb.ser_dn_line tb.ser_up_line,tb
 ifeq ($(filter 0 1,$(A7RC)),)
   $(error A7RC must be 0 or 1 (got "$(A7RC)"))
 endif
-HOST_DEFS      = -DRC_GEN=2 -DA7RC_LITERAL=$(A7RC) $(A7RC_EXPECT) $(if $(filter serial,$(IFACE)),-DSIM_SERIAL)
+ifeq ($(filter 0 1,$(DMA)),)
+  $(error DMA must be 0 or 1 (got "$(DMA)"))
+endif
+HOST_DEFS      = -DRC_GEN=2 -DA7RC_LITERAL=$(A7RC) $(A7RC_EXPECT) $(if $(filter serial,$(IFACE)),-DSIM_SERIAL) \
+                 $(if $(filter 0,$(DMA)),-DA7RC_NO_DMA)
 VIP_ENV        = VIP_PATCH=$(A7RC_DIR)/models/pcievhost/pcievhost-speed.patch \
                  VPROC_PATCH=$(A7RC_DIR)/models/cosim/vproc-coroutine.patch
 
@@ -168,7 +175,7 @@ VVP           ?= vvp
 
 CPPSTD         = -std=c++20
 INCLPATHS      = -I$(USRCODEDIR) -I$(VIP_DIR)/include
-OBJDIR         = $(CURDIR)/obj/$(SIM)$(EP_OBJ)$(if $(filter 1,$(A7RC)),_a7rc)$(if $(filter 1,$(DUMP)),_dump)
+OBJDIR         = $(CURDIR)/obj/$(SIM)$(EP_OBJ)$(if $(filter 1,$(A7RC)),_a7rc)$(if $(filter 1,$(DMA)),_dma)$(if $(filter 1,$(DUMP)),_dump)
 USERLIB        = $(OBJDIR)/libuser.a
 
 USER_ALL       = $(USER_C) VUserMain2.cpp a7rc_check.cpp ltssm.c
@@ -351,6 +358,7 @@ wavecrux_run: all
 help:
 	@echo "make [SIM=verilator|icarus] [EP=model|rtl] [IFACE=pipe|serial]   build the models and the simulation (EP=rtl: Verilator only)"
 	@echo "make A7RC=1 run                    literal host: only what the lab RC sends (default: the tester, also back to back)"
+	@echo "make DMA=1 run                     the tester also runs its EP DMA stage (off by default: our EP has no DMA, #41)"
 	@echo "make SEED=N run                    the tester's random stimulus with seed N (default 1), no rebuild"
 	@echo "make regress SEEDS=N               the tester over seeds 1 to N (default 10), in obj/regress/<seed>/"
 	@echo "    REGRESS_JOBS=J                 J seeds side by side (default 1); REGRESS_QUIET=0 keeps the packet display"

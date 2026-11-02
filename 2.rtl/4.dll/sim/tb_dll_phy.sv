@@ -63,13 +63,13 @@ module tb_dll_phy;
       endcase
    endfunction
 
-   logic clk_ref, clk_reg, clk_cfg;
+   logic clk_ref, clk_aon, clk_cfg;
    logic reset_n;
 
    initial clk_ref = 1'b1;
    always #(CLKPERIOD_REF/2.0) clk_ref = ~clk_ref;
-   initial clk_reg = 1'b1;
-   always #(CLKPERIOD_REG/2.0) clk_reg = ~clk_reg;
+   initial clk_aon = 1'b1;
+   always #(CLKPERIOD_REG/2.0) clk_aon = ~clk_aon;
    initial clk_cfg = 1'b1;
    always #(CLKPERIOD_CFG/2.0) clk_cfg = ~clk_cfg;
 
@@ -120,7 +120,7 @@ module tb_dll_phy;
 
    pcie_stack #(.DATA_BYTES(DATA_BYTES)) ep (
       .clk_ref           ( clk_ref        ),
-      .clk_reg           ( clk_reg        ),
+      .clk_aon           ( clk_aon        ),
       .clk_cfg           ( clk_cfg        ),
       .reset_n           ( reset_n        ),
       .o_PCLK            ( pclk[EP]       ),
@@ -159,7 +159,7 @@ module tb_dll_phy;
 
    pcie_stack #(.DATA_BYTES(DATA_BYTES)) rc (
       .clk_ref           ( clk_ref        ),
-      .clk_reg           ( clk_reg        ),
+      .clk_aon           ( clk_aon        ),
       .clk_cfg           ( clk_cfg        ),
       .reset_n           ( reset_n        ),
       .o_PCLK            ( pclk[RC]       ),

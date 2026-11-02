@@ -10,6 +10,7 @@
 * [Running the co-simulation](#running-the-co-simulation)
   * [The host: openPCIE's Artix-7 RC model](#the-host-openpcies-artix-7-rc-model)
   * [Make options](#make-options)
+  * [Sanity and regression](#sanity-and-regression)
   * [WaveCrux decoders](#wavecrux-decoders)
   * [Transaction taps: a test platform at every layer](#transaction-taps-a-test-platform-at-every-layer)
   * [Viewing the EP in WaveCrux](#viewing-the-ep-in-wavecrux)
@@ -162,7 +163,7 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
   - requests the EP must not support;
   - odd requests: ECRC, poisoned, traffic classes;
   - Data Link faults;
-  - EP DMA under credit starvation ([`usercode/ep_dma.h`](usercode/ep_dma.h));
+  - EP DMA under credit starvation ([`usercode/ep_dma.h`](usercode/ep_dma.h)), only with `DMA=1`: our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41));
   - speed changes and retrains; speed changes only when both sides do Gen2 (the EP model and our RTL are Gen1).
 - **Literal** (`A7RC=1`): only what the lab RC sends, with its timing.
 - **Against our EP** (2026-11-01) the tester run fails. The checker flags Naks for back-to-back TLPs ([#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26); on an error-free line any Nak is a violation, `DL.NAK`), no replay after held Acks or across a Recovery (`DL.REPLAY`, `TL.CPL-ALL`, [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)), Unsupported Request for reads longer than 1 DW (`TL.UR`, [#36](https://github.com/chili-chips-ba/openCologne-PCIE/issues/36)), reads that return data older than an earlier write (`TL.ORDER`, [#37](https://github.com/chili-chips-ba/openCologne-PCIE/issues/37)) and the SKP interval (`PL.SKP`, [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38)). The InitFC after every Recovery (`FC.INIT-ORDER`, [#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)) is fixed.
@@ -186,6 +187,7 @@ The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/is
 | `IFACE` | `pipe` (default), `serial` | where the host meets the EP: the PIPE (`RCPIPEx1__pcieVHost`, node 2; with `EP=rtl` in the `phy_top` socket), or the serial line (`PcieVhostSerial`), which adds the PHY: the real one with `EP=rtl`, the EP model's own with `EP=model` | all four `EP` x `IFACE` work; `EP=rtl` gives the same results on both, [above](#running-the-co-simulation) |
 | `CPU` | `rtl`, `vproc`, `iss` | the SOC CPU, with `EP=rtl`: eduBOS5 RTL, a native C/C++ program at node 0, or the rv32 ISS ([below](#the-cpu-node-three-ways-to-run-the-socs-software)) | all three, with `EP=rtl` |
 | `A7RC` | `0` (default), `1` | the host's mode: the tester (the lab RC's sequence, then a config space sweep and back-to-back requests), or literal, only what the lab RC sends ([above](#the-host-openpcies-artix-7-rc-model)) | both pass with `EP=model` |
+| `DMA` | `0` (default), `1` | the tester's EP DMA stage: off, or on | off until our EP has DMA ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)); the EP model passes it |
 | `SEED` | `1` (default), any | the seed of the tester's random stimulus, read at run time (no rebuild) | |
 | `SEEDS` | `10` (default) | `make regress`: seeds 1 to `SEEDS` | 100 seeds pass with `EP=model`; at about 1 s a seed, 1000 seeds per regression are practical (about 3 minutes with `REGRESS_JOBS=8`) |
 | `REGRESS_JOBS` | `1` (default), any | seeds run side by side, each in `obj/regress/<seed>/` ([`tools/regress.sh`](tools/regress.sh)) | a seed takes about 1 s with the EP model (coroutine VProc, below) |
@@ -197,6 +199,45 @@ The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/is
 | `DUMP` | `0` (default), `1` | write the FST: `tb.fst`, `tb_serial.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst`, by `EP` and `IFACE` | |
 | `OPENPCIE` | `../../openpcie` (default) | the openPCIE checkout the host comes from | |
 | `USRSIMFLAGS` | none (default) | extra Verilator or Icarus flags, such as defines | |
+
+### Sanity and regression
+
+Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh OPENPCIE=...`). The EP DMA stage is off in both (`DMA=0`, the default): our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)).
+
+**Sanity**, after every change: `bash run-sanity.sh`, five runs, about 40 s. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines.
+
+```sh
+make run                          # EP model at the PIPE, Verilator
+make SIM=icarus run               # the same on Icarus
+make IFACE=serial run             # EP model on the serial line
+make EP=rtl A7RC=1 run            # our EP RTL + firmware, the lab RC's requests
+make EP=rtl CPU=vproc A7RC=1 run  # the same, the firmware compiled for the host
+```
+
+**Regression**, before a push: `bash run-regression.sh`, about 8 minutes. A run that fails on open issues is reported as known, with them (`KNOWN` in the script); the script fails only on an unexpected result. What it runs:
+
+```sh
+make regress SEEDS=100 REGRESS_JOBS=8                 # 100 random seeds, EP model
+make run > v.log; make SIM=icarus run > i.log         # Verilator against Icarus:
+diff <(grep -a '===>' v.log) <(grep -a '===>' i.log)  #   the same lines, PIPE and IFACE=serial
+make EP=rtl run                                       # our EP against the tester
+make EP=rtl IFACE=serial A7RC=1 run                   # our EP with the real PHY
+(cd ../2.rtl/1.phy/3.sim && bash run-phy.sh pipe64 && bash run-phy.sh equiv)
+(cd ../2.rtl/4.dll/sim && bash run-dll-phy.sh)
+(cd ../2.rtl/5.tlp/sim && bash run-tl.sh)
+```
+
+| Run | Time | Today (2026-11-01) |
+|---|---|---|
+| `make regress SEEDS=100 REGRESS_JOBS=8` | 18 s | 0 of 100 failed; 8 rules checked in no seed: the EP's own requests (`TL.REQ-*`, DMA off), `PL.SPEED` and `PL.EIOS` (our EP is Gen1), `TL.CRS` |
+| Verilator against Icarus | 3 min (Icarus serial) | the same `===>` lines, PIPE and serial |
+| `make EP=rtl run` | 20 s | FAIL: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), [#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26), [#36](https://github.com/chili-chips-ba/openCologne-PCIE/issues/36) to [#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40); can end at the time limit, waiting for a read lost in Recovery (#24) |
+| `make EP=rtl IFACE=serial A7RC=1 run` | 35 s | PASS; SKP 1184 to 1200 Symbol Times apart. [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) stays open: the tester run still shows it |
+| `run-phy.sh pipe64`, `equiv` | 5 s | PASS |
+| `run-dll-phy.sh` | 6 s | PASS; the step-4 flips hit the TLP, not its END, so [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) is not reached |
+| `run-tl.sh` | 20 s | PASS |
+
+`make DMA=1 run` adds the DMA stage: the EP model passes it.
 
 ### WaveCrux decoders
 

@@ -38,9 +38,7 @@
 //--------------------------------------------------------------------------
 // Description:
 //   Simulation models of the GateMate primitives that clk_rst_gen uses and
-//   the Yosys library has only as blackboxes: CC_USR_RSTN, CC_PLL, CC_BUFG.
-//   CC_PLL makes CLK0 at OUT_CLK MHz and reports lock 20 reference clocks
-//   after start; its other settings are not modelled.
+//   the Yosys library has only as blackboxes: CC_USR_RSTN, CC_BUFG.
 //==========================================================================
 
 `timescale 1ps/1ps
@@ -61,66 +59,6 @@ module CC_BUFG (
 );
   assign O = I;
 endmodule: CC_BUFG
-
-module CC_PLL #(
-    parameter string REF_CLK     = "10.0",
-    parameter string OUT_CLK     = "100.0",
-    parameter string PERF_MD     = "ECONOMY",
-    parameter int    LOW_JITTER  = 1,
-    parameter int    LOCK_REQ    = 1,
-    parameter int    CLK270_DOUB = 0,
-    parameter int    CLK180_DOUB = 0
-) (
-    input  logic CLK_REF,
-    input  logic USR_CLK_REF,
-    input  logic CLK_FEEDBACK,
-    input  logic USR_LOCKED_STDY_RST,
-    output logic USR_PLL_LOCKED_STDY,
-    output logic USR_PLL_LOCKED,
-    output logic CLK0,
-    output logic CLK90,
-    output logic CLK180,
-    output logic CLK270,
-    output logic CLK_REF_OUT
-);
-  real    period_ps;
-  integer ref_edges;
-
-  assign CLK_REF_OUT         = CLK_REF;
-  assign CLK180              = ~CLK0;
-  assign CLK270              = ~CLK90;
-  assign USR_PLL_LOCKED_STDY = USR_PLL_LOCKED;
-
-  initial begin
-    USR_PLL_LOCKED = 1'b0;
-    ref_edges      = 0;
-  end
-
-  always @(posedge CLK_REF) begin
-    if (ref_edges < 20) begin
-      ref_edges = ref_edges + 1;
-    end
-    else begin
-      USR_PLL_LOCKED = 1'b1;
-    end
-  end
-
-  initial begin
-    period_ps = 1.0e6 / OUT_CLK.atoreal();
-    CLK0      = 1'b0;
-    forever begin
-      #(period_ps / 2.0) CLK0 = ~CLK0;
-    end
-  end
-
-  initial begin
-    CLK90 = 1'b0;
-    #(period_ps / 4.0);
-    forever begin
-      #(period_ps / 2.0) CLK90 = ~CLK90;
-    end
-  end
-endmodule: CC_PLL
 
 // -----------------------------------------------------------------------------
 // Project:     openCologne-PCIE

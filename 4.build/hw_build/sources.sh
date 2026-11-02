@@ -8,9 +8,10 @@
 #   own_rtl <2.rtl>         our own RTL: what run-format.sh formats
 #   design_rtl <2.rtl> <csr generated-files dir> [sim]
 #                           every file of top, in compile order: packages,
-#                           interfaces, then modules. With "sim", also the
-#                           opensource SerDes BFM that phy_top uses in
-#                           simulation.
+#                           interfaces, then modules. The SerDes
+#                           (ccfpga_serdes): ccfpga_serdes.SYNTH.sv, CC_SERDES
+#                           for the chip; with "sim", the opensource SerDes BFM
+#                           instead.
 
 own_rtl() {
   local r=$1
@@ -39,7 +40,9 @@ design_rtl() {
   ls "$cc"/mac_src/*.v
   ls "$cc"/dll_src/*.v | grep -v arbiter
   if [ "${3:-}" = sim ]; then
-    echo "$r"/1.phy/2.serdes-model/ccfpga_serdes_pkg.sv "$r"/1.phy/2.serdes-model/ccfpga_serdes.sv
+    echo "$r"/1.phy/2.serdes-model/ccfpga_serdes_pkg.sv "$r"/1.phy/2.serdes-model/ccfpga_serdes.BFM.sv
+  else
+    echo "$r"/1.phy/2.serdes-model/ccfpga_serdes.SYNTH.sv
   fi
 }
 

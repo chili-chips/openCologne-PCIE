@@ -25,7 +25,7 @@
 # Both versions use the same generated CSR (4.build/csr_build/generated-files)
 # and the same firmware.hex (4.build/sw_build) for the RAM contents.
 #
-# The GateMate primitives (CC_SERDES, CC_PLL, CC_USR_RSTN, CC_BUFG) are black
+# The GateMate primitives (CC_SERDES, CC_USR_RSTN, CC_BUFG) are black
 # boxes turned into ports (expose -evert): their inputs are compared, their
 # outputs are shared free inputs. equiv_induct starts from any state, so logic
 # that is only constant after reset shows up as unproven and needs a look by
@@ -62,7 +62,7 @@ cp "$HERE/../sw_build/firmware.hex" .
 files() {  # $1 = 2.rtl dir
   echo bb.v $(design_rtl "$1" "$CSR" | tr '\n' ' ')
 }
-BB="t:CC_SERDES t:CC_PLL t:CC_USR_RSTN t:CC_BUFG"
+BB="t:CC_SERDES t:CC_USR_RSTN t:CC_BUFG"
 PREP="hierarchy -top $TOP; proc; flatten; memory; async2sync"
 
 REN=""

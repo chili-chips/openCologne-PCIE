@@ -101,13 +101,13 @@ module tb_phy;
    parameter  [4:0] PLL_BISC_DLY_PFD_MON_DIV = 2;
    parameter  [2:0] PLL_BISC_COR_DLY         = 1;
 
-   logic  clk_ref, clk_reg, clk_cfg;
+   logic  clk_ref, clk_aon, clk_cfg;
    logic  reset_n, reset_reg_n;
 
    initial clk_ref = 1'b1;
    always #(CLKPERIOD_REF/2.0) clk_ref = ~clk_ref;
-   initial clk_reg = 1'b1;
-   always #(CLKPERIOD_REG/2.0) clk_reg = ~clk_reg;
+   initial clk_aon = 1'b1;
+   always #(CLKPERIOD_REG/2.0) clk_aon = ~clk_aon;
    initial clk_cfg = 1'b1;
    always #(CLKPERIOD_CFG/2.0) clk_cfg = ~clk_cfg;
 
@@ -150,14 +150,14 @@ module tb_phy;
    integer wr_i;
    task writeRegfile(input [7:0] addr, input [15:0] data, input [15:0] mask);
       begin
-         @(posedge clk_reg); #1.5;
+         @(posedge clk_aon); #1.5;
          regfile_en = 1'b1; regfile_we = 1'b1;
          regfile_addr = addr; regfile_mask = mask; regfile_di = data;
-         @(posedge clk_reg); #1.5;
+         @(posedge clk_aon); #1.5;
          regfile_en = 1'b0; regfile_we = 1'b0;
          regfile_addr = 8'h0; regfile_mask = 16'h0; regfile_di = 16'h0;
          for (wr_i = 0; wr_i < 40; wr_i = wr_i + 1) begin
-            @(posedge clk_reg); #1.5;
+            @(posedge clk_aon); #1.5;
          end
       end
    endtask
@@ -250,7 +250,7 @@ module tb_phy;
       .PLL_BISC_COR_DLY         (PLL_BISC_COR_DLY)
    ) DUT_BHV (
       .clk_ref_i            (clk_ref),
-      .clk_reg_i            (clk_reg),
+      .clk_reg_i            (clk_aon),
       .clk_cfg_i            (clk_cfg),
       .clk_core_tx_i        (bhv_clk_core),
       .clk_core_rx_i        (bhv_clk_core),
@@ -394,7 +394,7 @@ module tb_phy;
       .PLL_BISC_COR_DLY         (PLL_BISC_COR_DLY)
    ) DUT_REF (
       .clk_ref_i            (clk_ref),
-      .clk_reg_i            (clk_reg),
+      .clk_reg_i            (clk_aon),
       .clk_cfg_i            (clk_cfg),
       .clk_core_tx_i        (ref_clk_core),
       .clk_core_rx_i        (ref_clk_core),
@@ -1028,7 +1028,7 @@ module tb_phy ();
    // Not available through FPGA Fabric 
 
    logic         clk_ref;
-   logic         clk_reg;
+   logic         clk_aon;
    logic         clk_cfg;
 
    logic         reset_n;
@@ -1089,7 +1089,7 @@ module tb_phy ();
 
    // SerDes Config Parameter 
 
-   parameter  [5:0] PLL_FCNTRL               = 6'h1A;                   // (Default = 58 = T:20d)
+   parameter  [5:0] PLL_FCNTRL               = (DATA_BYTES == 8) ? 6'h3A : 6'h1A; // (Default = 58 = T:20d)
    parameter  [5:0] PLL_MAIN_DIVSEL          = {1'b0,2'b11,1'b0,2'b11}; // (Default = 27)
    parameter  [1:0] PLL_OUT_DIVSEL           = 2'b01;                   // (Default = 0 = T:1d)
 
@@ -1331,7 +1331,7 @@ module tb_phy ();
       )
      i_ccfpga_serdes (
       .clk_ref_i             ( clk_ref            ),
-      .clk_reg_i             ( clk_reg            ),
+      .clk_reg_i             ( clk_aon            ),
       .clk_cfg_i             ( clk_cfg            ),
       .clk_core_tx_i         ( clk_core_tx        ),
       .clk_core_rx_i         ( clk_core_tx        ),
@@ -1520,8 +1520,8 @@ module tb_phy ();
    initial clk_ref = 1'b1;
    always #(CLKPERIOD_REF / 2) clk_ref = ~clk_ref;  // 100 MHz
 
-   initial clk_reg = 1'b1;
-   always #(CLKPERIOD_REG / 2) clk_reg = ~clk_reg;  // 125 MHz
+   initial clk_aon = 1'b1;
+   always #(CLKPERIOD_REG / 2) clk_aon = ~clk_aon;  // 125 MHz
 
    initial clk_cfg = 1'b1;
    always #(CLKPERIOD_CFG / 2) clk_cfg = ~clk_cfg;  // 25 MHz
@@ -1609,13 +1609,13 @@ module tb_phy ();
                      input [15:0] mask);
       integer cnt;
       begin
-         @(posedge clk_reg); #1.5;
+         @(posedge clk_aon); #1.5;
          regfile_en   = 1'b1;
          regfile_we   = 1'b1;
          regfile_addr = addr;
          regfile_mask = mask;
          regfile_di   = data;
-         @(posedge clk_reg); #1.5;
+         @(posedge clk_aon); #1.5;
          regfile_en   = 1'b0;
          regfile_we   = 1'b0;
          regfile_addr = 8'h0;
@@ -1623,7 +1623,7 @@ module tb_phy ();
          regfile_di   = 16'h0;
          while ( regfile_rdy !== 1'b1 )
            begin
-              @(posedge clk_reg); #1.5;
+              @(posedge clk_aon); #1.5;
               cnt = cnt + 1;
               if ( cnt == 32 )
                 begin
@@ -1639,17 +1639,17 @@ module tb_phy ();
                     output [15:0] data);
       integer cnt;
       begin
-         @(posedge clk_reg); #1;
+         @(posedge clk_aon); #1;
          regfile_en   = 1'b1;
          regfile_we   = 1'b0;
          regfile_addr = addr;
-         @(posedge clk_reg); #1;
+         @(posedge clk_aon); #1;
          regfile_en   = 1'b0;
          regfile_addr = 8'h0;
          cnt = 0;
          while ( regfile_rdy !== 1'b1 )
            begin
-              @(posedge clk_reg); #1;
+              @(posedge clk_aon); #1;
               cnt = cnt + 1;
               if ( cnt == 32 )
                 begin
@@ -1778,7 +1778,7 @@ module tb_phy ();
               writeRegfile(8'h50, 16'h0000, 16'h0001);
               for ( i = 0; i < 100; i = i + 1 )
                 begin
-                   @(posedge clk_reg); #1;
+                   @(posedge clk_aon); #1;
                 end
            end
 
@@ -1819,7 +1819,7 @@ module tb_phy ();
            begin
               for ( i = 0; i < 1000; i = i + 1 )
                 begin
-                   @(posedge clk_reg); #1;
+                   @(posedge clk_aon); #1;
                 end
               readSerIOADPLLStatus(status);
               if ( status[0] == 1'b0 )

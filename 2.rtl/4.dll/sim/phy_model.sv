@@ -55,7 +55,7 @@ module phy_model #(
    )
    (
    input  logic                   clk_ref,
-   input  logic                   clk_reg,
+   input  logic                   clk_aon,
    input  logic                   clk_cfg,
    input  logic                   reset_n,
 
@@ -91,7 +91,7 @@ module phy_model #(
    output logic                   TX_SERIO_N
    );
 
-   localparam  [5:0] PLL_FCNTRL         = 6'h1A;
+   localparam  [5:0] PLL_FCNTRL         = (DATA_BYTES == 8) ? 6'h3A : 6'h1A;
    localparam  [5:0] PLL_MAIN_DIVSEL    = {1'b0,2'b11,1'b0,2'b11};
    localparam  [1:0] PLL_OUT_DIVSEL     = 2'b01;
    localparam  [1:0] RX_DATAPATH_SEL    = 3;
@@ -151,7 +151,7 @@ module phy_model #(
                     CFG_PLL3   = 4'd8,
                     CFG_DONE   = 4'd9;
 
-   always @(posedge clk_reg or negedge reset_n) begin
+   always @(posedge clk_aon or negedge reset_n) begin
       if (!reset_n) begin
          regfile_we    <= 1'b0;  regfile_en    <= 1'b0;
          regfile_addr  <= 8'h0;  regfile_mask  <= 16'h0;  regfile_di <= 16'h0;
@@ -324,7 +324,7 @@ module phy_model #(
       .PLL_SET_OP_LOCK      ( 1'h0                 )
    ) serdes_inst (
       .clk_ref_i            ( clk_ref            ),
-      .clk_reg_i            ( clk_reg            ),
+      .clk_reg_i            ( clk_aon            ),
       .clk_cfg_i            ( clk_cfg            ),
       .clk_core_tx_i        ( tx_clk             ),
       .clk_core_rx_i        ( tx_clk             ),

@@ -13,7 +13,7 @@ Work area for the Cologne Chip PHY PIPE developers.
 - [Yumewatari (whitequark) PHY segments with rudimentary LTSSM](https://github.com/whitequark/Yumewatari/tree/master/yumewatari/gateware)
 
 <p align="center">
-  <img alt="PCIe physical layer sub-blocks" width="60%" src="0.doc/images/PHY-Layers.drawio.png">
+  <img alt="PCIe physical layer sub-blocks" width="90%" src="0.doc/images/PHY-Layers.drawio.png">
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@ https://github.com/colognechip/gatemate-pipe/tree/dll_test/sim
 --------------------
 ## Open-source SerDes simulation model
 
-`2.serdes-model/` holds a copy of the open-source **SerDes BFM**, a behavioural model of the GateMate SerDes hard macro, so the PIPE, MAC and DLL simulate with open tools. Master copy, documentation, tests and 8b/10b proofs: [openCologne `7.SerDes/1.sim-model`](https://github.com/chili-chips-ba/openCologne/blob/main/7.SerDes/1.sim-model/README.md).
+`2.serdes-model/` holds a copy of the open-source **SerDes BFM**, a behavioural model of the GateMate SerDes at the level of Cologne Chip's sim model `ccfpga_serdes`, not the `CC_SERDES` primitive. Its sibling `ccfpga_serdes.SYNTH.sv` puts `CC_SERDES` behind the same ports for the chip: `phy_top` has one SerDes instance, the file list picks the file. So the PIPE, MAC and DLL simulate with open tools. Master copy, documentation, tests and 8b/10b proofs: [openCologne `7.SerDes/1.sim-model`](https://github.com/chili-chips-ba/openCologne/blob/main/7.SerDes/1.sim-model/README.md).
 
 | flow | result |
 |---|---|

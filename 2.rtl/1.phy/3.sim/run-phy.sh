@@ -60,7 +60,7 @@ esac
 
 guard_repo_clean "${REPO_ROOT}"
 
-OPEN_SRC="${MODEL_DIR}/ccfpga_serdes_pkg.sv ${MODEL_DIR}/ccfpga_serdes.sv"
+OPEN_SRC="${MODEL_DIR}/ccfpga_serdes_pkg.sv ${MODEL_DIR}/ccfpga_serdes.BFM.sv"
 REF_COPY=""
 cleanup () {
   if [ "${KEEP}" = "0" ] && [ -n "${REF_COPY}" ] && [ -d "${REF_COPY}" ]; then

@@ -58,17 +58,14 @@ module pcie_top
     input logic perst_n,  // PERST# from the connector, active low
 
           pipe_if.mac pipe_mac,  // to phy_top
-    input logic       phy_rdy_n, // from phy_top: SerDes TX out of reset
+    input logic       phy_rdy,   // from phy_top: SerDes TX out of reset
 
-    // clock and reset for the SerDes model in phy_top
-    output logic clk_reg,
-    output logic rst_reg_n,
+    output logic rst_pipe_n,  // to phy_top: PIPE Reset#, the SerDes reset
 
-    output logic trn_link_up,  // data link up
+    output logic dll_up,       // data link up
     output logic fw_pass       // the firmware has reported PASS
 );
 
-  logic pipe_rst_n;
   logic mac_rst_n;
   logic core_rst_n;
 
@@ -88,21 +85,17 @@ module pcie_top
       .clk_brd    (clk_brd),
       .perst_n    (perst_n),
       .pclk       (pipe_mac.pclk),
-      .phy_rdy_n  (phy_rdy_n),
-      .trn_link_up(trn_link_up),
-      .clk_reg    (clk_reg),
-      .rst_reg_n  (rst_reg_n),
-      .pipe_rst_n (pipe_rst_n),
-      .mac_rst_n  (mac_rst_n),
-      .core_rst_n (core_rst_n)
+      .phy_rdy    (phy_rdy),
+      .rst_pipe_n (rst_pipe_n),
+      .mac_rst_n  (mac_rst_n)
   );
 
   pcie_core u_core (
-      .pipe_rst_n (pipe_rst_n),
+      .rst_pipe_n (rst_pipe_n),
       .mac_rst_n  (mac_rst_n),
       .core_rst_n (core_rst_n),
       .pipe       (pipe_mac),
-      .trn_link_up(trn_link_up),
+      .dll_up     (dll_up),
       .s_axis_tx  (s_axis_tx),
       .m_axis_rx  (m_axis_rx),
       .cfg        (cfg)

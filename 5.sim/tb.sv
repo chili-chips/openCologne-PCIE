@@ -178,23 +178,14 @@ module tb #(
 
 `ifdef IFACE_SERIAL
   localparam  HALF_REF_PERIOD_PS        = 5_000;  // 100 MHz PCIE REFCLK
-  localparam  HALF_CFG_PERIOD_PS        = 20_000; // 25 MHz SerDes model config clock
 
   logic       refclk;
-  logic       clk_cfg;
   logic       ser_up_n;
 
   initial begin
     refclk = 1'b0;
     forever begin
       #(HALF_REF_PERIOD_PS) refclk = ~refclk;
-    end
-  end
-
-  initial begin
-    clk_cfg = 1'b0;
-    forever begin
-      #(HALF_CFG_PERIOD_PS) clk_cfg = ~clk_cfg;
     end
   end
 
@@ -225,7 +216,6 @@ module tb #(
     .clk_brd                           (clk_brd),
     .perst_n                           (rst_n),
     .refclk                            (refclk),
-    .clk_cfg                           (clk_cfg),
     .ser_rxp                           (ser_dn),
     .ser_rxn                           (ser_dn_idle ? ser_dn : ~ser_dn),
     .ser_txp                           (ser_up),
@@ -234,7 +224,7 @@ module tb #(
     .fw_pass                           (fw_pass)
   );
 `else
-  logic       phy_rdy_n;
+  logic       phy_rdy;
 
   pipe_if #(.DATA_BYTES(PIPE_DATAWIDTH/8)) pipe_mac ();
 
@@ -245,7 +235,7 @@ module tb #(
     .pclk                              (pclk),
     .rst_n                             (rst_n),
     .pipe                              (pipe_mac),
-    .phy_rdy_n                         (phy_rdy_n),
+    .phy_rdy                           (phy_rdy),
     .host_txdata                       (downdata),
     .host_txdatak                      (downdatak),
     .host_rxdata                       (updata),
@@ -257,15 +247,14 @@ module tb #(
     .clk_brd                           (clk_brd),
     .perst_n                           (rst_n),
     .pipe_mac                          (pipe_mac),
-    .phy_rdy_n                         (phy_rdy_n),
-    .clk_reg                           (),
-    .rst_reg_n                         (),
-    .trn_link_up                       (link_up),
+    .phy_rdy                           (phy_rdy),
+    .rst_pipe_n                        (),
+    .dll_up                            (link_up),
     .fw_pass                           (fw_pass)
   );
 `endif
 
-  always @(link_up) $display("%t tb: trn_link_up = %b", $time, link_up);
+  always @(link_up) $display("%t tb: dll_up = %b", $time, link_up);
   always @(fw_pass) $display("%t tb: fw_pass = %b", $time, fw_pass);
 `elsif IFACE_SERIAL
   PcieVhostSerial #(

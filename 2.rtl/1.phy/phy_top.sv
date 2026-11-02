@@ -42,41 +42,35 @@
 //   - ccfpga_pipe_logic (Cologne Chip, 2.pipe/pipe_src): the soft PIPE
 //     adaptation layer. It turns PIPE into the SerDes data path, makes PCLK,
 //     and runs the SerDes reset and comma-alignment FSMs.
-//   - the SerDes: on the chip the CC_SERDES hard macro; in simulation
-//     ccfpga_serdes, either our opensource SerDes BFM or the vendor's model
-//     (same name and ports; the file list picks one).
+//   - the SerDes, one ccfpga_serdes instance; the file list picks the
+//     module: ccfpga_serdes.SYNTH.sv for the chip (the CC_SERDES hard macro
+//     behind the BFM's ports), ccfpga_serdes.BFM.sv (our opensource BFM) or
+//     the vendor's model for simulation. Parameters set it up, as on the
+//     chip: SerDes and PLL on from reset, no regfile writes.
 //
-//   The two SerDes differ in how they are set up and wired. CC_SERDES takes
-//   its settings as parameters and connects to its dedicated serial pins and
-//   reference clock by itself, so the chip build has no serial ports here.
-//   The simulation model has the serial pins as ports and is brought up
-//   through its config and regfile ports, by a small FSM: SerDes enable,
-//   then the PLL.
+//   On the chip CC_SERDES has its own serial pins and reference clock, so
+//   clk_ref and ser_* go unused there; in simulation they are the model's.
 //==========================================================================
 
 module phy_top #(
     parameter int DATA_BYTES = 8
 ) (
-`ifndef SYNTHESIS
     input  logic clk_ref,    // 100 MHz PCIE REFCLK, the model's reference
-    input  logic clk_cfg,    // model config port clock
-    input  logic clk_reg,    // model regfile clock
-    input  logic rst_reg_n,  // root reset, released on clk_reg
+    input  logic rst_pipe_n,  // PIPE Reset#, released on clk_aon
     input  logic ser_rxp,
     input  logic ser_rxn,
     output logic ser_txp,
     output logic ser_txn,
-`endif
 
     pipe_if.phy pipe,
 
-    output logic phy_rdy_n  // low once the SerDes TX is out of reset
+    output logic phy_rdy    // high once the SerDes TX is out of reset
 );
 
   // SerDes settings, shared by both SerDes: as in Cologne Chip's
-  // ccfpga_pipe_wrapper.v, a 62.5 MHz PLL clock, a 64-bit datapath and the
-  // comma aligned on a 32-bit word
-  localparam logic [5:0] PLL_FCNTRL         = 6'h1A;
+  // ccfpga_pipe_wrapper.v, a 64-bit datapath, the PLL clock at the word rate
+  // (31.25 MHz at 2.5 Gb/s) and the comma aligned on a 32-bit word
+  localparam logic [5:0] PLL_FCNTRL         = 6'h3A;
   localparam logic [5:0] PLL_MAIN_DIVSEL    = {1'b0, 2'b11, 1'b0, 2'b11};
   localparam logic [1:0] PLL_OUT_DIVSEL     = 2'b01;
   localparam logic [1:0] RX_DATAPATH_SEL    = 2'd3;
@@ -107,10 +101,10 @@ module phy_top #(
   logic rx_detect_done, rx_present;
   logic tx_resetdone, rx_resetdone;
 
-  assign phy_rdy_n = ~tx_resetdone;
+  assign phy_rdy = tx_resetdone;  // CC_SERDES TX_RESET_DONE_O
 
-  // The SerDes TX and RX core clock, from the PIPE logic: the PLL clock
-  // divided by 2, the word rate
+  // The SerDes TX and RX core clock, from the PIPE logic: the PLL clock,
+  // the word rate, also PCLK
   logic tx_clk;
 
   ccfpga_pipe_logic #(
@@ -195,236 +189,14 @@ module phy_top #(
       .i_rx_ei_en          (rx_ei_en)
   );
 
-`ifdef SYNTHESIS
-
-  // The chip: CC_SERDES, set up by parameters as in Cologne Chip's
-  // ccfpga_pipe_wrapper.v. Its TX and RX core clocks are the PIPE logic's
-  // tx_clk; its regfile is not used.
-  CC_SERDES #(
-      .PLL_FCNTRL           (PLL_FCNTRL),
-      .PLL_MAIN_DIVSEL      (PLL_MAIN_DIVSEL),
-      .PLL_OUT_DIVSEL       (PLL_OUT_DIVSEL),
-      .RX_DATAPATH_SEL      (RX_DATAPATH_SEL),
-      .TX_DATAPATH_SEL      (TX_DATAPATH_SEL),
-      .RX_ALIGN_MCOMMA_VALUE(ALIGN_MCOMMA_VALUE),
-      .RX_ALIGN_PCOMMA_VALUE(ALIGN_PCOMMA_VALUE),
-      .RX_ALIGN_COMMA_ENABLE(ALIGN_COMMA_ENABLE),
-      .RX_ALIGN_COMMA_WORD  (ALIGN_COMMA_WORD),
-      .PLL_SET_OP_LOCK      (1'b0),
-      .SERDES_ENABLE        (1'b1)
-  ) u_serdes (
-      .RX_CLK_O              (clk_core_rx_rec),
-      .PLL_CLK_O             (clk_core_pll),
-      .LOOPBACK_I            (loopback),
-      .TX_RESET_I            (tx_reset),
-      .RX_RESET_I            (rx_reset),
-      .RX_PMA_RESET_I        (rx_pma_reset),
-      .RX_EQA_RESET_I        (rx_eqa_reset),
-      .RX_CDR_RESET_I        (rx_cdr_reset),
-      .RX_PCS_RESET_I        (rx_pcs_reset),
-      .RX_BUF_RESET_I        (rx_buf_reset),
-      .TX_PCS_RESET_I        (tx_pcs_reset),
-      .TX_PMA_RESET_I        (tx_pma_reset),
-      .PLL_RESET_I           (pll_reset),
-      .TX_RESET_DONE_O       (tx_resetdone),
-      .RX_RESET_DONE_O       (rx_resetdone),
-      .TX_CLK_I              (tx_clk),
-      .TX_DATA_I             (tx_data),
-      .TX_POWER_DOWN_N_I     (tx_powerdown_n),
-      .TX_POLARITY_I         (tx_polarity),
-      .TX_PRBS_SEL_I         (tx_prbs_sel),
-      .TX_PRBS_FORCE_ERR_I   (tx_prbs_force_err),
-      .TX_8B10B_EN_I         (tx_8b10b_en),
-      .TX_8B10B_BYPASS_I     (tx_8b10b_bypass),
-      .TX_CHAR_IS_K_I        (tx_char_is_k),
-      .TX_CHAR_DISPMODE_I    (tx_char_dispmode),
-      .TX_CHAR_DISPVAL_I     (tx_char_dispval),
-      .TX_ELEC_IDLE_I        (tx_elec_idle),
-      .TX_DETECT_RX_I        (tx_detect_rx),
-      .TX_BUF_ERR_O          (tx_buf_err),
-      .RX_CLK_I              (tx_clk),
-      .RX_POWER_DOWN_N_I     (rx_powerdown_n),
-      .RX_POLARITY_I         (rx_polarity),
-      .RX_PRBS_SEL_I         (rx_prbs_sel),
-      .RX_PRBS_CNT_RESET_I   (rx_prbs_cnt_reset),
-      .RX_PRBS_ERR_O         (  /*LINT:OK*/),
-      .RX_8B10B_EN_I         (rx_8b10b_en),
-      .RX_8B10B_BYPASS_I     (rx_8b10b_bypass),
-      .RX_EN_EI_DETECTOR_I   (rx_en_ei_detector),
-      .RX_COMMA_DETECT_EN_I  (rx_comma_detect_en),
-      .RX_SLIDE_I            (rx_slide),
-      .RX_MCOMMA_ALIGN_I     (rx_mcomma_align),
-      .RX_PCOMMA_ALIGN_I     (rx_pcomma_align),
-      .RX_DATA_O             (rx_data),
-      .RX_NOT_IN_TABLE_O     (rx_not_in_table),
-      .RX_CHAR_IS_COMMA_O    (rx_char_is_comma),
-      .RX_CHAR_IS_K_O        (rx_char_is_k),
-      .RX_DISP_ERR_O         (rx_disp_err),
-      .TX_DETECT_RX_DONE_O   (rx_detect_done),
-      .TX_DETECT_RX_PRESENT_O(rx_present),
-      .RX_BUF_ERR_O          (rx_buf_err),
-      .RX_BYTE_IS_ALIGNED_O  (rx_byte_is_aligned),
-      .RX_BYTE_REALIGN_O     (rx_byte_realign),
-      .RX_EI_EN_O            (rx_ei_en),
-      .REGFILE_CLK_I         (1'b0),
-      .REGFILE_WE_I          (1'b0),
-      .REGFILE_EN_I          (1'b0),
-      .REGFILE_ADDR_I        (8'h0),
-      .REGFILE_DI_I          (16'h0),
-      .REGFILE_MASK_I        (16'h0),
-      .REGFILE_DO_O          (  /*LINT:OK*/),
-      .REGFILE_RDY_O         (  /*LINT:OK*/)
-  );
-
-`else
-
-  // Simulation: the model, brought up through its ports. The FSM waits,
-  // enables the SerDes (config address 0x5C), then programs the PLL in two
-  // regfile writes to address 0x50.
-  typedef enum logic [3:0] {
-    CFG_IDLE,
-    CFG_EN0,
-    CFG_EN1,
-    CFG_EN2,
-    CFG_EN3,
-    CFG_PLL0,
-    CFG_PLL1,
-    CFG_PLL2,
-    CFG_PLL3,
-    CFG_DONE
-  } cfg_state_t;
-
-  cfg_state_t       cfg_state;
-  logic       [7:0] cfg_wait;
-  logic regfile_we, regfile_en;
-  logic [7:0] regfile_addr;
-  logic [15:0] regfile_mask, regfile_di;
-  logic cfg_en, cfgfile_valid;
-  logic [15:0] cfgfile_di;
-  logic [ 7:0] cfgfile_addr;
-  logic        reset_core_pll_n;
-
-  always_ff @(posedge clk_reg or negedge rst_reg_n) begin
-    if (!rst_reg_n) begin
-      regfile_we    <= 1'b0;
-      regfile_en    <= 1'b0;
-      regfile_addr  <= '0;
-      regfile_mask  <= '0;
-      regfile_di    <= '0;
-      cfg_en        <= 1'b0;
-      cfgfile_valid <= 1'b0;
-      cfgfile_di    <= '0;
-      cfgfile_addr  <= '0;
-      cfg_state     <= CFG_IDLE;
-      cfg_wait      <= '0;
-    end
-    else begin
-      regfile_en    <= 1'b0;
-      regfile_we    <= 1'b0;
-      cfgfile_valid <= 1'b0;
-
-      unique case (cfg_state)
-        CFG_IDLE: begin
-          if (cfg_wait == 8'd40) begin
-            cfg_state <= CFG_EN0;
-            cfg_wait  <= '0;
-          end
-          else begin
-            cfg_wait <= cfg_wait + 8'd1;
-          end
-        end
-
-        CFG_EN0: begin
-          cfg_en <= 1'b1;
-          if (cfg_wait == 8'd4) begin
-            cfg_state <= CFG_EN1;
-            cfg_wait  <= '0;
-          end
-          else begin
-            cfg_wait <= cfg_wait + 8'd1;
-          end
-        end
-
-        CFG_EN1: begin
-          cfgfile_valid <= 1'b1;
-          cfgfile_addr  <= 8'h5C;
-          cfgfile_di    <= 16'h0001;
-          cfg_state     <= CFG_EN2;
-        end
-
-        CFG_EN2: begin
-          cfgfile_addr <= '0;
-          cfgfile_di   <= '0;
-          if (cfg_wait == 8'd4) begin
-            cfg_state <= CFG_EN3;
-            cfg_wait  <= '0;
-          end
-          else begin
-            cfg_wait <= cfg_wait + 8'd1;
-          end
-        end
-
-        CFG_EN3: begin
-          cfg_en    <= 1'b0;
-          cfg_state <= CFG_PLL0;
-        end
-
-        CFG_PLL0: begin
-          regfile_en   <= 1'b1;
-          regfile_we   <= 1'b1;
-          regfile_addr <= 8'h50;
-          regfile_di   <= 16'h0002;
-          regfile_mask <= 16'h0007;
-          cfg_state    <= CFG_PLL1;
-          cfg_wait     <= '0;
-        end
-
-        CFG_PLL1: begin
-          regfile_addr <= '0;
-          regfile_di   <= '0;
-          regfile_mask <= '0;
-          if (cfg_wait == 8'd40) begin
-            cfg_state <= CFG_PLL2;
-            cfg_wait  <= '0;
-          end
-          else begin
-            cfg_wait <= cfg_wait + 8'd1;
-          end
-        end
-
-        CFG_PLL2: begin
-          regfile_en   <= 1'b1;
-          regfile_we   <= 1'b1;
-          regfile_addr <= 8'h50;
-          regfile_di   <= 16'h0003;
-          regfile_mask <= 16'h0003;
-          cfg_state    <= CFG_PLL3;
-          cfg_wait     <= '0;
-        end
-
-        CFG_PLL3: begin
-          regfile_addr <= '0;
-          regfile_di   <= '0;
-          regfile_mask <= '0;
-          if (cfg_wait == 8'd40) begin
-            cfg_state <= CFG_DONE;
-            cfg_wait  <= '0;
-          end
-          else begin
-            cfg_wait <= cfg_wait + 8'd1;
-          end
-        end
-
-        CFG_DONE: begin
-          cfg_state <= CFG_DONE;
-        end
-
-        default: begin
-          cfg_state <= CFG_DONE;
-        end
-      endcase
-    end
-  end
+  // The SerDes. Its TX and RX core clocks are the PIPE logic's tx_clk.
+  // TODO: validate PLL_REF_SEL(1'b1) (LVDS reference, as in the board-tested
+  //       SerDes loopback) and the clocking in general when the board
+  //       schematics are published.
+  // TODO: add TX de-emphasis (PCIe 2.5 GT/s: -3.5 dB, spec 4.3.3), e.g.
+  //       TX_BRANCH_EN_POST = TX_SEL_POST = 13 for about -3.6 dB (DS1001
+  //       eq. 2.10-2.12); validate on the board. Today: none, full swing.
+  logic reset_core_pll_n;  // the model's PLL-locked reset for its cores
 
   ccfpga_serdes #(
       .PLL_FCNTRL        (PLL_FCNTRL),
@@ -436,16 +208,19 @@ module phy_top #(
       .ALIGN_PCOMMA_VALUE(ALIGN_PCOMMA_VALUE),
       .ALIGN_COMMA_ENABLE(ALIGN_COMMA_ENABLE),
       .ALIGN_COMMA_WORD  (ALIGN_COMMA_WORD),
-      .PLL_SET_OP_LOCK   (1'h0)
+      .PLL_SET_OP_LOCK   (1'b0),
+      .PLL_EN_ADPLL_CTRL (1'b1),
+      .PLL_CONFIG_SEL    (1'b1),
+      .SERDES_ENABLE     (1'b1)
   ) u_serdes (
       .clk_ref_i           (clk_ref),
-      .clk_reg_i           (clk_reg),
-      .clk_cfg_i           (clk_cfg),
+      .clk_reg_i           (1'b0),  // no regfile access: parameters set the registers
+      .clk_cfg_i           (1'b0),
       .clk_core_tx_i       (tx_clk),
       .clk_core_rx_i       (tx_clk),
       .clk_core_rx_o       (clk_core_rx_rec),
-      .reset_n_i           (rst_reg_n),
-      .reset_reg_n_i       (rst_reg_n),
+      .reset_n_i           (rst_pipe_n),
+      .reset_reg_n_i       (rst_pipe_n),
       .reset_core_tx_n_i   (reset_core_pll_n),
       .reset_core_rx_n_i   (reset_core_pll_n),
       .testmode_i          (1'b0),
@@ -462,18 +237,18 @@ module phy_top #(
       .RX_SERIO_N_B        (ser_rxn),
       .TX_SERIO_P_B        (ser_txp),
       .TX_SERIO_N_B        (ser_txn),
-      .regfile_we_i        (regfile_we),
-      .regfile_en_i        (regfile_en),
-      .regfile_addr_i      (regfile_addr),
-      .regfile_mask_i      (regfile_mask),
-      .regfile_di_i        (regfile_di),
+      .regfile_we_i        (1'b0),
+      .regfile_en_i        (1'b0),
+      .regfile_addr_i      (8'h0),
+      .regfile_mask_i      (16'h0),
+      .regfile_di_i        (16'h0),
       .regfile_do_o        (  /*LINT:OK*/),
       .regfile_rdy_o       (  /*LINT:OK*/),
-      .cfg_en_i            (cfg_en),
+      .cfg_en_i            (1'b0),
       .reset_cfg_i         (1'b0),
-      .cfgfile_di_i        (cfgfile_di),
-      .cfgfile_valid_i     (cfgfile_valid),
-      .cfgfile_addr_i      (cfgfile_addr),
+      .cfgfile_di_i        (16'h0),
+      .cfgfile_valid_i     (1'b0),
+      .cfgfile_addr_i      (8'h0),
       .tx_reset_i          (tx_reset),
       .tx_pcs_reset_i      (tx_pcs_reset),
       .tx_pma_reset_i      (tx_pma_reset),
@@ -523,8 +298,6 @@ module phy_top #(
       .rx_resetdone_o      (rx_resetdone),
       .rx_ei_en_o          (rx_ei_en)
   );
-
-`endif
 
 endmodule
 

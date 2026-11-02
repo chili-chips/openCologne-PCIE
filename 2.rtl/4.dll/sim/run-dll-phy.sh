@@ -58,7 +58,7 @@ ${IVL} -g2012 -gspecify -Ttyp ${DUMP} ${DEFS} \
        ${MAC_SRC} \
        ${PIPE_SRC} \
        "${MODEL_DIR}/ccfpga_serdes_pkg.sv" \
-       "${MODEL_DIR}/ccfpga_serdes.sv" \
+       "${MODEL_DIR}/ccfpga_serdes.BFM.sv" \
        "${HERE}/phy_model.sv" \
        "${HERE}/pcie_stack.sv" \
        "${HERE}/tb_dll_phy.sv"

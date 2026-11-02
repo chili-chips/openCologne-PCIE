@@ -28,7 +28,7 @@
 # read_slang is built into the openXC7 Yosys, a plugin in the OSS CAD Suite.
 # When YOSYS_ARGS is not set, it is "" if the Yosys has read_slang, else
 # "-m slang".
-# The GateMate primitives (CC_SERDES, CC_PLL, ...) come from the Yosys
+# The GateMate primitives (CC_SERDES, CC_BUFG, ...) come from the Yosys
 # library (yosys-config --datdir), as blackboxes.
 #
 # The Cologne Chip submodule code (2.pipe/pipe_src) keeps its own style and
@@ -145,7 +145,7 @@ exit_check() {  # $1 phase, $2 exit status
 
 run_tags() {
   bb || { skip tags "no GateMate stubs (yosys-config)"; return; }
-  "$PYTHON" - 2.rtl/1.phy/2.serdes-model/ccfpga_serdes.sv -- bb.v $SV > tags.log <<'EOF'
+  "$PYTHON" - 2.rtl/1.phy/2.serdes-model/ccfpga_serdes.BFM.sv -- bb.v $SV > tags.log <<'EOF'
 import re, sys
 ports_only = sys.argv[1:sys.argv.index('--')]
 files = sys.argv[sys.argv.index('--') + 1:]

@@ -54,7 +54,7 @@ module phy_vproc_rc #(
     input  logic                    pclk,
     input  logic                    rst_n,
            pipe_if.phy              pipe,
-    output logic                    phy_rdy_n,
+    output logic                    phy_rdy,
     input  logic [DATA_BYTES*8-1:0] host_txdata,
     input  logic [  DATA_BYTES-1:0] host_txdatak,
     output logic [DATA_BYTES*8-1:0] host_rxdata,
@@ -90,7 +90,7 @@ module phy_vproc_rc #(
     end
   end
 
-  assign phy_rdy_n         = (rdy_cnt != 4'hF);
+  assign phy_rdy           = (rdy_cnt == 4'hF);
 
   assign pipe.pclk         = pclk;
   assign pipe.rx_data      = rx_data;

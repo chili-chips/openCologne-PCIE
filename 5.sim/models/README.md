@@ -8,7 +8,7 @@ This directory contains the following models
 * `phy_vproc_rc.sv` : the `phy_top` socket with `IFACE=pipe`, the host at the PIPE.
 * `ep_wavecrux_view.sv` : our EP's layer boundaries, for the WaveCrux decoders (`EP=rtl DUMP=1`).
 * `tlp_dw_if.sv`, `tlp_dw_monitor.sv`, `tlp_wavecrux_view.sv` : the SOC's AXI-Stream TLPs, one DW per clock, for the TLP decoder.
-* `gatemate_cells_sim.sv` : simulation models of the GateMate primitives `clk_rst_gen` uses: `CC_USR_RSTN`, `CC_PLL`, `CC_BUFG`.
+* `gatemate_cells_sim.sv` : simulation models of the GateMate primitives `clk_rst_gen` uses: `CC_USR_RSTN`, `CC_BUFG`.
 * `bfm_uart.sv` : a minimal UART BFM, 115.2 kb/s, 8N1.
 
 In addition, sub-directories contain the following models

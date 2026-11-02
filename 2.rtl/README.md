@@ -3,14 +3,37 @@
 **[WIP]** A scratchpad of ideas and team comments, from which we define structure, interfaces and partitioning. **Everyone is invited to contribute.**
 
 <p align="center">
-  <img alt="PCIe EndPoint top-level stack" width="50%" src="../0.doc/2.rtl/pcie-ep-top-stack.png">
+  <img alt="PCIe EndPoint top-level stack" width="35%" src="../0.doc/2.rtl/pcie-ep-top-stack.png">
 </p>
 
-### HW/SW Architecture
+### Block Diagram: Partitioning Protocol and DataFlow for Implementation
 
 <p align="center">
   <img alt="RTL blocks of the EndPoint: SOC, trn_bridge, soft TL+DLL+MAC, phy_top with the Cologne Chip soft wrapper and the GateMate SerDes, its BFM below" src="../0.doc/2.rtl/block-diagram.drawio.png" width="100%">
 </p>
+
+### Clock and Reset
+
+Two clocks. `clk_aon` (always on: the 10 MHz board clock, no PLL) runs the reset sequencing. The SerDes regfile clock is tied to 0: parameters set the registers, and start the SerDes and its PLL, on the chip and in simulation. PCLK (31.25 MHz at Gen1) is the SerDes PLL clock itself (`PLL_FCNTRL = 6'h3A`), and runs everything from the MAC up to the SOC.
+
+Each reset is asserted asynchronously and released on its own clock, in a chain ([`clk_rst_gen.sv`](clk_rst_gen.sv)):
+- `rst_pipe_n`: end of configuration (`CC_USR_RSTN`) and PERST#. PIPE Reset# and the SerDes PLL reset, the same in simulation and on the chip
+- `mac_rst_n` (MAC, DLL): once the SerDes TX is out of reset
+- `core_rst_n` (TL, `trn_bridge`, SOC): while the data link is up (`dll_up`); made in [`pcie_core.sv`](pcie_core.sv)
+
+<p align="center">
+  <img alt="Clocks and resets: the board clock is clk_aon for the reset chain root, rst_pipe_n; the SerDes PLL clock is PCLK; phy_rdy (CC_SERDES TX_RESET_DONE_O) releases mac_rst_n for MAC and DLL, dll_up drives core_rst_n in pcie_core for TL, trn_bridge and SOC" src="../0.doc/2.rtl/clk-rst.drawio.png" width="100%">
+</p>
+
+The rate is fixed at reset: no dynamic rate change ([Future Development](#future-development)). The default is Gen1, and the diagram shows its frequencies. A Gen2 build would run at:
+
+| Clock | Gen1 (default) | Gen2 |
+|---|---|---|
+| Line rate | 2.5 Gb/s | 5 Gb/s |
+| `PLL_OUT_DIVSEL` | 1 | 0 |
+| PCLK = `PLL_CLK_O` (64-bit PIPE, 8 symbols per clock) | 31.25 MHz | 62.5 MHz |
+| REFCLK | 100 MHz | 100 MHz |
+| `clk_aon` | 10 MHz | 10 MHz |
 
 ### Compatibility goal: an Artix-7 EndPoint, in open source
 
@@ -27,7 +50,7 @@ To its user, our EP looks exactly like the AMD Artix-7 EP, the `PCIE_2_1` hard m
 | openPCIE (Artix-7 RC) | openCologne-PCIE (GateMate EP) |
 |---|---|
 | `PCIE_2_1` hard macro: TL, DLL, LTSSM, MAC | soft RTL: MAC/LTSSM ([3.mac](3.mac)) by Cologne Chip, DLL ([4.dll](4.dll)) and TL ([5.tlp](5.tlp)) by Chili.CHIPS; MAC and DLL sources in the gatemate-pipe submodule |
-| `phy_top`: `mac2phy` + GTP wrapper + `GTPE2` hard macros | `phy_top`: Cologne Chip soft wrapper ([2.pipe](2.pipe)) + GateMate SerDes `CC_SERDES` ([1.phy](1.phy)), with the open [SerDes BFM](1.phy/2.serdes-model) for simulation |
+| `phy_top`: `mac2phy` + GTP wrapper + `GTPE2` hard macros | `phy_top`: Cologne Chip soft wrapper ([2.pipe](2.pipe)) + GateMate SerDes `CC_SERDES` ([1.phy](1.phy)), one `ccfpga_serdes` instance: `CC_SERDES` behind it for the chip, the open [SerDes BFM](1.phy/2.serdes-model) for simulation |
 | `trn_bridge`, `trn_if`, `axis_if`, `cfg_if`, `pcie_pkg` | the same ([5.tlp](5.tlp)); `trn_bridge` unchanged, on the TRN bus of our TL instead of `PCIE_2_1` |
 | SOC `riscv_pcie_soc` + PeakRDL CSR | the same ([6.soc](6.soc)), with the Rx window capturing any TLP, as an EP must see Memory requests |
 | eduBOS5 RISC-V core | copied from openPCIE, unchanged ([`6.soc/CPU.eduBOS5`](6.soc/CPU.eduBOS5)); more on eduBOS5, such as the CPU comparison, formal proofs and WaveCrux views, is in [openPCIE](https://github.com/chili-chips-ba/openPCIE/blob/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/README.md) |
@@ -59,7 +82,7 @@ These test benches cover the EP, layer by layer, each checking its layer against
 - [PCIE Base Spec Rev2.1](https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/0.doc/PCIE-base-spec.Rev2-1.pdf)
 - [openPCIE Controller WhitePaper](https://www.mdpi.com/2076-3417/16/7/3409)
 - [GateMate FPGA Datasheet, DS1001](../0.doc/2.rtl/ds1001-GateMate-datasheet.Sep2026.pdf) by Cologne Chip, September 2026
-- [GateMate FPGA Primitives Library, UG1001](../0.doc/2.rtl/ug1001-GateMate-primitives-library.Mar2025.pdf) by Cologne Chip, March 2025: `CC_PLL`, `CC_DFF`, `CC_BUFG`, `CC_USR_RSTN`, `CC_SERDES`
+- [GateMate FPGA Primitives Library, UG1001](../0.doc/2.rtl/ug1001-GateMate-primitives-library.Mar2025.pdf) by Cologne Chip, March 2025: `CC_DFF`, `CC_BUFG`, `CC_USR_RSTN`, `CC_SERDES`
 - [GateMate Integrated Logic Analyzer, UG1005](../0.doc/2.rtl/ug1005-GateMate-ILA.Aug2025.pdf) by Cologne Chip, August 2025: on-chip debug
 - [Inside GateMate: Analysis and Benchmarking of a New FPGA Architecture](https://ieeexplore.ieee.org/document/11322434) by Tarik Ibrahimović and Nedim Osmić, ICM 2025
 - [7 Series FPGAs Integrated Block for PCI Express, UG477](../0.doc/2.rtl/ug477_7Series_IntBlock_PCIe.pdf) by AMD/Xilinx: the user interface (TRN / AXI-Stream, configuration space) our EP reproduces; the reference whenever in doubt
@@ -115,7 +138,64 @@ A `Non-posted` transaction: the requester waits for a `Completion`.
 
 Configuration requests stop in the TL: `config_space` answers them and `cpl_gen` builds the completion. So do Unsupported Requests.
 
-## 1) `trn_if`
+# Walkthrough Interface Layers
+
+The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.png), from the PIPE up: each interface and the layer above it.
+
+## 1) PIPE (`pipe_if`)
+64-bit PIPE between the MAC and Cologne Chip's soft PHY. See [2.pipe](2.pipe/README.md) and [1.phy](1.phy/README.md).
+
+## 2) MAC: Physical Layer to PIPE
+
+#### Ordered sets
+
+| Ordered set | RX | TX | Notes |
+|---|---|---|---|
+| TS1, TS2 | ✔ | ✔ | Link and Lane numbers as numbers or PAD |
+| SKP | ✔ | ✔ | sent every 1180-1538 symbol times |
+| Logical idle | ✔ | ✔ | in Configuration.Idle and Recovery.Idle |
+| Electrical Idle (EIOS) | ✘ | ✘ | no speed change, no low-power states |
+| FTS | ✘ | ✘ | no L0s |
+| Compliance pattern | ✘ | ✘ | |
+
+#### Other internal features
+
+| Feature | Support | Notes |
+|---|---|---|
+| LTSSM | partial | Detect, Polling (Active, Configuration), Configuration (all substates), L0, Recovery (RcvrLock, RcvrCfg, Idle). No Polling.Compliance, L0s, L1, L2, Disabled, Loopback or Hot Reset |
+| Speed | Gen1 | no Recovery.Speed |
+| Scrambling | ✔ | data symbols only, reset by COM |
+| Lane polarity inversion | ✔ | detected in Polling, `RxPolarity` to the PHY |
+| Lane reversal | — | x1 |
+
+## 3) DLL (`dll_if`)
+
+#### DLLP generation and reception
+
+| DLLP | RX | TX | Notes |
+|---|---|---|---|
+| InitFC1, InitFC2 | ✔ | ✔ | P, NP, Cpl; credits from the TL's `INIT_*` ([gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17), [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)) |
+| UpdateFC | ✔ | ✔ | on the TL's request, and every 30 µs |
+| Ack, Nak | ✔ | ✔ | an Ack is sent as soon as it is scheduled: no AckNak latency timer yet |
+| PM_Enter_L1, PM_Enter_L23, PM_Active_State_Request_L1, PM_Request_Ack | ✘ | ✘ | no power management |
+| Vendor specific | ✘ | ✘ | |
+
+#### Other internal features
+
+| Feature | Support | Notes |
+|---|---|---|
+| Framing: STP ... END (TLP), SDP ... END (DLLP) | ✔ | |
+| LCRC (32-bit), DLLP CRC (16-bit) | ✔ | |
+| Sequence numbers, duplicates | ✔ | a duplicate TLP is Acked and dropped |
+| Retry buffer | ✔ | one TLP; built from flip-flops ([gatemate-pipe#16](https://github.com/colognechip/gatemate-pipe/issues/16)) |
+| Replay on Nak | ✔ | |
+| Replay timer | ✘ | a lost TLP is never replayed ([#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)) |
+| Nullified TLP (EDB) | ✘ | |
+| DL Init FSM | ✔ | `DL_Inactive` → `DL_Init` (`DL_INITFC1`, `DL_INITFC2`) → `DL_Active` |
+
+The TL starts a TLP only while `tx_tlp_ready` is high, and marks the last word of an odd-DW TLP with `tx_tlp_last_half` ([#21](https://github.com/chili-chips-ba/openCologne-PCIE/issues/21)).
+
+## 4) TL (`trn_if`)
 The user side of the TL: the 64-bit TRN bus, drop-in compatible with the Artix-7 `PCIE_2_1` hard macro's.
 
 #### TLP generation and reception
@@ -144,59 +224,6 @@ The user side of the TL: the 64-bit TRN bus, drop-in compatible with the Artix-7
 | Traffic Classes, Virtual Channels | ✘ | TC0, VC0 |
 | Error handling | ✔ | without AER: Malformed TLP and Receiver Overflow are Fatal, Unsupported Request Non-Fatal |
 
-## 2) `dll_if`
-
-#### DLLP generation and reception
-
-| DLLP | RX | TX | Notes |
-|---|---|---|---|
-| InitFC1, InitFC2 | ✔ | ✔ | P, NP, Cpl; credits from the TL's `INIT_*` ([gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17), [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)) |
-| UpdateFC | ✔ | ✔ | on the TL's request, and every 30 µs |
-| Ack, Nak | ✔ | ✔ | an Ack is sent as soon as it is scheduled: no AckNak latency timer yet |
-| PM_Enter_L1, PM_Enter_L23, PM_Active_State_Request_L1, PM_Request_Ack | ✘ | ✘ | no power management |
-| Vendor specific | ✘ | ✘ | |
-
-#### Other internal features
-
-| Feature | Support | Notes |
-|---|---|---|
-| Framing: STP ... END (TLP), SDP ... END (DLLP) | ✔ | |
-| LCRC (32-bit), DLLP CRC (16-bit) | ✔ | |
-| Sequence numbers, duplicates | ✔ | a duplicate TLP is Acked and dropped |
-| Retry buffer | ✔ | one TLP; built from flip-flops ([gatemate-pipe#16](https://github.com/colognechip/gatemate-pipe/issues/16)) |
-| Replay on Nak | ✔ | |
-| Replay timer | ✘ | a lost TLP is never replayed ([#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)) |
-| Nullified TLP (EDB) | ✘ | |
-| DL Init FSM | ✔ | `DL_Inactive` → `DL_Init` (`DL_INITFC1`, `DL_INITFC2`) → `DL_Active` |
-
-The TL starts a TLP only while `tx_tlp_ready` is high, and marks the last word of an odd-DW TLP with `tx_tlp_last_half` ([#21](https://github.com/chili-chips-ba/openCologne-PCIE/issues/21)).
-
-## 3) MAC: Physical Layer to PIPE
-
-#### Ordered sets
-
-| Ordered set | RX | TX | Notes |
-|---|---|---|---|
-| TS1, TS2 | ✔ | ✔ | Link and Lane numbers as numbers or PAD |
-| SKP | ✔ | ✔ | sent every 1180-1538 symbol times |
-| Logical idle | ✔ | ✔ | in Configuration.Idle and Recovery.Idle |
-| Electrical Idle (EIOS) | ✘ | ✘ | no speed change, no low-power states |
-| FTS | ✘ | ✘ | no L0s |
-| Compliance pattern | ✘ | ✘ | |
-
-#### Other internal features
-
-| Feature | Support | Notes |
-|---|---|---|
-| LTSSM | partial | Detect, Polling (Active, Configuration), Configuration (all substates), L0, Recovery (RcvrLock, RcvrCfg, Idle). No Polling.Compliance, L0s, L1, L2, Disabled, Loopback or Hot Reset |
-| Speed | Gen1 | no Recovery.Speed |
-| Scrambling | ✔ | data symbols only, reset by COM |
-| Lane polarity inversion | ✔ | detected in Polling, `RxPolarity` to the PHY |
-| Lane reversal | — | x1 |
-
-## 4) PIPE (`pipe_if`)
-64-bit PIPE between the MAC and Cologne Chip's soft PHY. See [2.pipe](2.pipe/README.md) and [1.phy](1.phy/README.md).
-
 ## 5) Type 0 Configuration Space
 
 In the TL (`config_space`), as on the hard macro. Each register is one 32-bit word with a write mask, and an RW1C mask where needed.
@@ -214,9 +241,41 @@ To the rest of the logic, through `cfg_if`: Bus and Device Number, Memory Space 
 ## 6) `axis_if` and TRN2PIO Bridge
 `trn_bridge` (`trn_rx`, `trn_tx`, `trn_tx_throttle`), unchanged from openPCIE, turns the TRN bus into the SOC's two 64-bit AXI-Stream streams (`axis_if`), as the AXI wrapper of `PCIE_2_1` does. Behind it, `riscv_pcie_soc` runs the PIO TestApp firmware on eduBOS5: it serves the MemWr and MemRd to BAR0 from its memory and builds the completions ([6.soc](6.soc/README.md), [3.sw](../3.sw/README.md)).
 
-## Miscellaneous Notes
+## 7) CSR, HAL and Software Interface
+The CSR block (`soc_csr`, at 0x3000_0000 on the CPU bus) is where the firmware meets the PCIE side: the `tx` registers (0x00) for the TLP to send, the `rx` window (0x10) for the received one, and `status` (0x24).
 
-### RTL coding rules
+**Handshake:** one TLP at a time each way, the firmware polls.
+
+- **Rx:** the SOC captures the first two beats of a TLP into the `rx` window and sets `rx.valid` at its last beat. While `rx.valid` is set, `tready` is low and the next TLP waits in the TL's queues (posted/completion 128 × 64 bit, non-posted 64 × 64 bit, 8 header credits each), its credits held, so nothing is lost. The firmware reads the window, answers, and writes 1 to `rx.valid` to open it again.
+- **Tx:** the firmware waits for the Tx FSM to be idle and the TL's Tx queue (64 × 64 bit, 3 TLPs) to have a free slot (`status.phy`), writes `tx.header0..2`, then `tx.data`. That last write starts the FSM, which sends the TLP in two beats.
+
+<p align="center"><img src="../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></p>
+
+> **Future feature:** PIO bursts without the CPU, see [Future Development](#future-development).
+
+The registers are written once, in SystemRDL ([`csr.rdl`](../4.build/csr_build/csr.rdl)). [PeakRDL](https://peakrdl.readthedocs.io) compiles that one file into the CSR RTL (`csr.sv`, `csr_pkg.sv`), the C header of the HAL (`csr.h`) and the register map docs ([`opencologne_pcie.md`](../4.build/csr_build/generated-files/opencologne_pcie.md)). RTL, firmware and docs cannot drift apart.
+
+- **Generate:** [4.build](../4.build/README.md#build-environment), step 1 (`MakefileCSR`)
+- **Firmware use:** [3.sw](../3.sw/README.md#ep-firmware)
+- **Co-simulation:** [5.sim](../5.sim/README.md#hal): the same firmware compiled for the host, each CSR access a _VProc_ bus cycle
+
+# Future Development
+
+1. **Dynamic rate change (Gen1 ↔ Gen2).**
+   - The LTSSM negotiates speed in Recovery.Speed and drives a PIPE `Rate`, which our `pipe_if` and CC's PIPE logic would also need.
+   - A fabric FSM reprograms the SerDes through its regfile: PLL off, `PLL_CFG1` (`PLL_OUT_DIVSEL` 1 → 0), PLL on, wait for lock, then `PhyStatus`.
+   - PCLK doubles to 62.5 MHz and stops during the relock, so everything above the PHY must close timing at Gen2.
+2. **PIO bursts.**
+   - An FSM, instead of the CPU, services the TL's queues: MemWr and MemRd to BAR0 go straight to and from the SOC memory, with multi-DW Completions.
+   - The firmware only sets it up. We stay the Completer: no new TLP types, no tags.
+3. **DMA.**
+   - The EP becomes a Requester: a DMA engine issues MemWr and MemRd to host memory, once Bus Master Enable is set.
+   - It needs tags and outstanding-request tracking, Completion reassembly and timeouts, and Tx arbitration with the PIO path.
+   - Descriptor CSRs for the firmware, and a host driver to hand out buffers.
+
+# Design Process and QA Methodology
+
+### RTL coding guidelines
 
 IEEE 1800-2009 SystemVerilog, the same rules as on [openPCIE](https://github.com/chili-chips-ba/openPCIE/blob/main/2.rtl/README.md#rtl-coding-rules), for our RTL and the models standing in for it. The gatemate-pipe submodule (`2.pipe/pipe_src`: the PIPE, MAC/LTSSM and DLL sources) keeps its own style. [`run-lint`](../4.build/hw_build/run-lint.sh), [`run-format`](../4.build/hw_build/run-format.sh) and [`run-leq`](../4.build/hw_build/run-leq.sh) are in `4.build/hw_build`.
 
@@ -224,7 +283,7 @@ IEEE 1800-2009 SystemVerilog, the same rules as on [openPCIE](https://github.com
 - **Declare and size once:** widths, constants and types live in a `_pkg` (e.g. `TRN_DATA_W` in openPCIE's `pcie_pkg.sv`); no module redeclares them.
 - **Fewer, richer ports:** interfaces and struct-typed ports, not many scalars; same for internal signals.
 - **Packages:** `import` right after the module name, no package prefix on every use.
-- **Case:** signals and ports lower case; constants (parameters, localparams, enum values, macros) UPPER CASE. Only vendor hard-macro and primitive pins (`CC_SERDES`, `CC_PLL`, `CC_BUFG`, ...) keep vendor names.
+- **Case:** signals and ports lower case; constants (parameters, localparams, enum values, macros) UPPER CASE. Only vendor hard-macro and primitive pins (`CC_SERDES`, `CC_BUFG`, `CC_USR_RSTN`, ...) keep vendor names.
 - **Descriptor names:** a signal of a `pcie_pkg` header or sideband type is named `*_dw0` ... `*_dw3`, `*_hdr_*` or `*_tuser` (e.g. `rx_hdr_dw0`, `tx_cfg_dw2`). It reads only the fields it needs; `run-lint.sh` waives the unread fields by that name.
 - **Procedural blocks:** `always_ff` for flip-flops, `always_comb` for combinational logic, never plain `always`. `unique case` for parallel muxes covering every value, `unique0 case` where no item may match, `priority case` for priority encoders; never plain `case`. A `unique case` has no `default`.
 

@@ -47,8 +47,7 @@
 //
 //   On the chip, the SerDes serial pins and its 100 MHz reference clock are
 //   dedicated pins that CC_SERDES connects by itself. They are ports of this
-//   module only in simulation, where the SerDes model needs them, along with
-//   the model's config clock and its regfile clock and reset.
+//   module only in simulation, where the SerDes model needs them.
 //==========================================================================
 
 module top (
@@ -57,7 +56,6 @@ module top (
 
 `ifndef SYNTHESIS
     input  logic refclk,   // 100 MHz PCIE REFCLK
-    input  logic clk_cfg,  // SerDes model config clock
     input  logic ser_rxp,
     input  logic ser_rxn,
     output logic ser_txp,
@@ -68,43 +66,37 @@ module top (
     output logic fw_pass   // for an LED: the firmware has reported PASS
 );
 
-  logic phy_rdy_n;
+  logic phy_rdy;
+  logic rst_pipe_n;
 
-`ifndef SYNTHESIS
-  logic clk_reg;
-  logic rst_reg_n;
+`ifdef SYNTHESIS
+  // CC_SERDES has its own serial pins and reference clock: no board pins here
+  logic refclk, ser_rxp, ser_rxn, ser_txp, ser_txn;
+  assign {refclk, ser_rxp, ser_rxn} = '0;
+  logic NC_ser_tx;  // the serial outputs go nowhere on the chip
+  assign NC_ser_tx = ser_txp ^ ser_txn;
 `endif
 
   pipe_if pipe_mac ();
 
   phy_top u_phy_top (
-`ifndef SYNTHESIS
-      .clk_ref  (refclk),
-      .clk_cfg  (clk_cfg),
-      .clk_reg  (clk_reg),
-      .rst_reg_n(rst_reg_n),
-      .ser_rxp  (ser_rxp),
-      .ser_rxn  (ser_rxn),
-      .ser_txp  (ser_txp),
-      .ser_txn  (ser_txn),
-`endif
-      .pipe     (pipe_mac),
-      .phy_rdy_n(phy_rdy_n)
+      .clk_ref   (refclk),
+      .rst_pipe_n(rst_pipe_n),
+      .ser_rxp   (ser_rxp),
+      .ser_rxn   (ser_rxn),
+      .ser_txp   (ser_txp),
+      .ser_txn   (ser_txn),
+      .pipe      (pipe_mac),
+      .phy_rdy   (phy_rdy)
   );
 
   pcie_top u_pcie_top (
       .clk_brd    (clk_brd),
       .perst_n    (perst_n),
       .pipe_mac   (pipe_mac),
-      .phy_rdy_n  (phy_rdy_n),
-`ifndef SYNTHESIS
-      .clk_reg    (clk_reg),
-      .rst_reg_n  (rst_reg_n),
-`else
-      .clk_reg    (  /*LINT:OK*/),
-      .rst_reg_n  (  /*LINT:OK*/),
-`endif
-      .trn_link_up(link_up),
+      .phy_rdy    (phy_rdy),
+      .rst_pipe_n (rst_pipe_n),
+      .dll_up     (link_up),
       .fw_pass    (fw_pass)
   );
 

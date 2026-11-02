@@ -16,4 +16,4 @@
 ../2.rtl/2.pipe/pipe_src/src/pipe_src/ccfpga_pipe_rx_mux.v
 ../2.rtl/2.pipe/pipe_src/src/pipe_src/ccfpga_pipe_tx_demux.v
 ../2.rtl/1.phy/2.serdes-model/ccfpga_serdes_pkg.sv
-../2.rtl/1.phy/2.serdes-model/ccfpga_serdes.sv
+../2.rtl/1.phy/2.serdes-model/ccfpga_serdes.BFM.sv

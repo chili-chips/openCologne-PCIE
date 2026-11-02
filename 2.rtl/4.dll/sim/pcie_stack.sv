@@ -7,7 +7,7 @@ module pcie_stack #(
    )
    (
    input  logic                   clk_ref,
-   input  logic                   clk_reg,
+   input  logic                   clk_aon,
    input  logic                   clk_cfg,
    input  logic                   reset_n,
 
@@ -48,15 +48,15 @@ module pcie_stack #(
    output logic                   TX_SERIO_N
    );
 
-   logic   [7:0] pipe_rst_cnt;
+   logic   [7:0] rst_pipe_cnt;
    logic        pipe_reset_n;
-   assign pipe_reset_n = (pipe_rst_cnt == 8'hFF);
+   assign pipe_reset_n = (rst_pipe_cnt == 8'hFF);
 
-   always @(posedge clk_reg or negedge reset_n) begin
+   always @(posedge clk_aon or negedge reset_n) begin
       if (!reset_n)
-         pipe_rst_cnt <= 8'd0;
+         rst_pipe_cnt <= 8'd0;
       else if (!pipe_reset_n)
-         pipe_rst_cnt <= pipe_rst_cnt + 8'd1;
+         rst_pipe_cnt <= rst_pipe_cnt + 8'd1;
    end
 
    logic   [1:0] mac_rst_sync;
@@ -166,7 +166,7 @@ module pcie_stack #(
       .DATA_BYTES ( DATA_BYTES )
    ) phy (
       .clk_ref           ( clk_ref           ),
-      .clk_reg           ( clk_reg           ),
+      .clk_aon           ( clk_aon           ),
       .clk_cfg           ( clk_cfg           ),
       .reset_n           ( reset_n           ),
 

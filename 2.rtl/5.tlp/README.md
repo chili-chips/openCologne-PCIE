@@ -55,7 +55,7 @@ Next to the TL, in this folder because it is its user side:
 - **TLPs**: the TL starts a TLP only while `tx_tlp_ready` is high, sends it in consecutive words, then waits for `tx_tlp_ready` to drop before the next one, matching the one-TLP DLL retry buffer. The last word of a TLP with an odd number of DWs is marked with `tx_tlp_last_half`, the DLL's `tl_tx_tlp_last_half` ([#21](https://github.com/chili-chips-ba/openCologne-PCIE/issues/21)): the DLL then sends only its lower 4 bytes.
 - **DLLPs**: the TL requests UpdateFC DLLPs (`tx_packet_type` is always UpdateFC) and takes the credits of the InitFC1, InitFC2 and UpdateFC DLLPs the DLL receives.
 
-InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)): the DLL used to send InitFC1 and InitFC2 with fixed credits (P 32/1008, NP 32/1, Cpl infinite). It now builds them from the `INIT_*` parameters, which `pcie_core` sets to the TL's. The fix is in [gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17); until it is merged, a fresh clone has the fixed credits.
+InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)): the DLL used to send InitFC1 and InitFC2 with fixed credits (P 32/1008, NP 32/1, Cpl infinite). It now builds them from the `INIT_*` parameters, which `pcie_core` sets to the TL's. The fix is in [gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17); until it is merged, the submodule points at our fork ([2.pipe](../2.pipe/README.md#submodule)).
 
 ### SOC side (trn_if and cfg_if)
 - **TRN RX** carries memory reads and writes that hit BAR0, and all completions.
