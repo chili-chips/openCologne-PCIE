@@ -1,12 +1,10 @@
 # RTL Architecture
 
-**[WIP]** A scratchpad of ideas and team comments, from which we define structure, interfaces and partitioning. **Everyone is invited to contribute.**
-
 <p align="center">
   <img alt="PCIe EndPoint top-level stack" width="35%" src="../0.doc/2.rtl/pcie-ep-top-stack.png">
 </p>
 
-### Block Diagram: Partitioning Protocol and DataFlow for Implementation
+### Block Diagram: Implementation-centric partitioning
 
 <p align="center">
   <img alt="RTL blocks of the EndPoint: SOC, trn_bridge, soft TL+DLL+MAC, phy_top with the Cologne Chip soft wrapper and the GateMate SerDes, its BFM below" src="../0.doc/2.rtl/block-diagram.drawio.png" width="100%">
@@ -342,7 +340,7 @@ Where they disagree: the spec text first, then the hard macro, then WaveCrux.
 
 Comparing them found three bugs in the models that one simulator alone hid: electrical idle unseen on 4-state simulators, a start-up race and a sampling race (openPCIE [issues 53, 55, 56](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#simulation-issues)).
 
-#### Simulation: Layer by layer
+#### Simulation: layer by layer
 
 These test benches cover the EP, layer by layer, each checking its layer against a link partner that does not share its code. Each is described next to its sources.
 
