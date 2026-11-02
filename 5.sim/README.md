@@ -174,7 +174,7 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
 - The tester's random mix is seeded (`make SEED=N`, `make regress`).
 - The EP model passes all of them, at the PIPE and on the serial line, over 100 seeds. Our EP passes with `A7RC=1` and fails the tester, above.
 
-The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22): our DLL's InitFC advertised P 32/1008 and NP 32/1, while the TL has 8/32 and 8/8, so its first UpdateFC-NP (9 after 32) looked to the host like a jump of 233 header credits. Fixed locally in gatemate-pipe (`send_DLLP.v` builds the InitFC DLLPs from `INIT_*`); `pcie_core.sv` gives the TL and DLL the same credits.
+The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22): our DLL's InitFC advertised P 32/1008 and NP 32/1, while the TL has 8/32 and 8/8, so its first UpdateFC-NP (9 after 32) looked to the host like a jump of 233 header credits. Fixed on our fork of gatemate-pipe (`send_DLLP.v` builds the InitFC DLLPs from `INIT_*`); `pcie_core.sv` gives the TL and DLL the same credits.
 
 ### Make options
 
