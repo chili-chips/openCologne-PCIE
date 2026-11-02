@@ -14,7 +14,10 @@ This is work area for the PCB-related thoughts and explanations, including the s
 </p>
 
 For additional detail, check the source repo:
- - [x] https://github.com/intergalaktik/ulx5m-m2
+- https://github.com/intergalaktik/ulx5m-m2
+
+While not the direct outcome of our project, the CologneChip PCIE card is also a good refrence
+- https://github.com/colognechip/gatemate-pcie-evb
 
   
 ### Edge card
