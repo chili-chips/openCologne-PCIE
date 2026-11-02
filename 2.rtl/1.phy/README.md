@@ -54,7 +54,7 @@ https://github.com/colognechip/gatemate-pipe/tree/dll_test/sim
 | flow | result |
 |---|---|
 | PIPE test, 64-bit (`3.sim/run-phy.sh pipe64`) | PASSED |
-| DLL, MAC, PIPE and SerDes, two link partners (`4.dll/sim/run-dll-phy.sh`) | fails from step 4 until [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
+| DLL, MAC, PIPE and SerDes, two link partners (`4.dll/sim/run-dll-phy.sh`) | PASSED; [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) still open: a corrupted END would hang it |
 
 PHY flows: [3.sim/README.md](3.sim/README.md). DLL over this PHY: [4.dll/sim/README.md](../4.dll/sim/README.md); its test-bench PHY (SerDes model + PIPE + bring-up FSM) is [`phy_model.sv`](../4.dll/sim/phy_model.sv).
 
