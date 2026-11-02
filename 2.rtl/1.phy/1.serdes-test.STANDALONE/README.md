@@ -2,7 +2,11 @@
 
 Mujo Sejdic and @KemalLikic workspace. [`PRBS-Loopback-Test-for-GateMate-EVK`](PRBS-Loopback-Test-for-GateMate-EVK) is a PRBS-7 loopback test of the GateMate SerDes on the evaluation board; [`build.sh`](build.sh) builds its bitstream.
 
-**Status:** tested on the board, runs fine.
+<p align="center">
+  <img alt="CologneChip EVK with SMA RF connectors, for SerDes PRBS loopback" width="40%" src="EVK-PRBS-Loopback-via-SMA-RF-cable.png">
+</p>
+    
+**Status:** tested on EVK board, using 10cm SMA RF loopback cable. It runs fine.
 
 **SerDes and PLL bring-up: an FSM, not defaults.** `CC_SERDES` gets only `SERDES_ENABLE = 1` and `SERDES_AUTO_INIT = 0`. After SW3, an FSM on the 10 MHz clock makes three regfile writes, 32 cycles apart (DS1001 register map):
 
@@ -58,5 +62,11 @@ Receiver:
 
 PCIe asks for Tx de-emphasis (spec 4.3.3); this test runs without it. For comparison, see the [ULX5M-M2 Ver1 settings](https://github.com/chili-chips-ba/openCologne-PCIE/tree/main/1.pcb#ver1) used for SerDes PRBS speed tests.
 
+---
+### References:
+- [CC SerDes LB](https://github.com/pu-cc/gm_serdes_lb) -- Includes **serdestool.py** tool for register map helpers
+- [Intergalaktik 2-chip SerDes test](https://github.com/chili-chips-ba/openCologne-PCIE/tree/main/1.pcb#ver1)
+- [openCologne ICLINK SerDes](https://github.com/chili-chips-ba/openCologne/tree/main/7.SerDes)
+  
 --------------------
 #### End of Document
