@@ -34,8 +34,8 @@ This is work area for the PCB-related thoughts and explanations, including the s
 For better Signal Integrity (SI) FPGA is moved next to edge connector. Power filtering that came out of experimentations with Ver1 was also added. With all that, hoping for 5Gbps 🤞.
 
 <p align="center">
-  <img alt="ULX5M M.2 V1.0 card, top side" width="36%" src="../0.doc/1.pcb/ulx5m-m2-v2--1.top.jpg">
-  <img alt="ULX5M M.2 V1.0 card, bottom side" width="36%" src="../0.doc/1.pcb/ulx5m-m2-v2--2.bottom.jpg">
+  <img alt="ULX5M M.2 V1.0 card, top side" width="60%" src="../0.doc/1.pcb/ulx5m-m2-v2--1.top.jpg">
+  <img alt="ULX5M M.2 V1.0 card, bottom side" width="60%" src="../0.doc/1.pcb/ulx5m-m2-v2--2.bottom.jpg">
 </p>
 
 
