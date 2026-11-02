@@ -2,7 +2,6 @@
 
 This is work area for the PCB-related thoughts and explanations, including the steps and results for conducting high-speed [openEMS](https://docs.openems.de) simulations.
 
-
 ### M2 card
 <p align="center">
    <a href="https://canva.link/vyykwt6k7odhs3t" target="_blank" rel="noopener">
@@ -10,7 +9,7 @@ This is work area for the PCB-related thoughts and explanations, including the s
   </a>
 </p>
 
-
+---
 #### Ver1
 ✅ Error-free data transfer at 1.25Gbps
 
@@ -29,7 +28,9 @@ This is work area for the PCB-related thoughts and explanations, including the s
   <img alt="ULX5M M.2 V1.0 Test Results with extra filters" width="45%" src="../0.doc/1.pcb/test-results/serdes-test-results---2026-10-26--with-extra-filters.png">
 </p>
 
+For comparison, see our [2.5Gbps SerDes settings](https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/2.rtl/1.phy/1.serdes-test.STANDALONE/README.md#serdes-loopback-tests) for a standalone PRBS loopback test on CologneChip EVK.
 
+---
 #### Ver2
 For better Signal Integrity (SI) FPGA is moved next to edge connector, see [Issue#4](https://github.com/chili-chips-ba/openCologne-PCIE/issues/4#issuecomment-4604732435). Power filtering that came out of our experimentation with Ver1 was also added. With all that, we are hoping for 5Gbps on Take2🤞.
 
@@ -45,7 +46,7 @@ For additional detail, check the source repo:
 While not the direct outcome of our project, the CologneChip PCIE card is also a good reference
 - https://github.com/colognechip/gatemate-pcie-evb
 
-  
+---  
 ### Edge card
 Just for illustration, and to get the ball rolling, here is an earlier attempt at PCIE "Slot" EndPoint card. Stay tuned for more...
 
@@ -53,7 +54,7 @@ Just for illustration, and to get the ball rolling, here is an earlier attempt a
   <img alt="Earlier ULX4M PCIe slot edge card prototype" width="45%" src="../0.doc/1.pcb/ULX4M-PCIe-IO.beta_v2.png">
 </p>
 
-
+---
 ### Form factors and hosts
 
 The PCB part of the project shall deliver two cards: GateMate in **(i) PCIE "Slot"** and **(ii) M.2** form-factors
@@ -85,6 +86,7 @@ With the M.2 RevA card done, the dev platform is now the ULX5M-M2 on our openPCI
   <img alt="PCIe interoperability with Raspberry Pi 5" width="40%" src="../0.doc/1.pcb/PCIE-interop-with-RPI5.png">
 </p>
 
+---
 #### References:
 - [GateMate Evaluation Board, DS1003](../0.doc/1.pcb/GateMate/ds1003-GateMate-EVB-datasheet.Jan2024.pdf) and its [schematics, rev 3v2](../0.doc/1.pcb/GateMate/ds1003-GateMate-EVB-3v2-schematics.Jan2024.pdf) by Cologne Chip, January 2024: the board of the SerDes PRBS test
 - [GateMate A2 GPIO Bank Allocation, UG1004](../0.doc/1.pcb/GateMate/ug1004-GateMate-A2-GPIO-allocation.Jun2025.pdf) by Cologne Chip, June 2025
