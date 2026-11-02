@@ -16,7 +16,7 @@ This is work area for the PCB-related thoughts and explanations, including the s
 
 ⬜ Almost error-free (BER in the order of 10^-11) at 2.5Gbps, but with some additional power filtering. These filter adjustment are going into Ver2 board 
 
-❌ We did not manage to get higher that 2.5Gbps connections between v005 GS and M2 Ver1
+❌ We did not manage to get higher than 2.5Gbps connections between v005 GS and M2 Ver1
  
 <p align="center">
   <img alt="ULX5M M.2 V1.0 card, top side" width="36%" src="../0.doc/1.pcb/ulx5m-m2.1--Top.jpg">
