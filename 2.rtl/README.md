@@ -90,7 +90,7 @@ Proprietary PCIE Core for Xilinx 7Series FPGA devices
 >
 > A common misconception: these are not open-source PCIE cores, but examples of how to use proprietary ones. Ours is currently the only open-source work creating a PCIE core itself.
 
-# Quick walkthrough the PIO MemWr, MemRd process
+# PIO MemWr/Rd signalling flow: a walkthrough
 
 How a PIO write and a PIO read cross today's stack, layer by layer. Details: [MAC](3.mac/README.md), [DLL](4.dll/README.md), [TL](5.tlp/README.md), [SOC](6.soc/README.md).
 
