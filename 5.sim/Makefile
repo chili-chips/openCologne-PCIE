@@ -335,9 +335,10 @@ run: all
 	@cd $(CURDIR) && $(FW_IN) A7RC_SEED=$(SEED) $(SIM_CMD); s=$$?; $(FW_OUT) exit $$s
 
 # The tester over seeds 1 to SEEDS, each in obj/regress/<seed>/, so seeds can
-# run side by side (tools/regress.sh)
+# run side by side (tools/regress.sh). PL.SPEED and PL.EIOS are listed apart:
+# our EP and the EP model are Gen1, so no seed changes the speed
 regress: all
-	@cd $(CURDIR) && $(FW_IN) bash tools/regress.sh $(SEEDS) $(REGRESS_JOBS) $(REGRESS_S) $(REGRESS_TRIES) \
+	@cd $(CURDIR) && $(FW_IN) REGRESS_NA="PL.SPEED PL.EIOS" bash tools/regress.sh $(SEEDS) $(REGRESS_JOBS) $(REGRESS_S) $(REGRESS_TRIES) \
 	    $(REGRESS_QUIET) $(CURDIR)/obj/regress "vusermain.cfg firmware.hex" -- $(SIM_CMD); s=$$?; $(FW_OUT) \
 	$(if $(filter fail,$(REGRESS_DUMP)),for d in obj/regress/*/; do [ ! -e $$d/failed ] || \
 	    $(MAKE) --no-print-directory wavecrux SEED=$$(basename $$d) WCX_OPEN=0; done;) exit $$s

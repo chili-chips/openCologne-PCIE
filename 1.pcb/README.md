@@ -2,16 +2,42 @@
 
 This is work area for the PCB-related thoughts and explanations, including the steps and results for conducting high-speed [openEMS](https://docs.openems.de) simulations.
 
+
 ### M2 card
 <p align="center">
    <a href="https://canva.link/vyykwt6k7odhs3t" target="_blank" rel="noopener">
      <img width="70%" alt="ULX5M-M2 promo video (click to watch with sound)" src="../0.doc/1.pcb/Intergalaktik-ULX5M.png">
   </a>
-
-  <img alt="ULX5M M.2 card, top side" width="36%" src="../0.doc/1.pcb/ulx5m-m2.1--Top.jpg">
-  <img alt="ULX5M M.2 card, bottom side" width="45%" src="../0.doc/1.pcb/ulx5m-m2.2--Bottom.jpg">
-  
 </p>
+
+
+#### Ver1
+✅ Error-free data transfer at 1.25Gbps
+
+⬜ Almost error-free (BER in the order of 10^-11) at 2.5Gbps, but with some additional power filtering. These filter adjustment are going into Ver2 board 
+
+❌ We did not manage to get higher that 2.5Gbps connections between v005 GS and M2 Ver1
+ 
+<p align="center">
+  <img alt="ULX5M M.2 V1.0 card, top side" width="36%" src="../0.doc/1.pcb/ulx5m-m2.1--Top.jpg">
+  <img alt="ULX5M M.2 V1.0 card, bottom side" width="45%" src="../0.doc/1.pcb/ulx5m-m2.2--Bottom.jpg">
+</p>
+  
+<p align="center">
+  <img alt="ULX5M M.2 V1.0 Messy Test Setup" width="45%" src="../0.doc/1.pcb/M2-Ver1--Messy-Test-Setup.jpg">
+  <img alt="ULX5M M.2 V1.0 SerDes Settings" width="45%" src="../0.doc/1.pcb/test-results/serdes-test-results---2026-10-18.settings2.png">
+  <img alt="ULX5M M.2 V1.0 Test Results with extra filters" width="45%" src="../0.doc/1.pcb/test-results/serdes-test-results---2026-10-26--with-extra-filters.png">
+</p>
+
+
+#### Ver2
+For better Signal Integrity (SI) FPGA is moved next to edge connector. Power filtering that came out of experimentations with Ver1 was also added. With all that, hoping for 5Gbps 🤞.
+
+<p align="center">
+  <img alt="ULX5M M.2 V1.0 card, top side" width="36%" src="../0.doc/1.pcb/ulx5m-m2-v2--1.top.jpg">
+  <img alt="ULX5M M.2 V1.0 card, bottom side" width="36%" src="../0.doc/1.pcb/ulx5m-m2-v2--2.bottom.jpg">
+</p>
+
 
 For additional detail, check the source repo:
 - https://github.com/intergalaktik/ulx5m-m2

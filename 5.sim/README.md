@@ -201,7 +201,7 @@ The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/is
 
 ### Sanity and regression
 
-Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh SIM=icarus`). The EP DMA stage is off in both (`DMA=0`, the default): our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)).
+Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh SIM=icarus`). The EP DMA stage runs only in the regression's seeds (`DMA=1`, on the EP model): our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)).
 
 **Sanity**, after every change: `bash run-sanity.sh`, five runs, about 40 s. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines.
 
@@ -226,12 +226,12 @@ make EP=rtl IFACE=serial A7RC=1 run                   # our EP with the real PHY
 (cd ../2.rtl/5.tlp/sim && bash run-tl.sh)
 ```
 
-| Run | Time | Today (2026-11-01) |
+| Run | Time | Today (2026-11-02) |
 |---|---|---|
-| `make regress SEEDS=100 REGRESS_JOBS=8` | 18 s | 0 of 100 failed; 8 rules checked in no seed: the EP's own requests (`TL.REQ-*`, DMA off), `PL.SPEED` and `PL.EIOS` (our EP is Gen1), `TL.CRS` |
+| `make regress SEEDS=100 REGRESS_JOBS=8 DMA=1` | 20 s | 0 of 100 failed; every rule checked in some seed (the EP model answers CRS in one seed in four), but `PL.SPEED` and `PL.EIOS`: not applicable, our EP and the EP model are Gen1 |
 | Verilator against Icarus | 3 min (Icarus serial) | the same `===>` lines, PIPE and serial |
 | `make EP=rtl run` | 20 s | FAIL: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), [#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26), [#36](https://github.com/chili-chips-ba/openCologne-PCIE/issues/36) to [#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40); can end at the time limit, waiting for a read lost in Recovery (#24) |
-| `make EP=rtl IFACE=serial A7RC=1 run` | 35 s | PASS; SKP 1184 to 1200 Symbol Times apart. [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) stays open: the tester run still shows it |
+| `make EP=rtl IFACE=serial A7RC=1 run` | 35 s | FAIL: [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38), one SKP dropped (2384 Symbol Times apart) |
 | `run-phy.sh pipe64`, `equiv` | 5 s | PASS |
 | `run-dll-phy.sh` | 6 s | PASS; the step-4 flips hit the TLP, not its END, so [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) is not reached |
 | `run-tl.sh` | 20 s | PASS |
