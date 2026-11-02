@@ -88,7 +88,11 @@ With the M.2 RevA card done, the dev platform is now the ULX5M-M2 on our openPCI
 
 ---
 #### References:
+- [Intergalaktik 2-chip SerDes test](https://github.com/chili-chips-ba/openCologne-PCIE/tree/main/1.pcb#ver1)
 - [GateMate Evaluation Board, DS1003](../0.doc/1.pcb/GateMate/ds1003-GateMate-EVB-datasheet.Jan2024.pdf) and its [schematics, rev 3v2](../0.doc/1.pcb/GateMate/ds1003-GateMate-EVB-3v2-schematics.Jan2024.pdf) by Cologne Chip, January 2024: the board of the SerDes PRBS test
+- [CC SerDes LB](https://github.com/pu-cc/gm_serdes_lb) -- Includes **serdestool.py** tool for register map helpers
+- [Our 2.5Gbps SerDes PRBS test](https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/2.rtl/1.phy/1.serdes-test.STANDALONE/README.md#serdes-loopback-tests) 
+- [openCologne ICLINK SerDes](https://github.com/chili-chips-ba/openCologne/tree/main/7.SerDes)
 - [GateMate A2 GPIO Bank Allocation, UG1004](../0.doc/1.pcb/GateMate/ug1004-GateMate-A2-GPIO-allocation.Jun2025.pdf) by Cologne Chip, June 2025
 - [USB3 PHY for GateMate](https://nlnet.nl/project/GateMate-USB3-PHY)
 - [KiCad and openEMS](https://www.youtube.com/watch?v=VcJqhsbzR3c)
