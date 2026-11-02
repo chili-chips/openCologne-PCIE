@@ -134,12 +134,12 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 
 | Ordered set | RX | TX | Notes |
 |---|---|---|---|
-| TS1, TS2 | ✔ | ✔ | Link and Lane numbers as numbers or PAD |
-| SKP | ✔ | ✔ | sent every 1180-1538 symbol times |
-| Logical idle | ✔ | ✔ | in Configuration.Idle and Recovery.Idle |
-| Electrical Idle (EIOS) | ✘ | ✘ | no speed change, no low-power states |
-| FTS | ✘ | ✘ | no L0s |
-| Compliance pattern | ✘ | ✘ | |
+| TS1, TS2 | ✅ | ✅ | Link and Lane numbers as numbers or PAD |
+| SKP | ✅ | ✅ | sent every 1180-1538 symbol times |
+| Logical idle | ✅ | ✅ | in Configuration.Idle and Recovery.Idle |
+| Electrical Idle (EIOS) | ❌ | ❌ | no speed change, no low-power states |
+| FTS | ❌ | ❌ | no L0s |
+| Compliance pattern | ❌ | ❌ | |
 
 #### Other internal features
 
@@ -147,8 +147,8 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 |---|---|---|
 | LTSSM | partial | Detect, Polling (Active, Configuration), Configuration (all substates), L0, Recovery (RcvrLock, RcvrCfg, Idle). No Polling.Compliance, L0s, L1, L2, Disabled, Loopback or Hot Reset |
 | Speed | Gen1 | no Recovery.Speed |
-| Scrambling | ✔ | data symbols only, reset by COM |
-| Lane polarity inversion | ✔ | detected in Polling, `RxPolarity` to the PHY |
+| Scrambling | ✅ | data symbols only, reset by COM |
+| Lane polarity inversion | ✅ | detected in Polling, `RxPolarity` to the PHY |
 | Lane reversal | — | x1 |
 
 ## 3) DLL (`dll_if`)
@@ -157,24 +157,24 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 
 | DLLP | RX | TX | Notes |
 |---|---|---|---|
-| InitFC1, InitFC2 | ✔ | ✔ | P, NP, Cpl; credits from the TL's `INIT_*` ([gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17), [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)) |
-| UpdateFC | ✔ | ✔ | on the TL's request, and every 30 µs |
-| Ack, Nak | ✔ | ✔ | an Ack is sent as soon as it is scheduled: no AckNak latency timer yet |
-| PM_Enter_L1, PM_Enter_L23, PM_Active_State_Request_L1, PM_Request_Ack | ✘ | ✘ | no power management |
-| Vendor specific | ✘ | ✘ | |
+| InitFC1, InitFC2 | ✅ | ✅ | P, NP, Cpl; credits from the TL's `INIT_*` ([gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17), [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)) |
+| UpdateFC | ✅ | ✅ | on the TL's request, and every 30 µs |
+| Ack, Nak | ✅ | ✅ | an Ack is sent as soon as it is scheduled: no AckNak latency timer yet |
+| PM_Enter_L1, PM_Enter_L23, PM_Active_State_Request_L1, PM_Request_Ack | ❌ | ❌ | no power management |
+| Vendor specific | ❌ | ❌ | |
 
 #### Other internal features
 
 | Feature | Support | Notes |
 |---|---|---|
-| Framing: STP ... END (TLP), SDP ... END (DLLP) | ✔ | |
-| LCRC (32-bit), DLLP CRC (16-bit) | ✔ | |
-| Sequence numbers, duplicates | ✔ | a duplicate TLP is Acked and dropped |
-| Retry buffer | ✔ | one TLP; built from flip-flops ([gatemate-pipe#16](https://github.com/colognechip/gatemate-pipe/issues/16)) |
-| Replay on Nak | ✔ | |
-| Replay timer | ✘ | a lost TLP is never replayed ([#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)) |
-| Nullified TLP (EDB) | ✘ | |
-| DL Init FSM | ✔ | `DL_Inactive` → `DL_Init` (`DL_INITFC1`, `DL_INITFC2`) → `DL_Active` |
+| Framing: STP ... END (TLP), SDP ... END (DLLP) | ✅ | |
+| LCRC (32-bit), DLLP CRC (16-bit) | ✅ | |
+| Sequence numbers, duplicates | ✅ | a duplicate TLP is Acked and dropped |
+| Retry buffer | ✅ | one TLP; built from flip-flops ([gatemate-pipe#16](https://github.com/colognechip/gatemate-pipe/issues/16)) |
+| Replay on Nak | ✅ | |
+| Replay timer | ❌ | a lost TLP is never replayed ([#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)) |
+| Nullified TLP (EDB) | ❌ | |
+| DL Init FSM | ✅ | `DL_Inactive` → `DL_Init` (`DL_INITFC1`, `DL_INITFC2`) → `DL_Active` |
 
 The TL starts a TLP only while `tx_tlp_ready` is high, and marks the last word of an odd-DW TLP with `tx_tlp_last_half` ([#21](https://github.com/chili-chips-ba/openCologne-PCIE/issues/21)).
 
@@ -185,27 +185,27 @@ The user side of the TL: the 64-bit TRN bus, drop-in compatible with the Artix-7
 
 | TLP | RX | TX | Notes |
 |---|---|---|---|
-| Memory Read, 32- and 64-bit address | ✔ to the SOC on a BAR0 hit | ✔ from the SOC | a BAR0 miss gets an Unsupported Request completion; SOC requests wait for Bus Master Enable |
-| Memory Write, 32- and 64-bit address | ✔ to the SOC on a BAR0 hit | ✔ from the SOC | a BAR0 miss or poisoned MWr is discarded, Unsupported Request |
-| Memory Read Locked | Unsupported Request | ✘ | |
-| I/O Read, I/O Write | Unsupported Request | ✘ | legacy |
-| Configuration Type 0 | ✔ answered by the TL | — | function 0; another function gets Unsupported Request |
+| Memory Read, 32- and 64-bit address | ✅ to the SOC on a BAR0 hit | ✅ from the SOC | a BAR0 miss gets an Unsupported Request completion; SOC requests wait for Bus Master Enable |
+| Memory Write, 32- and 64-bit address | ✅ to the SOC on a BAR0 hit | ✅ from the SOC | a BAR0 miss or poisoned MWr is discarded, Unsupported Request |
+| Memory Read Locked | Unsupported Request | ❌ | |
+| I/O Read, I/O Write | Unsupported Request | ❌ | legacy |
+| Configuration Type 0 | ✅ answered by the TL | — | function 0; another function gets Unsupported Request |
 | Configuration Type 1 | Unsupported Request | — | RCs and switches only |
-| AtomicOp | Unsupported Request | ✘ | |
+| AtomicOp | Unsupported Request | ❌ | |
 | Messages | PME_Turn_Off, Set_Slot_Power_Limit; others discarded or Unsupported Request | PME_TO_Ack, ERR_NONFATAL, ERR_FATAL | no legacy interrupts |
-| Cpl, CplD | ✔ to the SOC, `err_fwd` if poisoned | ✔ from the TL (configuration, Unsupported Request) and the SOC (its reads) | |
+| Cpl, CplD | ✅ to the SOC, `err_fwd` if poisoned | ✅ from the TL (configuration, Unsupported Request) and the SOC (its reads) | |
 
 #### Other internal features
 
 | Feature | Support | Notes |
 |---|---|---|
-| TLP header decode and build | ✔ | 3 DW and 4 DW, through the `pcie_pkg` structs |
-| Bus and Device Number capture | ✔ | on every Type 0 configuration write to function 0; Completer ID and Requester ID |
-| Ordering | ✔ | posted TLPs pass a waiting non-posted one, never the reverse |
-| Flow control | ✔ | transmit gating per 2.6.1.1; an UpdateFC on every credit release |
-| ECRC | ✘ | a digest is accounted for in the length, not checked |
-| Traffic Classes, Virtual Channels | ✘ | TC0, VC0 |
-| Error handling | ✔ | without AER: Malformed TLP and Receiver Overflow are Fatal, Unsupported Request Non-Fatal |
+| TLP header decode and build | ✅ | 3 DW and 4 DW, through the `pcie_pkg` structs |
+| Bus and Device Number capture | ✅ | on every Type 0 configuration write to function 0; Completer ID and Requester ID |
+| Ordering | ✅ | posted TLPs pass a waiting non-posted one, never the reverse |
+| Flow control | ✅ | transmit gating per 2.6.1.1; an UpdateFC on every credit release |
+| ECRC | ❌ | a digest is accounted for in the length, not checked |
+| Traffic Classes, Virtual Channels | ❌ | TC0, VC0 |
+| Error handling | ✅ | without AER: Malformed TLP and Receiver Overflow are Fatal, Unsupported Request Non-Fatal |
 
 ## 5) Type 0 Configuration Space
 
@@ -213,11 +213,11 @@ In the TL (`config_space`), as on the hard macro. Each register is one 32-bit wo
 
 | Capability | Implemented | Notes |
 |---|---|---|
-| Type 0 header | ✔ | BAR0 only: 32-bit, non-prefetchable, `2^BAR0_SIZE_BITS` bytes |
-| PCI Power Management | ✔ | D0 and D3hot |
-| PCI Express | ✔ | version 2, Endpoint; Max_Payload_Size 128 bytes; 2.5 GT/s, x1 |
-| MSI | ✘ | no interrupts |
-| AER, other extended capabilities | ✘ | |
+| Type 0 header | ✅ | BAR0 only: 32-bit, non-prefetchable, `2^BAR0_SIZE_BITS` bytes |
+| PCI Power Management | ✅ | D0 and D3hot |
+| PCI Express | ✅ | version 2, Endpoint; Max_Payload_Size 128 bytes; 2.5 GT/s, x1 |
+| MSI | ❌ | no interrupts |
+| AER, other extended capabilities | ❌ | |
 
 To the rest of the logic, through `cfg_if`: Bus and Device Number, Memory Space Enable, Bus Master Enable, Max_Payload_Size. Register list: [5.tlp](5.tlp/README.md#configuration-space).
 
