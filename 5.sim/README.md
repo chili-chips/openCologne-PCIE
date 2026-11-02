@@ -48,7 +48,7 @@ Each VProc instance is a node with its own program, `VUserMain<n>` for node `n`:
 
 | Node | Model | Program | Role |
 |---|---|---|---|
-| 2 | `RCPIPEx1__pcieVHost` | openPCIE's `5.sim/usercode/VUserMain2.cpp` | the host, openPCIE's [Artix-7 RC model](#the-host-openpcies-artix-7-rc-model): trains the link, then sends the RC firmware's requests: IDs, BAR sizing and assignment, a write and a read in BAR0; then, as the tester, the stages [below](#the-host-openpcies-artix-7-rc-model) |
+| 2 | `RCPIPEx1__pcieVHost` | [`models/a7rc-model/VUserMain2.cpp`](models/a7rc-model) (openPCIE's) | the host, openPCIE's [Artix-7 RC model](#the-host-openpcies-artix-7-rc-model): trains the link, then sends the RC firmware's requests: IDs, BAR sizing and assignment, a write and a read in BAR0; then, as the tester, the stages [below](#the-host-openpcies-artix-7-rc-model) |
 | 1 | `EPPIPEx1__pcieVHost_DUT` (`IFACE=serial`: `PcieVhostSerial`) | [`usercode/VUserMain1.cpp`](usercode/VUserMain1.cpp) | the EP model ([`stubs`](stubs/README.md)), an option next to the EP RTL + firmware: `EP=model` |
 | 0 | `soc_cpu.VPROC` | native C/C++, or the rv32 ISS | the SOC's CPU, in place of eduBOS5, with `CPU=vproc` or `CPU=iss` (below) |
 
@@ -136,11 +136,11 @@ make EP=rtl DUMP=1 run       # also write tb_rtl.fst: every layer of the EP, for
 
 The host is openPCIE's [Artix-7 RC model](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#the-rc-model): what the lab RC sends, from link training to the RC firmware's requests and their pacing. It runs at the PIPE or, with `IFACE=serial`, on the serial line, with 8b/10b and scrambling on. [`usercode/a7rc_ep.h`](usercode/a7rc_ep.h) says what it expects of our EP RTL; the EP model matches the RC model's own EP.
 
-**Masters.** The make file takes the host from an openPCIE checkout (`OPENPCIE`, default `../../openpcie`), which holds the masters. Pull it before major work here.
+**Masters.** The host is a copy in [`models/a7rc-model`](models/a7rc-model); the masters are in openPCIE. To update: copy, `cmp`, `bash run-sanity.sh`.
 
 | From openPCIE | Used for |
 |---|---|
-| `VUserMain2.cpp`, `a7rc_check.cpp` and `.h` (the checker), `ltssm.c` | the host |
+| `VUserMain2.cpp`, `a7rc_check.cpp` and `.h` (the checker), `ep_dma.h`, `ltssm.c` | the host |
 | `pcievhost-speed.patch` | applied to pcieVHost before the VIP build; both pcieVHost models here (host and EP model) |
 | `vproc-coroutine.patch` | applied to VProc; both models |
 
@@ -163,7 +163,7 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
   - requests the EP must not support;
   - odd requests: ECRC, poisoned, traffic classes;
   - Data Link faults;
-  - EP DMA under credit starvation ([`usercode/ep_dma.h`](usercode/ep_dma.h)), only with `DMA=1`: our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41));
+  - EP DMA under credit starvation ([`models/a7rc-model/ep_dma.h`](models/a7rc-model/ep_dma.h)), only with `DMA=1`: our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41));
   - speed changes and retrains; speed changes only when both sides do Gen2 (the EP model and our RTL are Gen1).
 - **Literal** (`A7RC=1`): only what the lab RC sends, with its timing.
 - **Against our EP** (2026-11-01) the tester run fails. The checker flags Naks for back-to-back TLPs ([#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26); on an error-free line any Nak is a violation, `DL.NAK`), no replay after held Acks or across a Recovery (`DL.REPLAY`, `TL.CPL-ALL`, [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)), Unsupported Request for reads longer than 1 DW (`TL.UR`, [#36](https://github.com/chili-chips-ba/openCologne-PCIE/issues/36)), reads that return data older than an earlier write (`TL.ORDER`, [#37](https://github.com/chili-chips-ba/openCologne-PCIE/issues/37)) and the SKP interval (`PL.SKP`, [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38)). The InitFC after every Recovery (`FC.INIT-ORDER`, [#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)) is fixed.
@@ -197,12 +197,11 @@ The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/is
 | `WCX_OPEN` | `1` (default), `0` | `make wavecrux SEED=N`: that seed with its waveform, opened in WaveCrux at the checker's first violation ([`tools/wavecrux.py`](tools/wavecrux.py); WaveCrux started with `--wcp-port 54321`); `0`: the waveform only | cursor and view set over WCP |
 | `OPTFLAG` | `-O2 -g` (default) | the C/C++ of the models and our user code; the VIP libraries are built `-O2 -g` too | `-O0` and `-O2` give the same result |
 | `DUMP` | `0` (default), `1` | write the FST: `tb.fst`, `tb_serial.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst`, by `EP` and `IFACE` | |
-| `OPENPCIE` | `../../openpcie` (default) | the openPCIE checkout the host comes from | |
 | `USRSIMFLAGS` | none (default) | extra Verilator or Icarus flags, such as defines | |
 
 ### Sanity and regression
 
-Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh OPENPCIE=...`). The EP DMA stage is off in both (`DMA=0`, the default): our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)).
+Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh SIM=icarus`). The EP DMA stage is off in both (`DMA=0`, the default): our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)).
 
 **Sanity**, after every change: `bash run-sanity.sh`, five runs, about 40 s. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines.
 
@@ -510,7 +509,7 @@ The upstream files are copied in [`vip`](vip/README.md), with these changes made
 | pcieVHost `verilog/headers/test_defs.v` | `` `fatal`` calls `tb.Fatal` | our test bench top is `tb` |
 | pcieVHost `src/displink.c`, `src/pcie_vhost_map.h`, `pcieVHost.v`, `pcieVHostPipex1.v` | transaction taps: TLP and DLLP ports ([`pcievhost-taps.patch`](models/pcievhost/pcievhost-taps.patch)) | waveform decoders need the TLP stream; the model keeps it in C |
 | pcieVHost `verilog/headers/pcie_vhost_map.v` | added: generated from `src/pcie_vhost_map.h` | upstream's make files generate it |
-| pcieVHost `src/ltssm.c` | not copied: the make file compiles openPCIE's `models/pcievhost/ltssm/ltssm.c`, with its LTSSM patch and Artix-7 RC profile | the host is openPCIE's Artix-7 RC model (step 4 above) |
+| pcieVHost `src/ltssm.c` | not copied: the make file compiles openPCIE's, [`models/a7rc-model/ltssm.c`](models/a7rc-model), with its LTSSM patch and Artix-7 RC profile | the host is openPCIE's Artix-7 RC model (step 4 above) |
 | pcieVHost `src/*.c`, `verilog/lib/Serialiser.v`, `verilog/lib/clkmux.v`, `verilog/pcieVHost/pcieVHost.v`, `verilog/pcieVHost/pcieVHostPipex1.v`, `verilog/headers/pciexpress_header.v` | openPCIE's `pcievhost-speed.patch`, applied by `tools/build-vip.sh` before the build | Gen2 speed changes, the Artix-7 RC profile's flow control and Ack timing, lane polarity inversion, and one electrical-idle rule on every simulator (`NOSIG` on the PIPE, constant 0 on the serial line, no X or Z) |
 | [`models/cosim/mem_model.sv`](models/cosim/mem_model.sv) | wraps upstream `mem_model.v` (as `f_mem_model.v`) in Verilator `lint_off` pragmas | keeps third-party code out of our lint |
 | rv32 `src/rv32csr_cpu.cpp` (in [`models/rv32/rv32-openpcie.patch`](models/rv32/rv32-openpcie.patch), from openPCIE) | the timer-compare check in `process_interrupts()` no longer charges cycles | it added 2 cycles to every instruction |

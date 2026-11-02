@@ -15,9 +15,9 @@
 # tools/build-vip.sh into ~/.cache. models/ holds our own wrappers.
 #
 # Nodes: VProc node 2 is the host, RCPIPEx1__pcieVHost, a pcieVHost in RC mode
-# running openPCIE's Artix-7 RC model, from an openPCIE checkout (OPENPCIE):
-# its 5.sim/usercode/VUserMain2.cpp, its ltssm.c, and pcieVHost and VProc built
-# with its pcievhost-speed.patch and vproc-coroutine.patch. What it expects of our EP RTL: usercode/a7rc_ep.h.
+# running openPCIE's Artix-7 RC model, copied into models/a7rc-model/:
+# VUserMain2.cpp, the checker, ltssm.c, and pcieVHost and VProc built with
+# pcievhost-speed.patch and vproc-coroutine.patch. What it expects of our EP RTL: usercode/a7rc_ep.h.
 # The EP is selected with EP: the EP RTL + firmware, or the EP model
 # EPPIPEx1__pcieVHost_DUT, a pcieVHost in EP mode at node 1 (stubs/,
 # usercode/VUserMain1.cpp), which proves the test bench and the host on their own.
@@ -76,13 +76,10 @@ else ifneq ($(IFACE),pipe)
 endif
 
 # ---- host ---------------------------------------------------------------------
-# openPCIE's Artix-7 RC model, from an openPCIE checkout: at the PIPE, or on
-# the serial line (IFACE=serial) with 8b/10b and scrambling on
-OPENPCIE      ?= $(CURDIR)/../../openpcie
-A7RC_DIR       = $(OPENPCIE)/5.sim
-ifeq ($(wildcard $(A7RC_DIR)/usercode/VUserMain2.cpp),)
-  $(error no openPCIE checkout at OPENPCIE=$(OPENPCIE): the host is its Artix-7 RC model)
-endif
+# openPCIE's Artix-7 RC model, a copy in models/a7rc-model/ (masters in
+# openPCIE): at the PIPE, or on the serial line (IFACE=serial) with 8b/10b and
+# scrambling on
+A7RC_DIR       = $(CURDIR)/models/a7rc-model
 # A7RC=0 (default): the host is a tester: the lab RC's sequence, then what its
 # firmware never sends but the spec allows (README.md, Tester and literal).
 # A7RC=1: literal, only what the lab RC sends
@@ -119,8 +116,8 @@ ifeq ($(filter 0 1,$(DMA)),)
 endif
 HOST_DEFS      = -DRC_GEN=2 -DA7RC_LITERAL=$(A7RC) $(A7RC_EXPECT) $(if $(filter serial,$(IFACE)),-DSIM_SERIAL) \
                  $(if $(filter 0,$(DMA)),-DA7RC_NO_DMA)
-VIP_ENV        = VIP_PATCH=$(A7RC_DIR)/models/pcievhost/pcievhost-speed.patch \
-                 VPROC_PATCH=$(A7RC_DIR)/models/cosim/vproc-coroutine.patch
+VIP_ENV        = VIP_PATCH=$(A7RC_DIR)/pcievhost-speed.patch \
+                 VPROC_PATCH=$(A7RC_DIR)/vproc-coroutine.patch
 
 # ---- CPU ----------------------------------------------------------------------
 #   rtl    (default) the eduBOS5 RTL core, running firmware.hex
@@ -154,7 +151,8 @@ endif
 
 # ---- user code ----------------------------------------------------------------
 # USER_C: our programs in USRCODEDIR (the EP model, the native CPU). The host,
-# openPCIE's VUserMain2.cpp, its spec checker a7rc_check.cpp and its ltssm.c,
+# openPCIE's VUserMain2.cpp, its spec checker a7rc_check.cpp and its ltssm.c
+# (models/a7rc-model),
 # the link-training helper, are always compiled with them
 USRCODEDIR    ?= $(CURDIR)/usercode
 OPTFLAG       ?= -O2 -g
@@ -174,7 +172,7 @@ IVERILOG      ?= iverilog
 VVP           ?= vvp
 
 CPPSTD         = -std=c++20
-INCLPATHS      = -I$(USRCODEDIR) -I$(VIP_DIR)/include
+INCLPATHS      = -I$(USRCODEDIR) -I$(A7RC_DIR) -I$(VIP_DIR)/include
 OBJDIR         = $(CURDIR)/obj/$(SIM)$(EP_OBJ)$(if $(filter 1,$(A7RC)),_a7rc)$(if $(filter 1,$(DMA)),_dma)$(if $(filter 1,$(DUMP)),_dump)
 USERLIB        = $(OBJDIR)/libuser.a
 
@@ -291,16 +289,16 @@ $(OBJDIR)/%.o: $(USRCODEDIR)/%.c | $(OBJDIR)
 $(OBJDIR)/%.o: $(USRCODEDIR)/%.cpp | $(OBJDIR)
 	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) $(INCLPATHS) $< -o $@
 
-# The host: the model, its checker and its ltssm.c, from openPCIE, without
+# The host: the model, its checker and its ltssm.c (models/a7rc-model), without
 # LTSSM_ABBREVIATED, as openPCIE compiles them (the model sets its own
 # Polling count)
-$(OBJDIR)/VUserMain2.o: $(A7RC_DIR)/usercode/VUserMain2.cpp $(A7RC_DIR)/usercode/a7rc_check.h | $(OBJDIR)
+$(OBJDIR)/VUserMain2.o: $(A7RC_DIR)/VUserMain2.cpp $(A7RC_DIR)/a7rc_check.h | $(OBJDIR)
 	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) $(INCLPATHS) $< -o $@
 
-$(OBJDIR)/a7rc_check.o: $(A7RC_DIR)/usercode/a7rc_check.cpp $(A7RC_DIR)/usercode/a7rc_check.h | $(OBJDIR)
+$(OBJDIR)/a7rc_check.o: $(A7RC_DIR)/a7rc_check.cpp $(A7RC_DIR)/a7rc_check.h | $(OBJDIR)
 	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) $(INCLPATHS) $< -o $@
 
-$(OBJDIR)/ltssm.o: $(A7RC_DIR)/models/pcievhost/ltssm/ltssm.c | $(OBJDIR)
+$(OBJDIR)/ltssm.o: $(A7RC_DIR)/ltssm.c | $(OBJDIR)
 	@$(HOST_CC) -c -fPIC -MMD -MP $(OPTFLAG) $(DEFS) $(INCLPATHS) $< -o $@
 
 $(USERLIB): $(VOBJS)
@@ -369,7 +367,6 @@ help:
 	@echo "make DUMP=1 run                    also write tb.fst (WaveCrux: tb.DLL-PIPE.wavecrux)"
 	@echo "make EP=rtl DUMP=1 run             also write tb_rtl.fst, the EP's layers (WaveCrux: tb_rtl.*.wavecrux)"
 	@echo "make clean                         remove obj/"
-	@echo "OPENPCIE (default ../../openpcie): the openPCIE checkout with the host, its Artix-7 RC model"
 	@echo "USER_C, USRCODEDIR, OPTFLAG, USRSIMFLAGS (extra simulator flags) can be overridden"
 
 clean:

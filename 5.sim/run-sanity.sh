@@ -8,7 +8,7 @@
 # print the same ===> lines. The EP DMA stage is off (DMA=0, #41).
 # Prints one line per run, logs in obj/sanity/; exits 1 if any run fails.
 #
-# Usage: bash run-sanity.sh [make variables, e.g. OPENPCIE=...]
+# Usage: bash run-sanity.sh [make variables, e.g. OPTFLAG=-O0]
 
 set -u
 cd "$(dirname "$0")"

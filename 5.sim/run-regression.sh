@@ -11,7 +11,7 @@
 # KNOWN as they close. Prints one line per run, logs in obj/regression/;
 # exits 1 if a run fails that should pass, or a known one passes.
 #
-# Usage: bash run-regression.sh [make variables, e.g. OPENPCIE=...]
+# Usage: bash run-regression.sh [make variables, e.g. SIM=icarus]
 
 set -u
 cd "$(dirname "$0")"
