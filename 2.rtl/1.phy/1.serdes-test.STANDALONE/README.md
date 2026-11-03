@@ -65,7 +65,7 @@ PCIe asks for Tx de-emphasis (spec 4.3.3); this test runs without it. For compar
 ---
 ### References:
 - [CC SerDes LB](https://github.com/pu-cc/gm_serdes_lb) -- Includes **serdestool.py** tool for register map helpers
-- [Intergalaktik 2-chip SerDes test](https://github.com/chili-chips-ba/openCologne-PCIE/tree/main/1.pcb#ver1)
+- [Intergalaktik 2-chip SerDes test](https://github.com/chili-chips-ba/openCologne-PCIE/tree/main/1.pcb#ver1), [more](https://github.com/chili-chips-ba/openCologne/issues/76#issue-6170309059)
 - [openCologne ICLINK SerDes](https://github.com/chili-chips-ba/openCologne/tree/main/7.SerDes)
   
 --------------------
