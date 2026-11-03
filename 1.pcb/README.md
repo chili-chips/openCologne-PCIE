@@ -2,7 +2,8 @@
 
 This is work area for the PCB-related thoughts and explanations, including the steps and results for conducting high-speed [openEMS](https://docs.openems.de) simulations.
 
-### M2 card
+---
+## M2 card
 <p align="center">
    <a href="https://canva.link/vyykwt6k7odhs3t" target="_blank" rel="noopener">
      <img width="70%" alt="ULX5M-M2 promo video (click to watch with sound)" src="../0.doc/1.pcb/Intergalaktik-ULX5M.png">
@@ -47,12 +48,24 @@ While not the direct outcome of our project, the CologneChip PCIE card is also a
 - https://github.com/colognechip/gatemate-pcie-evb
 
 ---  
-### Edge card
-Just for illustration, and to get the ball rolling, here is an earlier attempt at PCIE "Slot" EndPoint card. Stay tuned for more...
+## PCIE Edge/Slot card
+
+Just for illustration, and to get the ball rolling, here is an earlier attempt at PCIE Edge/Slot EndPoint card. 
 
 <p align="center">
   <img alt="Earlier ULX4M PCIe slot edge card prototype" width="45%" src="../0.doc/1.pcb/ULX4M-PCIe-IO.beta_v2.png">
 </p>
+
+---
+#### Ver1
+
+<p align="center">
+  <img alt="Earlier ULX4M PCIe slot edge card prototype" width="45%" src="../0.doc/1.pcb/PCIe_1X.png">
+</p>
+
+For additional detail, check the source repo:
+- https://github.com/intergalaktik/ulx5-PCIe-1x
+
 
 ---
 ### Form factors and hosts

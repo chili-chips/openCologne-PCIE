@@ -4,6 +4,7 @@ Mujo Sejdic and @KemalLikic workspace. [`PRBS-Loopback-Test-for-GateMate-EVK`](P
 
 <p align="center">
   <img alt="CologneChip EVK with SMA RF connectors, for SerDes PRBS loopback" width="60%" src="EVK-PRBS-Loopback-via-SMA-RF-cable.png">
+  <img alt="CologneChip EVK with SMA RF connectors, for SerDes PRBS loopback" width="60%" src="EVK-PRBS-Loopback-via-SMA-RF-cable2.jpg">
 </p>
     
 **Status:** tested on EVK board, using 10cm SMA RF loopback cable. It runs fine.
