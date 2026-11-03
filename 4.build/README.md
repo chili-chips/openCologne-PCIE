@@ -17,7 +17,7 @@ We aim for Linux-native tools throughout, and accept WSL for convenience and inc
 |---|---|---|
 | 1. CSR | [`MakefileCSR`](./MakefileCSR) | `csr_build/generated-files/` - `csr.sv`, `csr_pkg.sv`, `csr.h`, `csr_top.h`, `opencologne_pcie.md`, `html/` |
 | 2. SW | [`sw_build`](./sw_build) | `firmware.elf`, `firmware.bin`, `firmware.hex` |
-| 3. HW | [`hw_build`](./hw_build): `run-lint.sh`, `run-format.sh`, `run-leq.sh`, `run-synth.sh`, `run-pnr.sh` | lint, format and equivalence reports, the GateMate netlist (`top.json`); the placed and routed design and the bitstream (`top.bit`), on mock pins for the GateMate A1 EVB (`GateMateA1-EVB.ccf`) until the board exists |
+| 3. HW | [`hw_build`](./hw_build):<br>`run-lint.sh`<br>`run-format.sh`<br>`run-leq.sh`<br>`run-synth.sh`<br>`run-pnr.sh` | lint, format and equivalence reports, the GateMate netlist (`top.json`); the placed and routed design and the bitstream (`top.bit`), on mock pins for the GateMate A1 EVB (`GateMateA1-EVB.ccf`) until the board exists |
 
 eduBOS5 is a copy of openPCIE's, in [`2.rtl/6.soc/CPU.eduBOS5`](../2.rtl/6.soc/CPU.eduBOS5).
 
@@ -52,6 +52,7 @@ The versions this repo has been run with so far. "Runs" means the step completes
 |---|---|---|---|---|---|---|
 | 2026-11-02 | retry buffer in flip-flops ([#33](https://github.com/chili-chips-ba/openCologne-PCIE/issues/33)) | 80,093 (195%) | 39,808 (97%) | 20 / 64 | – | does not place |
 | 2026-11-02 | retry buffer in block RAM ([gatemate-pipe#20](https://github.com/colognechip/gatemate-pipe/pull/20)) | 22,076 (53%) | 7,261 (17%) | 22 / 64 | 12.2 MHz, 3 hold violations | routes; fails timing ([#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
+| 2026-11-02 | no latch in the MAC scrambler ([gatemate-pipe#21](https://github.com/colognechip/gatemate-pipe/pull/21)) | 22,181 (54%) | 7,147 (17%) | 22 / 64 | 12.75 MHz, no hold violation | routes; fails setup ([#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
 
 Out of 40,960 CPE_LT and CPE_FF, and 64 RAM_HALF.
 

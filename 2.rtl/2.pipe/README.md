@@ -1,7 +1,7 @@
 # gatemate-pipe
 
 ## Submodule
-`pipe_src` is [Cologne Chip's gatemate-pipe](https://github.com/colognechip/gatemate-pipe) (`dll_test`) plus our changes, on branch `ocp-integration` of [our fork](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration). We offer each change to Cologne Chip as a pull request: [#17](https://github.com/colognechip/gatemate-pipe/pull/17) (InitFC credits), [#19](https://github.com/colognechip/gatemate-pipe/pull/19) (64-bit PCLK straight from `PLL_CLK_O`), [#20](https://github.com/colognechip/gatemate-pipe/pull/20) (the DLL retry buffer in block RAM).
+`pipe_src` is [Cologne Chip's gatemate-pipe](https://github.com/colognechip/gatemate-pipe) (`dll_test`) plus our changes, on branch `ocp-integration` of [our fork](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration). We offer each change to Cologne Chip as a pull request: [#17](https://github.com/colognechip/gatemate-pipe/pull/17) (InitFC credits), [#19](https://github.com/colognechip/gatemate-pipe/pull/19) (64-bit PCLK straight from `PLL_CLK_O`), [#20](https://github.com/colognechip/gatemate-pipe/pull/20) (the DLL retry buffer in block RAM), [#21](https://github.com/colognechip/gatemate-pipe/pull/21) (no latch in the scrambler, lint).
 
 ## Description
 The **PHY Interface for the PCI Express Architecture (PIPE)** is part of the physical layer, between the Media Access Control (MAC) Layer and the Physical Coding Sublayer (PCS). It separates the soft-core RTL from the FPGA-specific SerDes, which reduces effort and eases porting to other FPGA vendors and platforms.
@@ -47,10 +47,22 @@ The RTL takes 8-, 16-, 32- or 64-Bit datapaths (`DATA_BYTES` = 1, 2, 4, 8). 64-B
 | 110             | Elastic Buffer Underflow              |
 | 111             | Disparity Error. Unused if <br>reported together with <br>8b/10b Error (100)              |
 
+This PHY (64-bit) reports only 000, 011, 100 and 111. SerDes clock correction is off (`RX_CLKCOR_USE` left at 0 in `phy_top.sv`, as in Cologne Chip's wrapper): the RX elastic buffer only aligns phase, never adds or removes SKP, so 001 and 010 never occur; its overflow/underflow flag (`o_rx_buf_err`) is not connected in `phy_top`, so neither do 101 and 110.
+
 ## Power states in PIPE Interface and their relation to power states in LTSSM
 Only two power states are supported: **P0**, normal operation on the line, and **P1**, the PHY powered off. Their relation to the LTSSM states:
 
-<img alt="PIPE power management process" src="./images/pcie-pipe-power-management-process.webp" width=350 height=362 />
+P1 in Detect, P0 in every other state. The full LTSSM, with all four PIPE power states, against ours: [LTSSM](../3.mac/README.md#ltssm).
+
+## Where it departs from PCIe 2.1
+
+| What | Base 2.1 | Issue |
+|---|---|---|
+| No clock tolerance compensation: no SKP added or removed on RX, so the ±300 ppm of separate reference clocks is not absorbed; both ends need the common REFCLK of the slot | 4.2.7 | |
+| P0 and P1 only: no P0s or P2 (so no L0s or L2); the MAC has no L1 either | 4.2.6 | |
+| One lane, 2.5 GT/s | 4.2.6.3, 4.2.6.4 | |
+
+The MAC's own list: [3.mac](../3.mac/README.md#where-it-departs-from-pcie-21).
 
 <!--## Prerequisites 
 The simulation can be run using the [Gatemate open source toolchain](https://colognechip.com/programmable-logic/gatemate/toolchain/).

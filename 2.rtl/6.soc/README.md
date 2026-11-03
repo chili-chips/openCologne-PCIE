@@ -45,6 +45,10 @@ Things worth knowing:
 
 Lint: [`4.build/hw_build/run-lint.sh`](../../4.build/hw_build/run-lint.sh) checks the SOC as part of `top`.
 
+### Where it departs from PCIe 2.1
+
+The SOC adds none: it is the user side, which the spec does not cover. The departures it sees come from below: [TL](../5.tlp/README.md#where-it-departs-from-pcie-21), [DLL](../4.dll/README.md#where-it-departs-from-pcie-21), [MAC](../3.mac/README.md#where-it-departs-from-pcie-21), [PIPE](../2.pipe/README.md#where-it-departs-from-pcie-21), [PHY](../1.phy/README.md#where-it-departs-from-pcie-21).
+
 ### Watching the CPU in WaveCrux
 
 [`sim/run-soc.sh`](sim/run-soc.sh) runs the SOC alone (`tb_soc`, Verilator, 20 µs): eduBOS5 starts the firmware, which then waits for the host. Open [`sim/tb_soc.RISCV-ISA.wavecrux`](sim/tb_soc.RISCV-ISA.wavecrux) in WaveCrux: the disassembly and the RVFI Commit Inspector come bound to `tb_soc.cpu_view` ([`soc_cpu_view.sv`](CPU.eduBOS5/wavecrux/soc_cpu_view.sv), from openPCIE).

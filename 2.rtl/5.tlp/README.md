@@ -88,10 +88,10 @@ InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/
 | `P_ADDR_W`         | `7`            | Posted/completion queue depth, `2^n` words           |
 | `NP_ADDR_W`        | `6`            | Non-posted queue depth, `2^n` words                  |
 | `TX_ADDR_W`        | `6`            | TX buffer depth, `2^n` words; `TX_SLOTS` is `(2^n - 1) / 18` |
-| `ASPM_SUPPORT`     | `2'b01`        | Link Capabilities ASPM Support (L0s)                 |
+| `ASPM_SUPPORT`     | `2'b01`        | Link Capabilities ASPM Support (L0s); the MAC has no L0s |
 | `L0S_EXIT_LATENCY` | `3'b111`       | Link Capabilities L0s Exit Latency                   |
 | `L1_EXIT_LATENCY`  | `3'b111`       | Link Capabilities L1 Exit Latency                    |
-| `L0S_ACCEPT_LAT`   | `3'b111`       | Device Capabilities Endpoint L0s Acceptable Latency  |
+| `L0S_ACCEPT_LAT`   | `3'b000`       | Device Capabilities Endpoint L0s Acceptable Latency: 64 ns, below the L0s exit latency (over 4 µs), so hosts that check it (e.g. Linux) keep ASPM L0s off |
 | `L1_ACCEPT_LAT`    | `3'b111`       | Device Capabilities Endpoint L1 Acceptable Latency   |
 | `SLOT_CLOCK`       | `1'b1`         | Link Status Slot Clock Configuration                 |
 
@@ -182,6 +182,15 @@ The function has no Advanced Error Reporting, so errors are handled as in Figure
 | Poisoned TLP received                    | —                   | Status: Detected Parity Error | —              |
 
 ERR_FATAL is sent when Fatal Error Reporting Enable or SERR# Enable is set. ERR_NONFATAL for an Unsupported Request is sent when (Unsupported Request Reporting Enable or SERR# Enable) and (Non-Fatal Error Reporting Enable or SERR# Enable) are set. Sending either message with SERR# Enable set sets Signaled System Error.
+
+## Where it departs from PCIe 2.1
+
+| What | Base 2.1 | Issue |
+|---|---|---|
+| An MRdLk gets its Unsupported Request completion as Cpl, not CplLk | 2.2.9 | [#39](https://github.com/chili-chips-ba/openCologne-PCIE/issues/39) |
+| No correctable errors: Correctable Error Detected is never set, ERR_COR never sent; the DLL reports no Bad TLP or Bad DLLP; a poisoned TLP sets only Detected Parity Error | 6.2.5, 2.7.2.2 | [#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40) |
+| Link Capabilities advertise L0s, which every component must support, but the MAC has none (no EIOS, no FTS); the 64 ns L0s Acceptable Latency keeps hosts that check it (e.g. Linux) from enabling it | 5.4.1, 7.8.6 | [#47](https://github.com/chili-chips-ba/openCologne-PCIE/issues/47) |
+| PM_Enter_L1 is never sent: D3hot does not take the link to L1 | 5.3.2.1 | |
 
 ## Simulation
 [`sim/tb_pcie_tl.sv`](sim/tb_pcie_tl.sv) tests `pcie_tl` with `trn_bridge` above it, as in `pcie_core`, through their interfaces. The test bench plays:

@@ -79,7 +79,8 @@ module pcie_tl
     parameter logic [ 1:0] ASPM_SUPPORT     = 2'b01,
     parameter logic [ 2:0] L0S_EXIT_LATENCY = 3'b111,
     parameter logic [ 2:0] L1_EXIT_LATENCY  = 3'b111,
-    parameter logic [ 2:0] L0S_ACCEPT_LAT   = 3'b111,
+    // 64 ns, below our L0s exit latency: hosts that check it keep ASPM L0s off (no L0s in the MAC)
+    parameter logic [ 2:0] L0S_ACCEPT_LAT   = 3'b000,
     parameter logic [ 2:0] L1_ACCEPT_LAT    = 3'b111,
     parameter logic        SLOT_CLOCK       = 1'b1
 ) (

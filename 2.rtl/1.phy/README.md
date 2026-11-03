@@ -1,11 +1,18 @@
-# PIPE PHY
+# PHY
 
-Work area for the Cologne Chip PHY PIPE developers.
+Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's soft PIPE adaptation layer ([2.pipe](../2.pipe/README.md)) over one GateMate SerDes.
+
+| Here | What |
+|---|---|
+| [`phy_top.sv`](phy_top.sv) | the PHY: `ccfpga_pipe_logic` + one `ccfpga_serdes` |
+| [`1.serdes-test.STANDALONE`](1.serdes-test.STANDALONE/README.md) | SerDes PRBS loopback on the GateMate EVB, tested on the board |
+| [`2.serdes-model`](2.serdes-model) | the SerDes BFM (simulation) and `ccfpga_serdes.SYNTH.sv` (chip) |
+| [`3.sim`](3.sim/README.md) | PHY tests |
 
 #### References:
-- [GateMate PIPE repo](https://github.com/colognechip/gatemate-pipe) with DLL testbench
-- [GateMate datasheet](https://colognechip.com/docs/ds1001-gatemate1-datasheet-latest.pdf)
-- [CologneChip PHY/PIPE Overview](0.doc/PIPE_overview.pdf)
+- gatemate-pipe: [Cologne Chip's](https://github.com/colognechip/gatemate-pipe) (`dll_test`), and [our fork](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration) (`ocp-integration`), which this repo uses
+- [GateMate datasheet, DS1001](https://colognechip.com/docs/ds1001-gatemate1-datasheet-latest.pdf) (copy: [September 2026](../../0.doc/2.rtl/ds1001-GateMate-datasheet.Sep2026.pdf))
+- Cologne Chip: [PHY/PIPE overview](0.doc/PIPE_overview.pdf), [PHY block diagram](0.doc/Physical_layer_block_diagram.pdf), [MAC overview](0.doc/MAC_Overview.pdf)
 - [Unified PIPE Spec, Sept.2025, v7.1](0.doc/Intel.643108_PIPE_Arch_Spec_Rev_7_1.pdf)
 - [Optimizing PCIE PIPE Power Management](https://www.synopsys.com/blogs/chip-design/optimizing-pcie-pipe-power-management.html)
 - [TUSB1310A USB SuperSpeed PHY with PIPE](https://www.ti.com/product/TUSB1310A)
@@ -20,31 +27,27 @@ Work area for the Cologne Chip PHY PIPE developers.
   <img alt="PCIe physical layer mapped onto GateMate" width="60%" src="0.doc/images/PHY-Layers-GateMate.drawio.png">
 </p>
 
-## Implementation Details
-See [block diagram](0.doc/Physical_layer_block_diagram.pdf).
+## phy_top
 
-### SerDes
+- **PCLK** is the SerDes PLL clock, `PLL_CLK_O`: 31.25 MHz at 2.5 Gb/s with the 64-bit PIPE ([gatemate-pipe#19](https://github.com/colognechip/gatemate-pipe/pull/19)). It is also the SerDes TX and RX core clock.
+- **Set up by parameters**, as on the chip; no register-file writes (`clk_reg_i` tied to 0): the SerDes and PLL on from reset (`SERDES_ENABLE`, `PLL_EN_ADPLL_CTRL`, `PLL_CONFIG_SEL`), the PLL for 2.5 Gb/s (`PLL_FCNTRL` 0x3A), a 64-bit datapath, the comma aligned on a 32-bit word, the RX electrical-idle detector on (`RX_EI_BIAS` 4).
+- **`ccfpga_pipe_logic`** runs the SerDes resets and comma alignment, receiver detection, the power states (P1 in Detect, P0 otherwise), PhyStatus and RxStatus ([2.pipe](../2.pipe/README.md)).
+- **`phy_rdy`** is the SerDes `TX_RESET_DONE_O`.
+
 <p align="center">
   <img alt="GateMate SerDes block diagram" width="60%" src="0.doc/images/SerDes-BlockDiagram.png">
 </p>
 
-<p align="center">
-  <img alt="PCIe PIPE power management states" width="60%" src="0.doc/images/optimizing-pcie-pipe-pwr-mgmt.png">
-</p>
+### Where it departs from PCIe 2.1
 
-**Hai:**
-> _"... our PIPE interface does not contain any functionality of the so called "MAC layer" which handles the training sequences, OSs and LTSSM..."_
-
-**Simon:**
-> For first functionality, the LTSSM just needs the linear power-up sequence from Detect.Quiet to L0 (Link UP), as per the table on page 14 of the PCIe Primer. Not part of pcievhost proper, but the model comes with demonstration code implementing the LTSSM to this spec, so we can test this first implementation.
-
-**Async RefClock?**
-> Does GateMate PHY support `Async RefClock`? That is, a 100MHz reference clock from a different oscillator than the Root Complex's: both nominally 100MHz, but still different.
-
-#### DLL TestBench
-
-Hai: Simon provided the x1 PIPE model. I modified the C++ model of the RC for different feature tests and set up my MAC layer design as the EP:
-https://github.com/colognechip/gatemate-pipe/tree/dll_test/sim
+| What | Spec | Note |
+|---|---|---|
+| No TX de-emphasis: full swing | 4.3.3 (-3.5 dB at 2.5 GT/s) | TODO in `phy_top`: `TX_SEL_POST`, `TX_BRANCH_EN_POST`; validate on the board |
+| No clock tolerance compensation: `phy_top` leaves `RX_CLKCOR_USE` at 0 (as Cologne Chip's wrapper), so the RX buffer adds or removes no SKP | 4.2.7 | fine with a common REFCLK, which most PCIe systems use: the slot's 100 MHz goes to both ends. Only two separate oscillators (up to 600 ppm apart) would over- or underflow the RX buffer |
+| RxStatus only 000, 011 (receiver detected), 100 (decode error), 111 (disparity error); no SKP added/removed, no buffer error | PIPE | the RX buffer error is not connected |
+| Power states P0 and P1 only | 4.2.6 | no L0s, L1, L2 |
+| 2.5 GT/s, x1 | 4.2.6.4.2 | no speed change |
+| Reference clock input (`PLL_REF_SEL`) | | to validate when the board schematics are out |
 
 --------------------
 ## Lane polarity: the P and N swaps
@@ -80,14 +83,14 @@ PHY flows: [3.sim/README.md](3.sim/README.md). DLL over this PHY: [4.dll/sim/REA
 The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), documents the hard macro, `CC_SERDES`: 61 pins. Cologne Chip's simulation model and our BFM (`2.serdes-model/ccfpga_serdes.BFM.sv`) are the `ccfpga_serdes` wrapper around it: the same 84 ports, its own logic on 23 of them. For the chip, `ccfpga_serdes.SYNTH.sv` is the wrapper, with no logic: it connects the 61 pins.
 
 - 🟪 **HM**: a `CC_SERDES` pin (**Pin**), through the wrapper. All 61 are.
-- 🟩 **wrapper only**: the vendor model's own logic (config port, scan, test, core resets, serial pins, reference clock). On the chip unused, or the constant in brackets.
+- 🟥 **wrapper only**: the vendor model's own logic (config port, scan, test, core resets, serial pins, reference clock). On the chip unused, or the constant in brackets.
 
 **Clocks** (DS1001 Tables 2.14, 2.26, 2.37)
 
 | Ports | Dir | Pin | What |
 |---|---|---|---|
-| 🟩 `clk_ref_i` | in | – | ADPLL reference clock (the chip has dedicated SerDes reference pins) |
-| 🟩 `refclk_sel_o`, `refclk_rterm_o` | out | – (`PLL_REF_SEL`, `PLL_REF_RTERM`) | reference clock type, 0 single-ended or 1 LVDS, and its termination |
+| 🟥 `clk_ref_i` | in | – | ADPLL reference clock (the chip has dedicated SerDes reference pins) |
+| 🟥 `refclk_sel_o`, `refclk_rterm_o` | out | – (`PLL_REF_SEL`, `PLL_REF_RTERM`) | reference clock type, 0 single-ended or 1 LVDS, and its termination |
 | 🟪 `pll_reset_i` | in | `PLL_RESET_I` | asynchronous ADPLL reset; holds both data paths in reset until the ADPLL locks again |
 | 🟪 `clk_core_pll_o` | out | `PLL_CLK_O` | data-path clock from the ADPLL; the fabric routes it back to `TX_CLK_I` and `RX_CLK_I` |
 | 🟪 `clk_core_tx_i`, `clk_core_rx_i` | in | `TX_CLK_I`, `RX_CLK_I` | TX and RX data-path clocks; RX may also take the recovered clock |
@@ -100,9 +103,9 @@ The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), d
 | 🟪 `tx_reset_i`, `tx_pma_reset_i`, `tx_pcs_reset_i` | in | `TX_RESET_I`, `TX_PMA_RESET_I`, `TX_PCS_RESET_I` | asynchronous TX resets: the whole path, PMA, PCS. A path reset also resets its parts |
 | 🟪 `rx_reset_i`, `rx_pma_reset_i`, `rx_eqa_reset_i`, `rx_cdr_reset_i`, `rx_pcs_reset_i`, `rx_buf_reset_i` | in | `RX_RESET_I`, `RX_PMA_RESET_I`, `RX_EQA_RESET_I`, `RX_CDR_RESET_I`, `RX_PCS_RESET_I`, `RX_BUF_RESET_I` | asynchronous RX resets: the whole path, PMA, equaliser (DFE), CDR, PCS, elastic buffer |
 | 🟪 `tx_resetdone_o`, `rx_resetdone_o` | out | `TX_RESET_DONE_O`, `RX_RESET_DONE_O` | TX and RX reset sequences done |
-| 🟩 `reset_n_i`, `reset_reg_n_i` | in | – | asynchronous reset; register-file reset |
-| 🟩 `reset_core_tx_n_i`, `reset_core_rx_n_i` | in | – | TX and RX core resets |
-| 🟩 `reset_core_pll_n_o` | out | – (1) | high once the ADPLL has locked |
+| 🟥 `reset_n_i`, `reset_reg_n_i` | in | – | asynchronous reset; register-file reset |
+| 🟥 `reset_core_tx_n_i`, `reset_core_rx_n_i` | in | – | TX and RX core resets |
+| 🟥 `reset_core_pll_n_o` | out | – (1) | high once the ADPLL has locked |
 
 **Power, electrical idle, receiver detection** (DS1001 2.5.5, 2.5.6, Table 2.43)
 
@@ -153,9 +156,9 @@ The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), d
 | 🟪 `tx_prbs_sel_i[2:0]`, `tx_prbs_force_err_i` | in | `TX_PRBS_SEL_I`, `TX_PRBS_FORCE_ERR_I` | pattern generator: 000 off, 001 PRBS-7, 010 PRBS-15, 110 2-UI and 111 20/40/80-UI square wave, the rest reserved; inject errors |
 | 🟪 `rx_prbs_sel_i[2:0]`, `rx_prbs_cnt_reset_i` | in | `RX_PRBS_SEL_I`, `RX_PRBS_CNT_RESET_I` | pattern checker: 000 off, 001 PRBS-7, 010 PRBS-15, the rest reserved; clear its error counter |
 | 🟪 `rx_prbs_err_o` | out | `RX_PRBS_ERR_O` | pattern checker: an error |
-| 🟩 `testmode_i` | in | – | test mode, where the register file's `*_OVR` fields override the ports |
-| 🟩 `scan_enable_i`, `scan_in_i[6:0]`, `scan_out_o[6:0]` | in, out | – (0) | scan chain |
-| 🟩 `TERM_SERIO_O` | out | – (0) | termination calibration output |
+| 🟥 `testmode_i` | in | – | test mode, where the register file's `*_OVR` fields override the ports |
+| 🟥 `scan_enable_i`, `scan_in_i[6:0]`, `scan_out_o[6:0]` | in, out | – (0) | scan chain |
+| 🟥 `TERM_SERIO_O` | out | – (0) | termination calibration output |
 
 **Register file** (DS1001 Table 2.58, 2.5.7)
 
@@ -165,22 +168,22 @@ The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), d
 | 🟪 `regfile_en_i`, `regfile_we_i` | in | `REGFILE_EN_I`, `REGFILE_WE_I` | access; write |
 | 🟪 `regfile_addr_i[7:0]`, `regfile_di_i[15:0]`, `regfile_mask_i[15:0]` | in | `REGFILE_ADDR_I`, `REGFILE_DI_I`, `REGFILE_MASK_I` | address, write data, write mask (1 writes the bit) |
 | 🟪 `regfile_do_o[15:0]`, `regfile_rdy_o` | out | `REGFILE_DO_O`, `REGFILE_RDY_O` | read data; ready. At least 16 clocks between accesses; JTAG wins a collision |
-| 🟩 `cfg_en_i`, `reset_cfg_i` | in | – | config port on (it takes over the register file); synchronous register reset |
-| 🟩 `clk_cfg_i`, `cfgfile_valid_i`, `cfgfile_addr_i[7:0]`, `cfgfile_di_i[15:0]` | in | – | config clock, write strobe, address, data |
+| 🟥 `cfg_en_i`, `reset_cfg_i` | in | – | config port on (it takes over the register file); synchronous register reset |
+| 🟥 `clk_cfg_i`, `cfgfile_valid_i`, `cfgfile_addr_i[7:0]`, `cfgfile_di_i[15:0]` | in | – | config clock, write strobe, address, data |
 
 **Serial pins**
 
 | Ports | Dir | Pin | What |
 |---|---|---|---|
-| 🟩 `TX_SERIO_P_B`, `TX_SERIO_N_B` | out | – (0) | serial TX pair (the chip drives its own pads) |
-| 🟩 `RX_SERIO_P_B`, `RX_SERIO_N_B` | in | – | serial RX pair |
+| 🟥 `TX_SERIO_P_B`, `TX_SERIO_N_B` | out | – (0) | serial TX pair (the chip drives its own pads) |
+| 🟥 `RX_SERIO_P_B`, `RX_SERIO_N_B` | in | – | serial RX pair |
 
 --------------------
 ## ccfpga_serdes parameters
 
-The vendor model's 115, plus `SERDES_ENABLE` and `SERDES_AUTO_INIT` of `CC_SERDES`: 117. All but 🟩 are `CC_SERDES` parameters, each the reset value of the register-file field of its name (`ALIGN_*` is `RX_ALIGN_*`, `RX_RESETDONE_GATE` is `RX_RESET_DONE_GATE`). **Default**: DS1001's register map (Table 2.59); six differ elsewhere ([four-way compare](#four-way-compare-ds1001-vendor-model-bfm-synth)). **BFM**: M modelled, R read back only, – accepted, not modelled (analog or calibration).
+The vendor model's 115, plus `SERDES_ENABLE` and `SERDES_AUTO_INIT` of `CC_SERDES`: 117. All but 🟥 are `CC_SERDES` parameters, each the reset value of the register-file field of its name (`ALIGN_*` is `RX_ALIGN_*`, `RX_RESETDONE_GATE` is `RX_RESET_DONE_GATE`). **Default**: DS1001's register map (Table 2.59); six differ elsewhere ([four-way compare](#four-way-compare-ds1001-vendor-model-bfm-synth)). **BFM**: M modelled, R read back only, – accepted, not modelled (analog or calibration).
 
-- 🟩 **wrapper only**: `TX_BUFFER_ADDR_WIDTH`; the four `RX_*_OVR`, which the wrapper packs into `RX_EN_EQA_EXT_VALUE` of `CC_SERDES`.
+- 🟥 **wrapper only**: `TX_BUFFER_ADDR_WIDTH`; the four `RX_*_OVR`, which the wrapper packs into `RX_EN_EQA_EXT_VALUE` of `CC_SERDES`.
 
 **ADPLL** (DS1001 Tables 2.15 to 2.21)
 
@@ -209,7 +212,7 @@ The vendor model's 115, plus `SERDES_ENABLE` and `SERDES_AUTO_INIT` of `CC_SERDE
 | Parameters | Default | BFM | What |
 |---|---|---|---|
 | `TX_DATAPATH_SEL`, `RX_DATAPATH_SEL` | 3, 3 | M | word: 0 16, 1 32, 2 or 3 64 bits (20, 40, 80 without 8b/10b) |
-| 🟩 `TX_BUFFER_ADDR_WIDTH` | 5 | M | TX buffer depth, 2^N words (must stay 5) |
+| 🟥 `TX_BUFFER_ADDR_WIDTH` | 5 | M | TX buffer depth, 2^N words (must stay 5) |
 | `TX_PMA_LOOPBACK` | 0 | M | TX PMA loopback mode (bit 1 must be 0) |
 | `RX_BUF_BYPASS` | 0 | M | 1: no elastic buffer (less latency) |
 | `RX_CLKCOR_USE` | 0 | M | elastic buffer: 0 phase alignment, 1 clock correction |
@@ -250,7 +253,7 @@ The vendor model's 115, plus `SERDES_ENABLE` and `SERDES_AUTO_INIT` of `CC_SERDE
 | `RX_EN_EQA`, `RX_EQA_LOCK_CFG`, `RX_EQA_CONFIG` | 0, 0, `16'h01C0` | – | DFE adaptation: on, lock configuration, configuration |
 | `RX_EQA_CKP_LF`, `RX_EQA_CKP_HF`, `RX_EQA_CKP_OFFSET` | `8'hA3`, `8'hA3`, `8'h01` | – | DFE loops: low- and high-frequency amplitude, offset |
 | `RX_TH_MON1`, `RX_TH_MON2`, `RX_TAPW` | 8, 8, 8 | – | monitor thresholds; DFE tap weight |
-| 🟩 `RX_TH_MON1_OVR`, `RX_TH_MON2_OVR`, `RX_TAPW_OVR`, `RX_AFE_OFFSET_OVR` | 0 each | – | use the values above, not adapted ones (bits 0 to 3 of `RX_EN_EQA_EXT_VALUE`) |
+| 🟥 `RX_TH_MON1_OVR`, `RX_TH_MON2_OVR`, `RX_TAPW_OVR`, `RX_AFE_OFFSET_OVR` | 0 each | – | use the values above, not adapted ones (bits 0 to 3 of `RX_EN_EQA_EXT_VALUE`) |
 | `RX_MON_PH_OFFSET`, `RX_EYE_MEAS_CFG` | 0, 0 | – | monitor 2 phase offset; eye measurement window count |
 | `RX_DBG_MODE`, `RX_DBG_SEL`, `RX_DBG_SRAM_DELAY` | 0, 0, `6'h05` | – | RX debug |
 

@@ -129,8 +129,8 @@ path = [
   "0.doc/4.build/ug1002-*.pdf",
   "0.doc/4.build/gatemate-ccgm1a*-pinlist.csv",
   "0.doc/2.rtl/ug1005-*.pdf",
-  "0.doc/1.pcb/ds1003-*.pdf",
-  "0.doc/1.pcb/ug1004-*.pdf",
+  "0.doc/1.pcb/GateMate/ds1003-*.pdf",
+  "0.doc/1.pcb/GateMate/ug1004-*.pdf",
   "0.doc/artwork/Cologne-Chip.logo.png",
   "0.doc/artwork/GateMate.png",
   "0.doc/artwork/ChipsAlliance-SV-Tools.logo.png",
@@ -155,10 +155,8 @@ path = [
   "0.doc/artwork/oshw-logo-*",
   "0.doc/artwork/wyvernSemi-logo-rounded.png",
   "2.rtl/1.phy/0.doc/Intel.*.pdf",
-  "2.rtl/1.phy/0.doc/ds1001-GateMate-datasheet.*.pdf",
   "2.rtl/1.phy/0.doc/images/SerDes-BlockDiagram.png",
-  "2.rtl/1.phy/0.doc/images/optimizing-pcie-pipe-pwr-mgmt.png",
-  "2.rtl/2.pipe/images/pcie-pipe-power-management-process.webp",
+  "2.rtl/3.mac/images/MAC_LTSSM_full.png",
   "2.rtl/4.dll/Doc/opensource-PCIE-Controller.applsci-*.pdf",
 ]
 precedence = "override"

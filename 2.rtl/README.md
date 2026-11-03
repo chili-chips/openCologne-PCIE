@@ -12,7 +12,7 @@
 
 ### Clock and Reset
 
-Two clocks. `clk_aon` (always on: the 10 MHz board clock, no PLL) runs the reset sequencing. The SerDes regfile clock is tied to 0: parameters set the registers, and start the SerDes and its PLL, on the chip and in simulation. PCLK (31.25 MHz at Gen1) is the SerDes PLL clock itself (`PLL_FCNTRL = 6'h3A`), and runs everything from the MAC up to the SOC.
+Two clocks. `clk_aon` (always on: the 10 MHz board clock, no PLL) runs the reset sequencing. The SerDes regfile clock is tied to 0: parameters set the registers, and start the SerDes and its PLL, on the chip and in simulation. PCLK (31.25 MHz at Gen1) is the SerDes PLL clock itself (`PLL_FCNTRL = 6'h3A`), and runs everything from the MAC up to the SOC. SerDes clock correction is off: no SKP is added or removed on RX, so the EP needs the common REFCLK of the slot.
 
 Each reset is asserted asynchronously and released on its own clock, in a chain ([`clk_rst_gen.sv`](clk_rst_gen.sv)):
 - `rst_pipe_n`: end of configuration (`CC_USR_RSTN`) and PERST#. PIPE Reset# and the SerDes PLL reset, the same in simulation and on the chip
@@ -100,7 +100,7 @@ A `Posted` transaction: no response.
 | Layer | RX: the MemWr comes in | TX: what goes back |
 |---|---|---|
 | SerDes + PHY | 8b/10b decode, elastic buffer, comma alignment; `ccfpga_pipe_fsm` hands the words to the MAC on `pipe_if` | |
-| MAC | descrambles, strips the ordered sets, passes data and K flags to the DLL | scrambles the DLL's Ack and UpdateFC DLLPs; inserts SKP every 1180-1538 symbol times |
+| MAC | descrambles, strips the ordered sets, passes data and K flags to the DLL | scrambles the DLL's Ack and UpdateFC DLLPs; inserts SKP ordered sets |
 | DLL | finds STP, checks LCRC and sequence number, strips the framing, hands the TLP to the TL on `dll_if` | schedules an Ack for it |
 | TL | checks the TLP (Malformed, Receiver Overflow), queues it as posted, decodes the BAR0 hit | an UpdateFC-P once the TLP has left its queue |
 | `trn_bridge` | TRN RX to `m_axis_rx`, `tuser.bar_hit` = BAR0 | |
@@ -135,8 +135,8 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 | Ordered set | RX | TX | Notes |
 |---|---|---|---|
 | TS1, TS2 | ✅ | ✅ | Link and Lane numbers as numbers or PAD |
-| SKP | ✅ | ✅ | sent every 1180-1538 symbol times |
-| Logical idle | ✅ | ✅ | in Configuration.Idle and Recovery.Idle |
+| SKP | ✅ | partial | sent every 2360-2384 symbol times, not 1180-1538 ([#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38)); cuts a TS1 short in Polling ([#31](https://github.com/chili-chips-ba/openCologne-PCIE/issues/31)); RX: not detected, may reach the DLL as data ([#32](https://github.com/chili-chips-ba/openCologne-PCIE/issues/32)) |
+| Logical idle | ✅ | ✅ | in Configuration.Idle and Recovery.Idle; RX counts any word without COM as idle |
 | Electrical Idle (EIOS) | ❌ | ❌ | no speed change, no low-power states |
 | FTS | ❌ | ❌ | no L0s |
 | Compliance pattern | ❌ | ❌ | |
@@ -145,11 +145,12 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 
 | Feature | Support | Notes |
 |---|---|---|
-| LTSSM | partial | Detect, Polling (Active, Configuration), Configuration (all substates), L0, Recovery (RcvrLock, RcvrCfg, Idle). No Polling.Compliance, L0s, L1, L2, Disabled, Loopback or Hot Reset |
+| LTSSM | partial | Detect, Polling (Active, Configuration), Configuration (all but Lanenum.Wait, unused at x1), L0, Recovery (RcvrLock, RcvrCfg, Idle). No Polling.Compliance, L0s, L1, L2, Disabled, Loopback or Hot Reset |
 | Speed | Gen1 | no Recovery.Speed |
-| Scrambling | ✅ | data symbols only, reset by COM; Disable Scrambling (TS Training Control bit 3) honoured both ways. RX in L0 also descrambles a received TS1/TS2 ([#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42)) |
+| Scrambling | ✅ | data symbols only, reset by COM; Disable Scrambling (TS Training Control bit 3) taken in Configuration.Complete, both ways ([3.mac](3.mac/README.md#scrambling)). RX in L0 also descrambles a received TS1/TS2 ([#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42)) |
 | Lane polarity inversion | ✅ | detected in Polling, `RxPolarity` to the PHY |
 | Lane reversal | — | x1 |
+| Clock tolerance compensation | ❌ | SerDes clock correction off; common REFCLK only |
 
 ## 3) DLL (dll_if)
 
@@ -157,9 +158,9 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 
 | DLLP | RX | TX | Notes |
 |---|---|---|---|
-| InitFC1, InitFC2 | ✅ | ✅ | P, NP, Cpl; credits from the TL's `INIT_*` ([gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17), [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)) |
+| InitFC1, InitFC2 | ✅ | ✅ | P, NP, Cpl; credits from the TL's `INIT_*` ([gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17), [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)); repeated every 34 µs ([#25](https://github.com/chili-chips-ba/openCologne-PCIE/issues/25)) |
 | UpdateFC | ✅ | ✅ | on the TL's request, and every 30 µs |
-| Ack, Nak | ✅ | ✅ | an Ack is sent as soon as it is scheduled: no AckNak latency timer yet |
+| Ack, Nak | ✅ | ✅ | an Ack is sent as soon as it is scheduled: no AckNak latency timer yet; a Nak for every bad TLP (no `NAK_SCHEDULED`) |
 | PM_Enter_L1, PM_Enter_L23, PM_Active_State_Request_L1, PM_Request_Ack | ❌ | ❌ | no power management |
 | Vendor specific | ❌ | ❌ | |
 
@@ -170,7 +171,8 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 | Framing: STP ... END (TLP), SDP ... END (DLLP) | ✅ | |
 | LCRC (32-bit), DLLP CRC (16-bit) | ✅ | |
 | Sequence numbers, duplicates | ✅ | a duplicate TLP is Acked and dropped |
-| Retry buffer | ✅ | one TLP; built from flip-flops ([gatemate-pipe#16](https://github.com/colognechip/gatemate-pipe/issues/16)) |
+| Retry buffer | ✅ | one TLP, in block RAM ([gatemate-pipe#20](https://github.com/colognechip/gatemate-pipe/pull/20)) |
+| Back-to-back TLPs | ❌ | a TLP right behind another one is dropped without a Nak ([#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26)) |
 | Replay on Nak | ✅ | |
 | Replay timer | ❌ | a lost TLP is never replayed ([#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)) |
 | Nullified TLP (EDB) | ❌ | |
@@ -187,7 +189,7 @@ The user side of the TL: the 64-bit TRN bus, drop-in compatible with the Artix-7
 |---|---|---|---|
 | Memory Read, 32- and 64-bit address | ✅ to the SOC on a BAR0 hit | ✅ from the SOC | a BAR0 miss gets an Unsupported Request completion; SOC requests wait for Bus Master Enable |
 | Memory Write, 32- and 64-bit address | ✅ to the SOC on a BAR0 hit | ✅ from the SOC | a BAR0 miss or poisoned MWr is discarded, Unsupported Request |
-| Memory Read Locked | Unsupported Request | ❌ | |
+| Memory Read Locked | Unsupported Request | ❌ | as Cpl, not CplLk ([#39](https://github.com/chili-chips-ba/openCologne-PCIE/issues/39)) |
 | I/O Read, I/O Write | Unsupported Request | ❌ | legacy |
 | Configuration Type 0 | ✅ answered by the TL | — | function 0; another function gets Unsupported Request |
 | Configuration Type 1 | Unsupported Request | — | RCs and switches only |
@@ -205,7 +207,7 @@ The user side of the TL: the 64-bit TRN bus, drop-in compatible with the Artix-7
 | Flow control | ✅ | transmit gating per 2.6.1.1; an UpdateFC on every credit release |
 | ECRC | ❌ | a digest is accounted for in the length, not checked |
 | Traffic Classes, Virtual Channels | ❌ | TC0, VC0 |
-| Error handling | ✅ | without AER: Malformed TLP and Receiver Overflow are Fatal, Unsupported Request Non-Fatal |
+| Error handling | ✅ | without AER: Malformed TLP and Receiver Overflow are Fatal, Unsupported Request Non-Fatal; no correctable errors, and a poisoned TLP sets only Detected Parity Error ([#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40)) |
 
 ## 5) Type 0 Configuration Space
 
@@ -215,7 +217,7 @@ In the TL _config_space_, as on the hard macro. Each register is one 32-bit word
 |---|---|---|
 | Type 0 header | ✅ | BAR0 only: 32-bit, non-prefetchable, `2^BAR0_SIZE_BITS` bytes |
 | PCI Power Management | ✅ | D0 and D3hot |
-| PCI Express | ✅ | version 2, Endpoint; Max_Payload_Size 128 bytes; 2.5 GT/s, x1 |
+| PCI Express | ✅ | version 2, Endpoint; Max_Payload_Size 128 bytes; 2.5 GT/s, x1; advertises L0s, which the MAC lacks ([#47](https://github.com/chili-chips-ba/openCologne-PCIE/issues/47)); its 64 ns L0s Acceptable Latency keeps hosts that check it (e.g. Linux) from enabling it |
 | MSI | ❌ | no interrupts |
 | AER, other extended capabilities | ❌ | |
 
@@ -241,6 +243,11 @@ The registers are written once, in SystemRDL ([`csr.rdl`](../4.build/csr_build/c
 - **Generate:** [4.build](../4.build/README.md#build-environment), step 1 (`MakefileCSR`)
 - **Firmware use:** [3.sw](../3.sw/README.md#ep-firmware)
 - **Co-simulation:** [5.sim](../5.sim/README.md#hal): the same firmware compiled for the host, each CSR access a _VProc_ bus cycle
+
+---
+# Where it departs from PCIe 2.1
+
+By design: Gen1 and x1 only; no L0s, L1, L2, Disabled, Loopback, Hot Reset or Compliance; no clock tolerance compensation (common REFCLK only); framing in the DLL. Open bugs and the full lists, with spec sections and issues, per layer: [PHY](1.phy/README.md#where-it-departs-from-pcie-21), [PIPE](2.pipe/README.md#where-it-departs-from-pcie-21), [MAC](3.mac/README.md#where-it-departs-from-pcie-21), [DLL](4.dll/README.md#where-it-departs-from-pcie-21), [TL](5.tlp/README.md#where-it-departs-from-pcie-21).
 
 ---
 # Future Development
@@ -310,7 +317,7 @@ Lint finds what tests miss: undriven signals, truncated widths, unintended latch
 | `run-leq.sh` | Yosys formal equivalence, old vs new RTL | proves a cleanup changes nothing |
 | `run-synth.sh` | Yosys `synth_gatemate` | the RTL maps to GateMate; cell count |
 
-Example: the first run flagged a latch in the MAC scrambler (128 `CC_DLT` cells): a combinational `always` that skips an assignment on some path must hold the old value. The simulation passed; only lint caught it.
+Example: the first run flagged a latch in the MAC scrambler (128 `CC_DLT` cells, fixed in [gatemate-pipe#21](https://github.com/colognechip/gatemate-pipe/pull/21)): a combinational `always` that skips an assignment on some path must hold the old value. The simulation passed; only lint caught it.
 
 Next: wider `run-lint.sh` coverage. [LintCrux](https://github.com/Ferrite-Engineering/lintcrux) (from the WaveCrux makers) runs several lint engines and tracks waivers and trends; it has been run on eduBOS5 and is a candidate.
 
