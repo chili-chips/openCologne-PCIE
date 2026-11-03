@@ -3,10 +3,11 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
-# Sanity, after every change (README.md, Sanity and regression): five runs,
-# about 40 s. Each must end RC MODEL RESULT: PASS; Verilator and Icarus must
+# Sanity, after every change (README.md, Sanity and regression): six runs,
+# about 2 minutes. Each must end RC MODEL RESULT: PASS; Verilator and Icarus must
 # print the same ===> lines. The EP DMA stage is off (DMA=0, #41).
-# Our EP (rtl, rtl-vproc) drops an SKP (#38): those two run on past the SVA
+# rtl-serial is the one run through top (its SerDes nets, by hierarchy).
+# Our EP (rtl, rtl-vproc, rtl-serial) drops an SKP (#38): those run on past the SVA
 # and pass as "known #38" while SVA #38 fired, PL.SKP holds every checker
 # violation and the firmware still ends 0x0000face. Drop KNOWN when #38 closes.
 # Prints one line per run, logs in obj/sanity/; exits 1 if any run fails.
@@ -45,12 +46,13 @@ run() {  # name, [known38], make variables
     printf '%-16s %4d s  %-36s %s\n' "$n" $((SECONDS - t0)) "$*" "${r:-no result, see $LOG/$n.log}"
 }
 
-# #38: the two runs of our EP go on past the SVA (the error limit)
+# #38: the runs of our EP go on past the SVA (the error limit)
 run model         "$@"
 run model-icarus  SIM=icarus "$@"
 run model-serial  IFACE=serial "$@"
 run rtl           known38 EP=rtl A7RC=1 SIM_ARGS=+verilator+error+limit+100 "$@"
 run rtl-vproc     known38 EP=rtl CPU=vproc A7RC=1 SIM_ARGS=+verilator+error+limit+100 "$@"
+run rtl-serial    known38 EP=rtl IFACE=serial A7RC=1 SIM_ARGS=+verilator+error+limit+100 "$@"
 
 if diff -q <(grep -a '===>' $LOG/model.log) <(grep -a '===>' $LOG/model-icarus.log) > /dev/null; then
     echo "Verilator = Icarus: the same ===> lines"

@@ -1,0 +1,36 @@
+<mxfile host="Electron">
+  <diagram name="axis-format" id="axisFormat0">
+    <mxGraphModel dx="900" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="720" pageHeight="342" background="none" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c1" value="AXI-Stream (axis_if): DW0 in [31:0]" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=left;fontSize=16;fontFamily=Helvetica;fontColor=#000000;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="0" y="0" width="700" height="26" as="geometry" /></mxCell>
+        <mxCell id="c2" value="[63:32]" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=center;fontSize=13;fontFamily=Helvetica;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="160" y="30" width="150" height="22" as="geometry" /></mxCell>
+        <mxCell id="c3" value="[31:0]" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=center;fontSize=13;fontFamily=Helvetica;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="310" y="30" width="150" height="22" as="geometry" /></mxCell>
+        <mxCell id="c4" value="m_axis_rx (s_axis_tx alike)" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=left;fontSize=13;fontFamily=Helvetica;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="472" y="30" width="200" height="22" as="geometry" /></mxCell>
+        <mxCell id="c5" value="MWr32, 1 DW" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=right;fontSize=14;fontFamily=Helvetica;fontColor=#555555;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="0" y="54" width="150" height="68" as="geometry" /></mxCell>
+        <mxCell id="c6" value="H1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#D5E8D4;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="160" y="54" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c7" value="H0" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#D5E8D4;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="310" y="54" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c8" value="tkeep = FF" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=left;fontSize=13;fontFamily=Helvetica;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="472" y="54" width="230" height="34" as="geometry" /></mxCell>
+        <mxCell id="c9" value="D0" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#FFF2CC;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="160" y="88" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c10" value="H2" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#D5E8D4;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="310" y="88" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c11" value="tlast, tkeep = FF" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=left;fontSize=13;fontFamily=Helvetica;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="472" y="88" width="230" height="34" as="geometry" /></mxCell>
+        <mxCell id="c12" value="MRd32" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=right;fontSize=14;fontFamily=Helvetica;fontColor=#555555;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="0" y="132" width="150" height="68" as="geometry" /></mxCell>
+        <mxCell id="c13" value="H1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#D5E8D4;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="160" y="132" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c14" value="H0" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#D5E8D4;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="310" y="132" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c15" value="tkeep = FF" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=left;fontSize=13;fontFamily=Helvetica;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="472" y="132" width="230" height="34" as="geometry" /></mxCell>
+        <mxCell id="c16" value="unused" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#FFFFFF;strokeColor=#666666;fontFamily=Helvetica;dashed=1;fontColor=#999999;" parent="1" vertex="1"><mxGeometry x="160" y="166" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c17" value="H2" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#D5E8D4;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="310" y="166" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c18" value="tlast, tkeep = 0F" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=left;fontSize=13;fontFamily=Helvetica;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="472" y="166" width="230" height="34" as="geometry" /></mxCell>
+        <mxCell id="c19" value="CplD, 1 DW" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=right;fontSize=14;fontFamily=Helvetica;fontColor=#555555;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="0" y="210" width="150" height="68" as="geometry" /></mxCell>
+        <mxCell id="c20" value="H1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#D5E8D4;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="160" y="210" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c21" value="H0" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#D5E8D4;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="310" y="210" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c22" value="tkeep = FF" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=left;fontSize=13;fontFamily=Helvetica;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="472" y="210" width="230" height="34" as="geometry" /></mxCell>
+        <mxCell id="c23" value="D0" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#FFF2CC;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="160" y="244" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c24" value="H2" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;fillColor=#D5E8D4;strokeColor=#666666;fontFamily=Helvetica;" parent="1" vertex="1"><mxGeometry x="310" y="244" width="150" height="34" as="geometry" /></mxCell>
+        <mxCell id="c25" value="tlast, tkeep = FF" style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=left;fontSize=13;fontFamily=Helvetica;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="472" y="244" width="230" height="34" as="geometry" /></mxCell>
+        <mxCell id="c26" value="H: header DW, D: payload DW. BAR0 is 32-bit memory, so every TLP of the PIO test has a 3-DW header. trn_bridge swaps the two DWs of every TRN beat." style="text;html=1;whiteSpace=wrap;verticalAlign=middle;align=left;fontSize=13;fontFamily=Helvetica;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="0" y="294" width="700" height="44" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

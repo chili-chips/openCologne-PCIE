@@ -21,6 +21,7 @@
 #
 # usage:  bash run-lint.sh [phase ...]    default: all phases
 #         VIEW=sim bash run-lint.sh        lint the simulation view of phy_top
+#                                          (no yosys or slang: the BFM is behavioural)
 #                                          (default chip: SYNTHESIS defined)
 #
 # A phase whose tool is not found is skipped. The tool commands can be
@@ -36,8 +37,9 @@
 # and slang's are not shown, while the ones that can be bugs (latches,
 # undriven wires) stay; they belong upstream. Its waivers are temporary: closer to the
 # first release, that code is brought up to our standard and through this
-# flow. The SerDes BFM is a behavioural model, not RTL, and is left out the
-# same way.
+# flow. The SerDes BFM (ccfpga_serdes.BFM.sv, ccfpga_serdes_pkg.sv) is a
+# behavioural model, not RTL, and is left out the same way; the synthesis
+# wrapper ccfpga_serdes.SYNTH.sv is RTL and is linted like ours.
 #
 # Sources are copied into a work directory (LINT_WORK, default mktemp -d) and
 # every tool gets relative paths. Logs stay there: <phase>.log is the tool
@@ -129,7 +131,7 @@ found() {  # $1 phase; one finding per line on stdin (not a pipe: RESULT must st
 
 # /*LINT:OK*/ on anything but an output port; the port directions come from the
 # module headers of the design and the primitive stubs, plus the SerDes model:
-# phy_top instantiates it behind `ifndef SYNTHESIS
+# its ports are those of the synthesis wrapper
 # A tool that fails, or stops before the step its findings come from, fails its
 # phase: "0 finding(s)" must not stand for "not checked"
 failed() {  # $1 phase, $2 reason
@@ -199,7 +201,15 @@ run_verilator() {
 `verilator_config
 lint_off -file "*bb.v"
 lint_off -file "*/pipe_src/*"
-lint_off -file "*/2.serdes-model/*"
+lint_off -file "*/2.serdes-model/ccfpga_serdes.BFM.sv"
+lint_off -file "*/2.serdes-model/ccfpga_serdes_pkg.sv"
+// the synthesis wrapper's serial and termination outputs: CC_SERDES has no such
+// pin (the chip drives its own pads), so they stay unconnected
+lint_off -rule UNDRIVEN -file "*/2.serdes-model/ccfpga_serdes.SYNTH.sv" -match "*SERIO*"
+// top's SerDes nets: no chip pin; the test bench drives and reads them by hierarchy
+lint_off -rule UNDRIVEN -file "*2.rtl/top.sv" -match "*'refclk'*"
+lint_off -rule UNDRIVEN -file "*2.rtl/top.sv" -match "*'ser_rx?'*"
+lint_off -rule UNUSEDSIGNAL -file "*2.rtl/top.sv" -match "*'ser_tx?'*"
 VLT
   # --timescale: the Cologne Chip code sets one, our RTL does not (no delays)
   "$VERILATOR" --lint-only -Wall -Wno-fatal --timing --timescale 1ns/1ps --top-module $TOP $VL_DEFS \
@@ -210,6 +220,7 @@ VLT
 }
 
 run_yosys() {
+  [ -z "$SIM" ] || { skip yosys "sim view: the SerDes BFM is behavioural, not for synthesis tools"; return; }
   have "$YOSYS" || { skip yosys "$YOSYS not found"; return; }
   bb || { skip yosys "no GateMate stubs"; return; }
   "$YOSYS" $YOSYS_ARGS -q -l yosys.log -p "read_slang $SL_DEFS --top $TOP bb.v $SV; \
@@ -223,6 +234,7 @@ run_yosys() {
 }
 
 run_slang() {
+  [ -z "$SIM" ] || { skip slang "sim view: the SerDes BFM is behavioural, not for synthesis tools"; return; }
   have "$YOSYS" || { skip slang "$YOSYS not found"; return; }
   bb || { skip slang "no GateMate stubs"; return; }
   "$YOSYS" $YOSYS_ARGS -q -l slang.log -p "read_slang $SL_DEFS --top $TOP -Wextra bb.v $SV" \
@@ -234,7 +246,7 @@ run_slang() {
   found slang < <(sed -E 's#^(\.\./)+[^ ]*/(2\.rtl|csr)/#\2/#;
                           s/^([^ :]+:[0-9]+): Warning:/\1:0: warning:/;
                           s/^([^ :]+:[0-9]+): Error:/\1:0: error:/' slang.log |
-                  grep -E 'warning:|error:' | grep -v -E '^(bb\.v|2\.rtl/2\.pipe/pipe_src/|2\.rtl/1\.phy/2\.serdes-model/)')
+                  grep -E 'warning:|error:' | grep -v -E '^(bb\.v|2\.rtl/2\.pipe/pipe_src/|2\.rtl/1\.phy/2\.serdes-model/ccfpga_serdes(\.BFM|_pkg)\.sv)')
   exit_check slang $rc
 }
 

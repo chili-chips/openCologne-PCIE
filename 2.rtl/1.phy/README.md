@@ -158,7 +158,7 @@ The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), d
 | 🟪 `rx_prbs_err_o` | out | `RX_PRBS_ERR_O` | pattern checker: an error |
 | 🟥 `testmode_i` | in | – | test mode, where the register file's `*_OVR` fields override the ports |
 | 🟥 `scan_enable_i`, `scan_in_i[6:0]`, `scan_out_o[6:0]` | in, out | – (0) | scan chain |
-| 🟥 `TERM_SERIO_O` | out | – (0) | termination calibration output |
+| 🟥 `TERM_SERIO_O` | out | – (unconnected) | termination calibration output; the BFM does not model it |
 
 **Register file** (DS1001 Table 2.58, 2.5.7)
 
@@ -175,7 +175,7 @@ The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), d
 
 | Ports | Dir | Pin | What |
 |---|---|---|---|
-| 🟥 `TX_SERIO_P_B`, `TX_SERIO_N_B` | out | – (0) | serial TX pair (the chip drives its own pads) |
+| 🟥 `TX_SERIO_P_B`, `TX_SERIO_N_B` | out | – (unconnected) | serial TX pair: the BFM's serializer drives it; the chip drives its own pads |
 | 🟥 `RX_SERIO_P_B`, `RX_SERIO_N_B` | in | – | serial RX pair |
 
 --------------------
@@ -324,6 +324,7 @@ HM only, not set through the wrapper: 95 of the 208 parameters. The TX driver se
 | [#43](https://github.com/chili-chips-ba/openCologne-PCIE/issues/43) | `RX_EI_EN_O`: the idle line, the `RX_EI_BW_SEL` filter, the `RX_EI_BIAS` default |
 | [#44](https://github.com/chili-chips-ba/openCologne-PCIE/issues/44) | five defaults of the vendor model vs DS1001: `PLL_CI`, `PLL_CP`, `RX_CDR_CKP`, `PLL_SET_OP_LOCK`, `RX_CDR_LOCK_CFG` (and its width) |
 | [#45](https://github.com/chili-chips-ba/openCologne-PCIE/issues/45) | DS1001: seven ADPLL defaults, Tables 2.18/2.19 vs the register map |
+| [#49](https://github.com/chili-chips-ba/openCologne-PCIE/issues/49) | the SerDes pins (`SER_TX_*`, `SER_RX_*`, `SER_CLK*`) cannot be top-level ports: `CC_SERDES` has no port for them |
 
 **Notes**
 

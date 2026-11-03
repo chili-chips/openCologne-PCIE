@@ -228,7 +228,7 @@ See [6.litex/README.md](6.litex/README.md)
 >- ✅ TB, Sim, VIP
 
 - 🟠 Design, debug and manufacture two flavors of EP cards
-> Given the high-speed nature of this design, we plan for two iterations:
+> Given the high-speed nature of our design, we plan for two iterations:
 >- ✅ M.2  **RevA**
 >- 🟠 "Slot" RevA
 

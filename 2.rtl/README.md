@@ -120,6 +120,25 @@ A `Non-posted` transaction: the requester waits for a `Completion`.
 
 Configuration requests stop in the TL: `config_space` answers them and `cpl_gen` builds the completion. So do Unsupported Requests.
 
+## (iii) PCIE packets that make it possible
+
+A TLP carries the request or completion; the DLL frames it with a sequence number and LCRC. DLLPs are the DLL's own traffic: flow control (InitFC, UpdateFC) and the Ack or Nak of each TLP by its sequence number. Details: [Packet Structures](4.dll/README.md#packet-structures), [Ack/Nak](4.dll/README.md#acknak).
+
+<p align="center">
+  <img alt="TLP framing: STP, 12-bit sequence number, TLP of 12 to 4112 bytes, 4-byte LCRC, END, PAD" src="4.dll/images/TLP_structure.png" width="70%">
+</p>
+<p align="center">
+  <img alt="Flow-control DLLP: type, VC, HdrFC, DataFC, 16-bit CRC; type codes for InitFC1, InitFC2 and UpdateFC" src="4.dll/images/DLLP_structure.png" width="48%">
+  <img alt="Ack/Nak DLLP: type (00h Ack, 10h Nak), reserved, 12-bit AckNak_Seq_Num, 16-bit CRC" src="4.dll/images/AckNak_structure.png" width="48%">
+</p>
+
+Inside the TLP, the 3-DW headers of the walkthrough's requests and completions:
+
+<p align="center">
+  <img alt="3-DW request header, byte 0 of every DW in [31:24]: H0 Fmt, Type, TC, TD, EP, Attr, Length; H1 Requester ID, Tag, Last and 1st DW byte enables; H2 Address[31:2]" src="5.tlp/images/tlp_header_request.drawio.png" width="48%">
+  <img alt="3-DW completion header: H0 as for a request; H1 Completer ID, Status, BCM, Byte Count; H2 Requester ID, Tag, Lower Address" src="5.tlp/images/tlp_header_completion.drawio.png" width="48%">
+</p>
+
 ---
 # Walkthrough Interface Layers
 
@@ -153,6 +172,8 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 | Clock tolerance compensation | ❌ | SerDes clock correction off; common REFCLK only |
 
 ## 3) DLL (dll_if)
+
+More in the [DLL README](4.dll/README.md): [packet structures](4.dll/README.md#packet-structures), [Ack/Nak](4.dll/README.md#acknak), [DL Init FSM](4.dll/README.md#dll-init-fsm), [flow-control initialization](4.dll/README.md#flow-control-initialization), [retry buffer](4.dll/README.md#retry-buffer).
 
 #### DLLP generation and reception
 
@@ -211,7 +232,9 @@ The user side of the TL: the 64-bit TRN bus, drop-in compatible with the Artix-7
 
 ## 5) Type 0 Configuration Space
 
-In the TL _config_space_, as on the hard macro. Each register is one 32-bit word with a write mask, and an RW1C mask where needed.
+In hardware: the TL's `config_space` RTL answers the host's CfgRd0/CfgWr0; the eduBOS5 firmware never sees them, so enumeration works before it starts. This follows AMD's `PCIE_2_1` hard macro in EP mode, whose configuration space is in silicon too and whose user logic gets only Memory and I/O requests and completions on TRN ([UG477](../0.doc/2.rtl/ug477_7Series_IntBlock_PCIe.pdf)); keeping that split keeps `trn_if` a drop-in for its user logic. Each register is one 32-bit word with a write mask, and an RW1C mask where needed. What is done where: [8) HW / SW Partitioning](#8-hw--sw-partitioning).
+
+<p align="center"><img alt="Type 0 configuration space, 00h to FFFh: implemented registers in green, not implemented ones (reading 0) in grey" src="5.tlp/images/Config_Space.drawio.png" width="75%"></p>
 
 | Capability | Implemented | Notes |
 |---|---|---|
@@ -225,6 +248,11 @@ To the rest of the logic, through `cfg_if`: Bus and Device Number, Memory Space 
 
 ## 6) axis_if and TRN2PIO Bridge
 `trn_bridge` (`trn_rx`, `trn_tx`, `trn_tx_throttle`), unchanged from openPCIE, turns the TRN bus into the SOC's two 64-bit AXI-Stream streams (`axis_if`), as the AXI wrapper of `PCIE_2_1` does. Behind it, `riscv_pcie_soc` runs the PIO TestApp firmware on eduBOS5: it serves the MemWr and MemRd to BAR0 from its memory and builds the completions ([6.soc](6.soc/README.md), [3.sw](../3.sw/README.md)).
+
+The same TLPs on both sides of `trn_bridge` ([byte order](5.tlp/README.md#byte-order)):
+
+<p align="center"><img alt="TLPs on trn_if: MWr32, MRd32 and CplD in 64-bit beats, header DW0 in [63:32], rsof on the first beat, reof and rrem on the last" src="5.tlp/images/trn_if_format.drawio.png" width="70%"></p>
+<p align="center"><img alt="The same TLPs on axis_if: header DW0 in [31:0], tlast and tkeep on the last beat" src="5.tlp/images/axis_if_format.drawio.png" width="70%"></p>
 
 ## 7) CSR, HAL and SW Interface
 The CSR block (`soc_csr`, at 0x3000_0000 on the CPU bus) is where the firmware meets the PCIE side: the `tx` registers (0x00) for the TLP to send, the `rx` window (0x10) for the received one, and `status` (0x24).
@@ -243,6 +271,25 @@ The registers are written once, in SystemRDL ([`csr.rdl`](../4.build/csr_build/c
 - **Generate:** [4.build](../4.build/README.md#build-environment), step 1 (`MakefileCSR`)
 - **Firmware use:** [3.sw](../3.sw/README.md#ep-firmware)
 - **Co-simulation:** [5.sim](../5.sim/README.md#hal): the same firmware compiled for the host, each CSR access a _VProc_ bus cycle
+
+## 8) HW / SW Partitioning
+
+Everything up to and including the TLP is hardware. The eduBOS5 firmware sees only Memory requests to BAR0, one TLP at a time, through the CSR block.
+
+| Function | Where | Block |
+|---|---|---|
+| 8b/10b, serializer, CDR, comma alignment, elastic buffer | HW | GateMate SerDes, Cologne Chip soft PHY ([1.phy](1.phy/README.md)) |
+| LTSSM, scrambling, SKP ordered sets | HW | MAC ([3.mac](3.mac/README.md)) |
+| Framing, sequence numbers, LCRC, Ack/Nak, replay, InitFC and UpdateFC DLLPs | HW | DLL ([4.dll](4.dll/README.md)) |
+| TLP checks, queues, ordering, flow-control credits, error reporting | HW | TL ([5.tlp](5.tlp/README.md)) |
+| Configuration space: CfgRd0/CfgWr0, IDs, BAR0 sizing, capabilities, Bus/Device Number | HW | TL `config_space`, `cpl_gen` |
+| Unsupported Requests: a BAR0 miss, I/O, Type 1 configuration, a function other than 0 | HW | TL `tlp_rx_dispatch`, `cpl_gen` |
+| TRN to and from AXI-Stream | HW | `trn_bridge` |
+| One TLP in, one TLP out: Rx window, Tx FSM, `status` | HW | SOC `soc_csr` ([7)](#7-csr-hal-and-sw-interface)) |
+| MemWr and MemRd to BAR0: decode, byte enables, the 4 KB PIO memory | SW | `EP/main.c` ([3.sw](../3.sw/README.md#ep-firmware)) |
+| CplD: Completer ID from `status.cfg_id`, Requester ID and Tag from the request, split at the 64-byte RCB | SW | `common/pcie.c` |
+| Unsupported Request for any other non-posted request: a fallback, as the TL lets only MRd and MWr to BAR0 through | SW | `EP/main.c` |
+| PASS: `status.result` = 0x0000_FACE, the `fw_pass` LED | SW | `EP/main.c` |
 
 ---
 # Where it departs from PCIe 2.1

@@ -16,7 +16,7 @@ The EP firmware runs bare-metal on the eduBOS5 core of our GateMate SOC. It is t
 
 What a reader should take from it:
 
-- **The TL does the configuration, not the firmware.** The host's CfgRd0/CfgWr0 (IDs, Command register, BAR0 sizing) are answered by the soft TL, as on the AMD hard macro. Only Memory requests reach the firmware, so enumeration works even before the firmware has started.
+- **The TL does the configuration, not the firmware.** The host's CfgRd0/CfgWr0 (IDs, Command register, BAR0 sizing) are answered by the soft TL, as AMD's `PCIE_2_1` hard macro answers them in silicon in EP mode. Only Memory requests reach the firmware, so enumeration works even before the firmware has started.
 - **One TLP at a time, nothing lost.** The SOC captures each incoming TLP into the Rx window, the header in `rx.header0..2`, the DWORDs from DW3 on in `rx_payload`, and sets `rx.valid`. While it is set, the link is held off; the firmware clears it once it has answered.
 - **A Completion routes back by the request's IDs.** Requester ID and Tag come from the request, TC and Attr are copied from it, and the Completer ID is our own Bus/Device/Function, read from `status.cfg_id`. That value comes from the host's configuration writes and differs between a direct link and a link behind a switch, so it is never hard-coded.
 - **Byte enables matter.** A MemWr updates only the enabled bytes of its first and last DWORD; a MemRd's Byte Count and Lower Address follow from its First and Last DW Byte Enables (Base Specification 2.1, Tables 2-31 and 2-32), and each of its Completions carries the bytes left from its own first byte on. On the TRN interface, payload byte 0 travels in bits [31:24].

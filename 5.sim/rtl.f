@@ -8,6 +8,7 @@
 // (models/phy_vproc_rc.sv).
 
 // Packages
+models/pipe_sym_pkg.sv
 ../2.rtl/5.tlp/pcie_pkg.sv
 ../2.rtl/5.tlp/tl_pkg.sv
 ../4.build/csr_build/generated-files/csr_pkg.sv

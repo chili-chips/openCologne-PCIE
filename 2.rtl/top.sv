@@ -46,21 +46,15 @@
 //   place of phy_top, or the EP model in place of pcie_top (5.sim).
 //
 //   On the chip, the SerDes serial pins and its 100 MHz reference clock are
-//   dedicated pins that CC_SERDES connects by itself. They are ports of this
-//   module only in simulation, where the SerDes model needs them.
+//   dedicated pins that CC_SERDES connects by itself: a GateMate netlist
+//   cannot reach them, so they are not ports of this module (on a Xilinx
+//   part they would be). They stay nets here, which the test bench drives
+//   and reads by hierarchy in simulation.
 //==========================================================================
 
 module top (
     input logic clk_brd,  // board oscillator
     input logic perst_n,  // PERST# from the connector, active low
-
-`ifndef SYNTHESIS
-    input  logic refclk,   // 100 MHz PCIE REFCLK
-    input  logic ser_rxp,
-    input  logic ser_rxn,
-    output logic ser_txp,
-    output logic ser_txn,
-`endif
 
     output logic link_up,  // for an LED: the data link is up
     output logic fw_pass   // for an LED: the firmware has reported PASS
@@ -69,13 +63,13 @@ module top (
   logic phy_rdy;
   logic rst_pipe_n;
 
-`ifdef SYNTHESIS
-  // CC_SERDES has its own serial pins and reference clock: no board pins here
+  // The serial pins and the reference clock: CC_SERDES has none. The chip's
+  // SerDes drives and senses its own dedicated pads and takes its own REFCLK,
+  // which no netlist reaches, so on the chip these stay unconnected: no level
+  // on a pin the chip does not have. In simulation the test bench drives
+  // refclk and ser_rx* and reads ser_tx* by hierarchy (5.sim/tb.sv), for the
+  // SerDes BFM in phy_top (ccfpga_serdes.SYNTH.sv, ccfpga_serdes.BFM.sv)
   logic refclk, ser_rxp, ser_rxn, ser_txp, ser_txn;
-  assign {refclk, ser_rxp, ser_rxn} = '0;
-  logic NC_ser_tx;  // the serial outputs go nowhere on the chip
-  assign NC_ser_tx = ser_txp ^ ser_txn;
-`endif
 
   pipe_if pipe_mac ();
 

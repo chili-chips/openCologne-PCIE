@@ -206,14 +206,17 @@ module tb #(
   (
     .clk_brd                           (clk_brd),
     .perst_n                           (rst_n),
-    .refclk                            (refclk),
-    .ser_rxp                           (ser_dn),
-    .ser_rxn                           (ser_dn_idle ? ser_dn : ~ser_dn),
-    .ser_txp                           (ser_up),
-    .ser_txn                           (ser_up_n),
     .link_up                           (link_up),
     .fw_pass                           (fw_pass)
   );
+
+  // the SerDes pins are not ports of top (no GateMate netlist reaches them):
+  // its nets, by hierarchy
+  assign dut.refclk  = refclk;
+  assign dut.ser_rxp = ser_dn;
+  assign dut.ser_rxn = ser_dn_idle ? ser_dn : ~ser_dn;
+  assign ser_up      = dut.ser_txp;
+  assign ser_up_n    = dut.ser_txn;
 `else
   logic       phy_rdy;
 

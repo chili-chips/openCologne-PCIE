@@ -204,7 +204,7 @@ The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/is
 
 Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh SIM=icarus`). The EP DMA stage runs only in the regression's seeds (`DMA=1`, on the EP model): our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)).
 
-**Sanity**, after every change: `bash run-sanity.sh`, five runs, about 40 s. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines. Our EP drops an SKP ([#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38)), so its two runs go on past the SVA and pass as "known #38" if PL.SKP holds every checker violation and the firmware still ends `0x0000face`.
+**Sanity**, after every change: `bash run-sanity.sh`, six runs, about 2 minutes. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines. Our EP drops an SKP ([#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38)), so its three runs go on past the SVA and pass as "known #38" if PL.SKP holds every checker violation and the firmware still ends `0x0000face`.
 
 ```sh
 make run                          # EP model at the PIPE, Verilator
@@ -212,6 +212,7 @@ make SIM=icarus run               # the same on Icarus
 make IFACE=serial run             # EP model on the serial line
 make EP=rtl A7RC=1 SIM_ARGS=+verilator+error+limit+100 run            # our EP RTL + firmware, the lab RC's requests
 make EP=rtl CPU=vproc A7RC=1 SIM_ARGS=+verilator+error+limit+100 run  # the same, the firmware compiled for the host
+make EP=rtl IFACE=serial A7RC=1 SIM_ARGS=+verilator+error+limit+100 run # our EP with the real PHY, through top
 ```
 
 **Regression**, before a push: `bash run-regression.sh`, about 8 minutes. A run that fails on open issues is reported as known, with them (`KNOWN` in the script); the script fails only on an unexpected result. What it runs:

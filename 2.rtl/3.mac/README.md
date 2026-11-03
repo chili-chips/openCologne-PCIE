@@ -79,7 +79,7 @@ The MAC uses the PHY's control-symbol flags (`TxDataK`/`RxDataK`); 8b/10b lives 
 | PAD    | K23.7  | Pad           | Link and Lane numbers not yet set, in TS1/TS2 during Configuration |
 | SKP    | K28.0  | Skip          | The SKP ordered set, for clock-tolerance compensation |
 
-**Framing symbols**: the DLL inserts and checks them (`retry_buffer.v`, `send_DLLP.v`, `packet_handler.v`); the MAC only watches them for where a packet starts and ends (`ccfpga_send_data.v`, `ccfpga_rx_MAC_data.v`). Base 2.1 puts framing in the Physical Layer (4.2.2); this design puts it in the DLL.
+**Framing symbols**: the DLL inserts and checks them (`retry_buffer.v`, `send_DLLP.v`, `packet_handler.v`); the MAC only watches them for where a packet starts and ends (`ccfpga_send_data.v`, `ccfpga_rx_MAC_data.v`). Base 2.1 puts framing in the Physical Layer (4.2.2); our design puts it in the DLL.
 
 | Symbol | Code   | Name          | Use |
 | ------ |:------ |:------------- |:--- |

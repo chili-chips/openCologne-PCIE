@@ -56,6 +56,18 @@ The versions this repo has been run with so far. "Runs" means the step completes
 
 Out of 40,960 CPE_LT and CPE_FF, and 64 RAM_HALF.
 
+**Per block** (2026-11-03):
+
+| Block | CPE_LT | CPE_FF | RAM_HALF |
+|---|---|---|---|
+| SOC (`riscv_pcie_soc`: eduBOS5, RAM, CSR) | 5,999 (27%) | 2,091 (30%) | 12 |
+| TL (`pcie_tl`) | 4,588 (20%) | 1,789 (26%) | 6 |
+| DLL (`dll_logic`) | 7,286 (32%) | 1,695 (24%) | 4 |
+| Other (MAC, PHY, `trn_bridge`, clocks and resets) | 4,597 (20%) | 1,365 (20%) | 0 |
+| Total | 22,470 | 6,940 | 22 |
+
+Neither Yosys nor nextpnr reports a flat build per block. These numbers come from a second build that keeps the three blocks (`read_slang --best-effort-hierarchy`, `keep_hierarchy`), packed by nextpnr and counted by cell name. Nothing is optimised across the block boundaries there, so it is 1.2% larger in CPE_LT (9% in Yosys LUTs), and its routing did not converge; a second build per change is not sustainable, so this table is a snapshot.
+
 #### References:
 - [GateMate FPGA Toolchain Installation, UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf) by Cologne Chip, May 2026
 - GateMate pin lists, from the DS1001 attachment, September 2026: [CCGM1A1](../0.doc/4.build/gatemate-ccgm1a1-pinlist.csv), [CCGM1A2](../0.doc/4.build/gatemate-ccgm1a2-pinlist.csv)

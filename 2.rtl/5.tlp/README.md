@@ -50,6 +50,11 @@ Next to the TL, in this folder because it is its user side:
 
 `pcie_tl` swaps the bytes of every DW at the DLL boundary (`trn_byte_swap`) and the two DWs at the TRN boundary, so the whole TL works in AXI-Stream order and reads the header through the `pcie_pkg` structs.
 
+<p align="center">
+  <img alt="3-DW request header, byte 0 of every DW in [31:24]: H0 Fmt, Type, TC, TD, EP, Attr, Length; H1 Requester ID, Tag, Last and 1st DW byte enables; H2 Address[31:2]" src="images/tlp_header_request.drawio.png" width="48%">
+  <img alt="3-DW completion header: H0 as for a request; H1 Completer ID, Status, BCM, Byte Count; H2 Requester ID, Tag, Lower Address" src="images/tlp_header_completion.drawio.png" width="48%">
+</p>
+
 ### Data Link Layer (dll_if)
 - **DL_Up** is `dl_state` in DL_Init FC_INIT2 or DL_Active, registered. While DL_Up is low the TL is held in reset: DL_Down resets the TL, as required for an upstream port.
 - **TLPs**: the TL starts a TLP only while `tx_tlp_ready` is high, sends it in consecutive words, then waits for `tx_tlp_ready` to drop before the next one, matching the one-TLP DLL retry buffer. The last word of a TLP with an odd number of DWs is marked with `tx_tlp_last_half`, the DLL's `tl_tx_tlp_last_half` ([#21](https://github.com/chili-chips-ba/openCologne-PCIE/issues/21)): the DLL then sends only its lower 4 bytes.
@@ -58,6 +63,9 @@ Next to the TL, in this folder because it is its user side:
 InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)): the DLL used to send InitFC1 and InitFC2 with fixed credits (P 32/1008, NP 32/1, Cpl infinite). It now builds them from the `INIT_*` parameters, which `pcie_core` sets to the TL's. The fix is on our fork ([2.pipe](../2.pipe/README.md#submodule)), offered upstream as [gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17).
 
 ### SOC side (trn_if and cfg_if)
+
+<p align="center"><img alt="TLPs on trn_if: MWr32, MRd32 and CplD in 64-bit beats, header DW0 in [63:32], rsof on the first beat, reof and rrem on the last" src="images/trn_if_format.drawio.png" width="70%"></p>
+
 - **TRN RX** carries memory reads and writes that hit BAR0, and all completions.
   - A word moves when `rsrc_rdy` and `rdst_rdy` are both high. `rrem` is 1, and 0 on a last word holding one DW. `rbar_hit[0]` marks BAR0 (0 for completions), `rerrfwd` a poisoned TLP, `recrc_err` is 0.
   - `trn_bridge` turns them into `m_axis_rx`: `tkeep` `8'hFF`, or `8'h0F` on a last beat holding one DW; `tuser.bar_hit`, `tuser.err_fwd`, `tuser.ecrc_err`.
@@ -154,7 +162,7 @@ Credit types that were advertised as 0 in InitFC are infinite and always pass. A
 
 ## Configuration space
 
-<img alt="Transaction Layer configuration space" src="./images/Config_Space.png" width=600 />
+<p align="center"><img alt="Type 0 configuration space, 00h to FFFh: implemented registers in green (IDs, Command, Status, Class Code, Header Type, Cache Line Size, BAR0, Subsystem IDs, Capabilities Pointer, Interrupt Line, PM capability with PMCSR D0/D3hot, PCI Express capability); not implemented, reading 0, in grey (BIST, Latency Timer, BAR1-5, CardBus CIS, Expansion ROM, Max_Lat, Min_Gnt, Interrupt Pin, PM Data, Slot and Root registers, Device Capabilities/Control/Status 2 and Link Capabilities 2, MSI and other capabilities, extended space)" src="./images/Config_Space.drawio.png" width="75%"></p>
 
 | Register                 | Notes                                                                                   |
 |:------------------------ |:--------------------------------------------------------------------------------------- |
