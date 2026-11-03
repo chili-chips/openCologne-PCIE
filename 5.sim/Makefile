@@ -54,7 +54,7 @@ else ifeq ($(EP),rtl)
   ifneq ($(SIM),verilator)
     $(error EP=rtl needs SIM=verilator: Icarus 13 parses neither our interface ports nor the generated csr_pkg.sv)
   endif
-  A7RC_EXPECT  = -DA7RC_EP_EXPECT='"a7rc_ep.h"'
+  A7RC_EXPECT  = -DA7RC_EP_EXPECT='"a7rc_ep.h"' -DA7RC_PIPE_SCRAMBLE  # our EP scrambles at the PIPE too
   EP_FILES     = rtl.f
   EP_VLT       = +define+EP_RTL --timescale 1ps/1ps -F rtl.f --assert models/ep_sva.sv
   EP_OBJ       = _rtl

@@ -38,15 +38,13 @@
 //--------------------------------------------------------------------------
 // Description:
 //   phy_vproc_rc: the phy_top socket with IFACE=pipe, the host at the PIPE.
-//   It is the PHY side of pipe_if for our MAC: PCLK from the test bench, the
-//   host's PIPE data in and out, electrical idle both ways (NOSIG, the K flag
-//   and 0xFF, per symbol on the host's data), and receiver detection: while the MAC asks for it
-//   (tx_detect_rx), RxStatus reports a receiver present (3'b011).
+//   It is the PHY side of pipe_if for our MAC, PCLK from the test bench: a
+//   wrapper of models/pipe_phy_core.sv (master in openPCIE), which gives the
+//   PIPE handshakes (PhyStatus, receiver detection) and electrical idle both
+//   ways (NOSIG on the host's data).
 //==========================================================================
 
 `timescale 1ps/1ps
-
-`include "pciexpress_header.v"
 
 module phy_vproc_rc #(
     parameter int DATA_BYTES = 8
@@ -60,57 +58,39 @@ module phy_vproc_rc #(
     output logic [DATA_BYTES*8-1:0] host_rxdata,
     output logic [  DATA_BYTES-1:0] host_rxdatak
 );
-  logic [3:0] rdy_cnt;
+  assign pipe.pclk = pclk;
 
-  // Electrical idle is NOSIG (the K flag and 0xFF: no 8b/10b code) per symbol
-  // on the host's data, on every simulator. The MAC gets 0 under RxElecIdle;
-  // the host gets NOSIG under the MAC's TxElecIdle, never the data the MAC
-  // leaves there. RxValid and RxElecIdle are per word: a word only partly
-  // NOSIG (idle entry after an EIOS, exit before a TS) is valid, its idle
-  // bytes D0.0, which the MAC ignores there, as on a line settling
-  localparam logic [8:0] NOSIG_SYM = {1'b1, `NOSIG};   // {K, byte}
-  logic [  DATA_BYTES-1:0] host_idle;
-  logic [DATA_BYTES*8-1:0] rx_data;
-  logic [  DATA_BYTES-1:0] rx_datak;
+  pipe_phy_core #(
+      .LANES        (1),
+      .BYTES        (DATA_BYTES),
+      .RDY_LAT      (15),
+      .RCVRDET_LAT  (4)     // 128 ns: the SerDes BFM detects in 120 ns
+  ) u_core (
+      .pclk         (pclk),
+      .rst_n        (rst_n),
+      .phy_rdy      (phy_rdy),
 
-  always_comb begin
-    for (int b = 0; b < DATA_BYTES; b++) begin
-      host_idle[b]        = ({host_txdatak[b], host_txdata[8*b +: 8]} == NOSIG_SYM);
-      rx_data [8*b +: 8]  = host_idle[b] ? 8'h00 : host_txdata[8*b +: 8];
-      rx_datak[b]         = host_idle[b] ? 1'b0  : host_txdatak[b];
-    end
-  end
+      .mac_reset    (!pipe.reset_n),
+      .powerdown    (pipe.power_down),
+      .rate         (1'b0),               // Gen1 only
+      .tx_detect_rx (pipe.tx_detect_rx),
+      .tx_elec_idle (pipe.tx_elec_idle),
+      .tx_data      (pipe.tx_data),
+      .tx_datak     (pipe.tx_datak),
 
-  always_ff @(posedge pclk or negedge rst_n) begin
-    if (!rst_n) begin
-      rdy_cnt <= '0;
-    end
-    else if (rdy_cnt != 4'hF) begin
-      rdy_cnt <= rdy_cnt + 4'd1;
-    end
-  end
+      .phy_status   (pipe.phy_status),
+      .rx_status    (pipe.rx_status),
+      .rx_valid     (pipe.rx_valid),
+      .rx_elec_idle (pipe.rx_elec_idle),
+      .rx_data      (pipe.rx_data),
+      .rx_datak     (pipe.rx_datak),
 
-  assign phy_rdy           = (rdy_cnt == 4'hF);
-
-  assign pipe.pclk         = pclk;
-  assign pipe.rx_data      = rx_data;
-  assign pipe.rx_datak     = rx_datak;
-  assign pipe.rx_elec_idle = &host_idle;
-  assign pipe.rx_valid     = !(&host_idle);
-
-  always_ff @(posedge pclk or negedge rst_n) begin
-    if (!rst_n) begin
-      pipe.phy_status <= 1'b1;
-      pipe.rx_status  <= 3'b000;
-    end
-    else begin
-      pipe.phy_status <= !pipe.reset_n || pipe.tx_detect_rx;
-      pipe.rx_status  <= pipe.tx_detect_rx ? 3'b011 : 3'b000;
-    end
-  end
-
-  assign host_rxdata  = pipe.tx_elec_idle ? {DATA_BYTES{NOSIG_SYM[7:0]}} : pipe.tx_data;
-  assign host_rxdatak = pipe.tx_elec_idle ? {DATA_BYTES{NOSIG_SYM[8]}}   : pipe.tx_datak;
+      .rcvr_present (1'b1),
+      .host_rxdata  (host_rxdata),
+      .host_rxdatak (host_rxdatak),
+      .host_txdata  (host_txdata),
+      .host_txdatak (host_txdatak)
+  );
 endmodule: phy_vproc_rc
 
 // -----------------------------------------------------------------------------

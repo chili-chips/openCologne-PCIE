@@ -81,4 +81,5 @@
 
 // GateMate primitives for simulation, and the phy_top socket
 models/gatemate_cells_sim.sv
+models/pipe_phy_core.sv
 models/phy_vproc_rc.sv

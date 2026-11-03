@@ -20,7 +20,7 @@ A transmit datapath, a receive datapath, and the control plane binding them.
 - **RX datapath**: `RxData`/`RxDataK` from the PIPE interface → descrambling → packet detection → packet stream to the DLL.
 - **LTSSM**: drives the PIPE command signals (`i_PowerDown`, `i_TxDetectRx`, `i_TxElecIdle`, `i_RxPolarity`, `i_TxCompliance`) and consumes the PIPE status signals (`o_PhyStatus`, `o_RxValid`, `o_RxElecIdle`, `o_RxStatus`) to sequence the link through Detect → Polling → Configuration → L0, and Recovery.
 - **Ordered-set generator/detector**: builds and recognises TS1/TS2, SKP used during link training.
-- **Scrambler/descrambler**: LFSR applied to data symbols only; reset by COM and bypassed for training sequences and control symbols.
+- **Scrambler/descrambler**: LFSR applied to data symbols only; reset by COM and bypassed for training sequences and control symbols (RX in L0: see [Scrambling](#scrambling)).
 
 ## The Interface
 **Upstream** to the Data Link Layer, **downstream** to the PIPE / PHY.
@@ -66,7 +66,10 @@ The MAC uses the PHY's control-symbol flags (`TxDataK`/`RxDataK`); 8b/10b lives 
 Ordered sets generated/detected by the MAC: **TS1/TS2** (Polling, Configuration, Recovery), **SKP** (clock compensation — insertion/removal is done by the PHY elastic buffer and reported via `RxStatus`).
 
 ## Scrambling
-Data (D) symbols are scrambled with the standard PCIe LFSR, **G(x) = x¹⁶ + x⁵ + x⁴ + x³ + 1**, advanced once per symbol and reset on COM. Bypassed for control symbols, TS1/TS2 and SKP. RX descrambles with the identical LFSR.
+Data (D) symbols are scrambled with the standard PCIe LFSR, **G(x) = x¹⁶ + x⁵ + x⁴ + x³ + 1**, seeded FFFFh by COM and advanced once per symbol but SKP (Base 2.1, 4.2.3). Not scrambled: K symbols, and on TX the TS1/TS2 data symbols. RX descrambles with the identical LFSR.
+
+- **Disable Scrambling:** Training Control bit 3 of the TS received in Configuration.Complete turns both off; Detect and a new Configuration clear it.
+- **RX, TS1/TS2:** the RX mask is per LTSSM state, not per symbol: in L0, Configuration.Idle and PRE_L0 (the cycle before L0) it descrambles every data symbol, a received TS1/TS2 too (the spec leaves those unscrambled), so the EP never follows the partner into Recovery ([#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42)).
 
 <!--## Prerequisites
 The simulation can be run using the pcieVHost ... TODO

@@ -33,13 +33,27 @@ The versions this repo has been run with so far. "Runs" means the step completes
 |---|---|---|---|
 | PeakRDL | 1.5.0 | CSR RTL, headers, docs (`MakefileCSR`) | generates |
 | xPack RISC-V GCC | 15.2.0-1 | firmware (`sw_build`) | builds |
-| Yosys | 0.70, with `read_slang` | 8b/10b proofs, standalone SerDes test synthesis, `run-synth.sh`, `run-lint.sh` | runs |
+| GCC | 15.2 | co-sim C/C++: VProc, pcieVHost, the RC model; `-O0`/`-O2`, UBSan, ASan | builds |
+| Yosys | 0.70, with `read_slang` | 8b/10b proofs, standalone SerDes test synthesis, `run-synth.sh`, `run-lint.sh`, `run-leq.sh` | runs |
+| Verible | v0.0-4296-g0f262651 | `run-lint.sh`, `run-format.sh` | runs |
 | Icarus Verilog | 13.0 | PHY and DLL-over-PHY simulations, co-sim (`make SIM=icarus run`) | runs |
 | Verilator | 5.052 | co-sim (`make run`, default), SOC lint; its FST writer needs `liblz4-dev` | runs, checks |
-| nextpnr-himbaechel (GateMate), gmpack | from the OSS CAD Suite | place and route, bitstream (`run-pnr.sh`) | not yet run here |
+| OSS CAD Suite | 2026-11-02 | Cologne Chip's toolchain package ([UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf)): nextpnr-himbaechel `nextpnr-0.11.1-85-ga2c64799`, GateMate, for `run-pnr.sh` (`NEXTPNR=`); its Yosys is a development build, not used | places and routes; timing fails |
+| gmpack | OSS CAD Suite, or Project Peppercorn v1.14 | bitstream (`run-pnr.sh`) | not yet run: P&R stops on timing |
 | openFPGALoader | 1.1.1 | loading the bitstream over JTAG | not yet used on the board |
-| WaveCrux Pro | 1.1.0 (1.0.1+) | waveforms; PIPE, DLL and serial-line decoding (wcx-pcie 0.2.0, 0.1.0+), TLP decoding (Pro, and [our plugin](https://github.com/Ferrite-Engineering/wavecrux-decoders/tree/main/decoders/pcie-tlp)), RISC-V (Windows) | runs |
-| Python | 3.12 | build scripts | runs |
+| WaveCrux Pro | 1.1.1 | waveforms; PIPE, DLL and serial-line decoding (wcx-pcie 0.3.0), TLP decoding (Pro, and [our plugin](https://github.com/Ferrite-Engineering/wavecrux-decoders/tree/main/decoders/pcie-tlp), pcie-tlp 0.1.1), RISC-V (Windows) | runs |
+| Python | 3.12 | build scripts, `run-format.sh` | runs |
+
+## Utilization
+
+`run-synth.sh`, then `run-pnr.sh`, on the CCGM1A1 (EVB pins, PCLK 31.25 MHz). One row per change that moves the numbers.
+
+| Date | Design | CPE_LT | CPE_FF | RAM_HALF | PCLK | Result |
+|---|---|---|---|---|---|---|
+| 2026-11-02 | retry buffer in flip-flops ([#33](https://github.com/chili-chips-ba/openCologne-PCIE/issues/33)) | 80,093 (195%) | 39,808 (97%) | 20 / 64 | – | does not place |
+| 2026-11-02 | retry buffer in block RAM ([gatemate-pipe#20](https://github.com/colognechip/gatemate-pipe/pull/20)) | 22,076 (53%) | 7,261 (17%) | 22 / 64 | 12.2 MHz, 3 hold violations | routes; fails timing ([#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
+
+Out of 40,960 CPE_LT and CPE_FF, and 64 RAM_HALF.
 
 #### References:
 - [GateMate FPGA Toolchain Installation, UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf) by Cologne Chip, May 2026

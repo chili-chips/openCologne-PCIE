@@ -23,14 +23,14 @@ fails=0
 
 # the runs that fail today, and why
 declare -A KNOWN=(
-    [rtl-tester]="#24 #26 #38-#40"
+    [rtl-tester]="#24 #26 #38-#40 #42"
     [rtl-serial]="#38"
     [dll-stp]="#24"
     [dll-end]="#24"
 )
 # ... and what the log of each must show: another failure is not the known one
 declare -A KNOWN_SIG=(
-    [rtl-tester]="SVA #24"
+    [rtl-tester]="still in RcvrLock at Gen1"   # #42; SVA #24 comes before it
     [rtl-serial]="SVA #38"
     [dll-stp]="stp corrupted: EP did not replay"
     [dll-end]="end corrupted: EP did not replay"
@@ -76,7 +76,8 @@ if diff -q <(grep -a '===>' $LOG/serial.log) <(grep -a '===>' $LOG/serial-icarus
 else
     report sim-match 0 0 "Verilator = Icarus, serial" "diff the ===> lines of serial.log and serial-icarus.log"
 fi
-# SVA #24 stops the run at 2.86 ms; going on, it also reaches the TL issues
+# SVA #24 stops the run at 2.86 ms; going on, it reaches the TL issues, then
+# hangs from the first Recovery (#42) to the 10 ms limit
 run rtl-tester     EP=rtl SIM_ARGS=+verilator+error+limit+100 "$@"
 run rtl-serial     EP=rtl IFACE=serial A7RC=1 "$@"
 

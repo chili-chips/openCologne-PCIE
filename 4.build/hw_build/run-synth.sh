@@ -10,8 +10,9 @@
 #
 # usage:  bash run-synth.sh
 #
-# Needs Yosys with the read_slang plugin: YOSYS_ARGS defaults to "-m slang";
-# point it at the plugin, e.g. YOSYS_ARGS="-m ~/opt/src/sv-elab-main/build/slang.so".
+# Needs Yosys with read_slang, built in or as a plugin. When YOSYS_ARGS is not
+# set, it is "" if the Yosys has read_slang, else "-m slang" (as run-lint.sh);
+# point it at another plugin, e.g. YOSYS_ARGS="-m ~/opt/src/sv-elab-main/build/slang.so".
 # YOSYS and YOSYS_CONFIG override the commands. The work directory is
 # SYNTH_WORK (default ~/.cache/opencologne-pcie/synth); it gets:
 #   top.json   the netlist, for nextpnr-himbaechel
@@ -24,7 +25,13 @@ REPO=$(cd "$HERE/../.." && pwd)
 . "$HERE/sources.sh"
 YOSYS=${YOSYS:-yosys}
 YOSYS_CONFIG=${YOSYS_CONFIG:-yosys-config}
-YOSYS_ARGS=${YOSYS_ARGS:--m slang}
+if [ -z "${YOSYS_ARGS+set}" ]; then
+  if "$YOSYS" -p 'help read_slang' 2>/dev/null | grep -q 'read_slang \['; then
+    YOSYS_ARGS=""
+  else
+    YOSYS_ARGS="-m slang"
+  fi
+fi
 W=${SYNTH_WORK:-$HOME/.cache/opencologne-pcie/synth}
 mkdir -p "$W"
 

@@ -1,12 +1,14 @@
 # gatemate-pipe
 
 ## Submodule
-`pipe_src` is [Cologne Chip's gatemate-pipe](https://github.com/colognechip/gatemate-pipe) (`dll_test`) plus our changes, on branch `ocp-integration` of [our fork](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration). We offer each change to Cologne Chip as a pull request: [#17](https://github.com/colognechip/gatemate-pipe/pull/17) (InitFC credits), [#19](https://github.com/colognechip/gatemate-pipe/pull/19) (64-bit PCLK straight from `PLL_CLK_O`).
+`pipe_src` is [Cologne Chip's gatemate-pipe](https://github.com/colognechip/gatemate-pipe) (`dll_test`) plus our changes, on branch `ocp-integration` of [our fork](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration). We offer each change to Cologne Chip as a pull request: [#17](https://github.com/colognechip/gatemate-pipe/pull/17) (InitFC credits), [#19](https://github.com/colognechip/gatemate-pipe/pull/19) (64-bit PCLK straight from `PLL_CLK_O`), [#20](https://github.com/colognechip/gatemate-pipe/pull/20) (the DLL retry buffer in block RAM).
 
 ## Description
 The **PHY Interface for the PCI Express Architecture (PIPE)** is part of the physical layer, between the Media Access Control (MAC) Layer and the Physical Coding Sublayer (PCS). It separates the soft-core RTL from the FPGA-specific SerDes, which reduces effort and eases porting to other FPGA vendors and platforms.
 
-<img alt="Position of the PIPE layer in the PCIe stack" src="./images/PIPE_Position.png" width=300 height=330 />
+<p align="center">
+  <img alt="Position of the PIPE layer in the PCIe stack" width="50%" src="../1.phy/0.doc/images/PHY-Layers-GateMate.drawio.png">
+</p>
 
 ## The Interface
 The schematic shows the **64-Bit datapath**, where `o_PCLK` runs at the **SERDES TX_clock** frequency. Narrower datapaths run `o_PCLK` at a multiple of **TX_clock**, by the datapath ratio, to keep MAC and PHY synchronized: a **32-Bit datapath** (half the **64-Bit SERDES datapath**) runs `o_PCLK` at twice **TX_clock**.

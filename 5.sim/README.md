@@ -134,7 +134,7 @@ make EP=rtl DUMP=1 run       # also write tb_rtl.fst: every layer of the EP, for
 
 ### The host: openPCIE's Artix-7 RC model
 
-The host is openPCIE's [Artix-7 RC model](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#the-rc-model): what the lab RC sends, from link training to the RC firmware's requests and their pacing. It runs at the PIPE or, with `IFACE=serial`, on the serial line, with 8b/10b and scrambling on. [`usercode/a7rc_ep.h`](usercode/a7rc_ep.h) says what it expects of our EP RTL; the EP model matches the RC model's own EP.
+The host is openPCIE's [Artix-7 RC model](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#the-rc-model): what the lab RC sends, from link training to the RC firmware's requests and their pacing. It runs at the PIPE or, with `IFACE=serial`, on the serial line, with 8b/10b and scrambling on. At the PIPE it scrambles too against our EP RTL (`A7RC_PIPE_SCRAMBLE`, as the lab RC); against the EP model it sets Disable Scrambling. [`usercode/a7rc_ep.h`](usercode/a7rc_ep.h) says what it expects of our EP RTL; the EP model matches the RC model's own EP.
 
 **Masters.** The host is a copy in [`models/a7rc-model`](models/a7rc-model); the masters are in openPCIE. To update: copy, `cmp`, `bash run-sanity.sh`.
 
@@ -204,14 +204,14 @@ The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/is
 
 Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh SIM=icarus`). The EP DMA stage runs only in the regression's seeds (`DMA=1`, on the EP model): our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)).
 
-**Sanity**, after every change: `bash run-sanity.sh`, five runs, about 40 s. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines.
+**Sanity**, after every change: `bash run-sanity.sh`, five runs, about 40 s. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines. Our EP drops an SKP ([#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38)), so its two runs go on past the SVA and pass as "known #38" if PL.SKP holds every checker violation and the firmware still ends `0x0000face`.
 
 ```sh
 make run                          # EP model at the PIPE, Verilator
 make SIM=icarus run               # the same on Icarus
 make IFACE=serial run             # EP model on the serial line
-make EP=rtl A7RC=1 run            # our EP RTL + firmware, the lab RC's requests
-make EP=rtl CPU=vproc A7RC=1 run  # the same, the firmware compiled for the host
+make EP=rtl A7RC=1 SIM_ARGS=+verilator+error+limit+100 run            # our EP RTL + firmware, the lab RC's requests
+make EP=rtl CPU=vproc A7RC=1 SIM_ARGS=+verilator+error+limit+100 run  # the same, the firmware compiled for the host
 ```
 
 **Regression**, before a push: `bash run-regression.sh`, about 8 minutes. A run that fails on open issues is reported as known, with them (`KNOWN` in the script); the script fails only on an unexpected result. What it runs:
@@ -231,7 +231,7 @@ make EP=rtl IFACE=serial A7RC=1 run                   # our EP with the real PHY
 |---|---|---|
 | `make regress SEEDS=100 REGRESS_JOBS=8 DMA=1` | 20 s | 0 of 100 failed; every rule checked in some seed (the EP model answers CRS in one seed in four), but `PL.SPEED` and `PL.EIOS`: not applicable, our EP and the EP model are Gen1 |
 | Verilator against Icarus | 3 min (Icarus serial) | the same `===>` lines, PIPE and serial |
-| `make EP=rtl run` | 20 s | FAIL: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), [#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26), [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) to [#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40); `SVA #24` at 2.86 ms, a TLP neither Acked nor replayed; the regression lets it go on (`SIM_ARGS=+verilator+error+limit+100`), to the TL issues |
+| `make EP=rtl run` | 90 s | FAIL: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), [#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26), [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) to [#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40), [#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42); `SVA #38` from 139 µs, a dropped SKP; `SVA #24` at 2.86 ms, a TLP neither Acked nor replayed; the regression lets it go on (`SIM_ARGS=+verilator+error+limit+100`), through the TL issues, until the first Recovery at 3.07 ms: the EP stays in L0 (#42) to the 10 ms limit |
 | `make EP=rtl IFACE=serial A7RC=1 run` | 35 s | FAIL: [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38), stops at 216.0 µs on `SVA #38`: the MAC drops an SKP Ordered Set |
 | `run-phy.sh pipe64`, `equiv` | 5 s | PASS |
 | `run-dll-phy.sh` | 6 s | PASS: a corrupted sequence number, TLP byte or LCRC is Naked and replayed, a DLLP with a bad CRC dropped |
@@ -316,7 +316,7 @@ As on the host's page, dn is RC -> EP and up is EP -> RC. The Pro TLP decoder ta
 
 The sessions open the FST from this directory: [`tb_rtl.EP-layers.wavecrux`](tb_rtl.EP-layers.wavecrux) (all boundaries, Pro), [`tb_rtl.EP-free.wavecrux`](tb_rtl.EP-free.wavecrux) (the free decoders only) and, for `IFACE=serial`, [`tb_rtl_serial.EP-serial.wavecrux`](tb_rtl_serial.EP-serial.wavecrux). They need WaveCrux 1.1.0 or later, and:
 
-- the [wcx-pcie](https://github.com/Ferrite-Engineering/wavecrux-decoders/releases/tag/pcie-v0.2.0) 0.2.0 and [pcie-tlp](https://github.com/Ferrite-Engineering/wavecrux-decoders/releases/tag/pcie-tlp-v0.1.0) 0.1.0 plugins, added under **Settings -> Extensions -> Decoder Plugins**;
+- the [wcx-pcie](https://github.com/Ferrite-Engineering/wavecrux-decoders/releases/tag/pcie-v0.3.0) 0.3.0 and [pcie-tlp](https://github.com/Ferrite-Engineering/wavecrux-decoders/releases/tag/pcie-tlp-v0.1.1) 0.1.1 plugins (0.2.0 and 0.1.0 work too), added under **Settings -> Extensions -> Decoder Plugins**;
 - the plugin notice accepted: until then the decoder rows stay empty, without a message;
 - a Pro licence, for the Pro rows;
 - after an RTL change, [`tools/wavecrux-rebind.py`](tools/wavecrux-rebind.py): a session binds its decoders by signal number (the FST handle), and the RTL can renumber them.

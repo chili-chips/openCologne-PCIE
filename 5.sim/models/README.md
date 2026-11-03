@@ -5,7 +5,8 @@ This directory contains the following models
 * `soc_cpu.VPROC.sv` : _VProc_ based `soc_cpu` compatible virtual processor.
 * `PIPEx1__pcieVHost.sv` : a pcieVHost on an x1 PIPE link, as RC or EP, with the link offered at the PIPE, Data Link and Transaction layers.
 * `RCPIPEx1__pcieVHost.sv` : the host, `PIPEx1__pcieVHost` fixed to the RC role.
-* `phy_vproc_rc.sv` : the `phy_top` socket with `IFACE=pipe`, the host at the PIPE.
+* `phy_vproc_rc.sv` : the `phy_top` socket with `IFACE=pipe`, the host at the PIPE: a wrapper of `pipe_phy_core.sv`.
+* `pipe_phy_core.sv` : the PHY side of PIPE with its handshakes (PhyStatus, receiver detection, power state), shared with openPCIE (master there).
 * `ep_wavecrux_view.sv` : our EP's layer boundaries, for the WaveCrux decoders (`EP=rtl DUMP=1`).
 * `tlp_dw_if.sv`, `tlp_dw_monitor.sv`, `tlp_wavecrux_view.sv` : the SOC's AXI-Stream TLPs, one DW per clock, for the TLP decoder.
 * `gatemate_cells_sim.sv` : simulation models of the GateMate primitives `clk_rst_gen` uses: `CC_USR_RSTN`, `CC_BUFG`.

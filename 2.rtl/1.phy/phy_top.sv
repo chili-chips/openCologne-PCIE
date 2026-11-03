@@ -211,6 +211,8 @@ module phy_top #(
       .PLL_SET_OP_LOCK   (1'b0),
       .PLL_EN_ADPLL_CTRL (1'b1),
       .PLL_CONFIG_SEL    (1'b1),
+      .RX_EI_BIAS        (4'h4),  // RX electrical-idle detector on (RxElecIdle), as
+                                  // DS1001 and the BFM; CC_SERDES defaults to 0
       .SERDES_ENABLE     (1'b1)
   ) u_serdes (
       .clk_ref_i           (clk_ref),

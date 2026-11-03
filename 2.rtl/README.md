@@ -147,7 +147,7 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 |---|---|---|
 | LTSSM | partial | Detect, Polling (Active, Configuration), Configuration (all substates), L0, Recovery (RcvrLock, RcvrCfg, Idle). No Polling.Compliance, L0s, L1, L2, Disabled, Loopback or Hot Reset |
 | Speed | Gen1 | no Recovery.Speed |
-| Scrambling | ✅ | data symbols only, reset by COM |
+| Scrambling | ✅ | data symbols only, reset by COM; Disable Scrambling (TS Training Control bit 3) honoured both ways. RX in L0 also descrambles a received TS1/TS2 ([#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42)) |
 | Lane polarity inversion | ✅ | detected in Polling, `RxPolarity` to the PHY |
 | Lane reversal | — | x1 |
 

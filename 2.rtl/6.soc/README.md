@@ -53,5 +53,17 @@ Lint: [`4.build/hw_build/run-lint.sh`](../../4.build/hw_build/run-lint.sh) check
 - No RTL reads them; they are for WaveCrux and formal checks.
 - eduBOS5 drives them when built with `RISCV_FORMAL` (simulation only); under VProc they read 0, as a native program has no instructions.
 
+**The disassembly**, from the EP co-simulation ([5.sim](../../5.sim/README.md)): the firmware clearing `pio_mem`, one turn of the loop. RVFI on top, the RISC-V decoder's table below:
+
+<p align="center">
+  <img alt="WaveCrux: eduBOS5 RVFI signals and the RISC-V decoder's disassembly of the pio_mem loop" src="../../0.doc/5.sim/wavecrux-ep-cpu-loop.png" width="900">
+</p>
+
+**The RVFI Commit Inspector** (View -> Toggle Stage Panel), the same core and view in openPCIE: each retired instruction with its effect, a register written or a store:
+
+<p align="center">
+  <img alt="WaveCrux RVFI Commit Inspector: eduBOS5 commits" src="https://github.com/chili-chips-ba/openPCIE/raw/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/wavecrux/wavecrux-rvfi-commits.png" width="900">
+</p>
+
 --------------------
 #### End of Document
