@@ -219,6 +219,7 @@ package tl_pkg;
   typedef struct packed {
     logic        is_msg;
     logic        with_data;
+    logic        locked;
     logic [2:0]  tc;
     logic [1:0]  attr;
     logic [15:0] requester_id;

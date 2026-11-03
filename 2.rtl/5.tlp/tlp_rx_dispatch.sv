@@ -261,6 +261,7 @@ module tlp_rx_dispatch
 
   assign cpl.is_msg = cpl_is_msg;
   assign cpl.with_data = cpl_with_data;
+  assign cpl.locked = (kind_r == K_MRDLK);
   assign cpl.tc = cur_hdr_dw01.dw0.tc;
   assign cpl.attr = cur_hdr_dw01.dw0.attr;
   assign cpl.requester_id = cur_req_dw1.requester_id;

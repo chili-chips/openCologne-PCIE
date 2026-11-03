@@ -602,6 +602,7 @@ module tb_pcie_tl;
     reg [DATA_WIDTH-1:0] t2;
     integer              t_len;
     reg                  t_half;
+    reg                  cpl_lk = 1'b0;
 
     task tx_wait(input integer limit, output reg got);
         integer t;
@@ -632,7 +633,7 @@ module tb_pcie_tl;
                 errors = errors + 1;
                 $display("[%0t] ERROR: no completion for tag %h", $time, tag);
             end else begin
-                if (t0[7:0] != (with_data ? 8'h4A : 8'h0A)) begin
+                if (t0[7:0] != ((with_data ? 8'h4A : 8'h0A) | {7'd0, cpl_lk})) begin
                     errors = errors + 1;
                     $display("[%0t] ERROR: tag %h fmt/type %h", $time, tag, t0[7:0]);
                 end
@@ -1007,7 +1008,9 @@ module tb_pcie_tl;
         tlp_dw[2] = dw_addr(BAR0 + 32'h10);
         tlp_ndw   = 3;
         rx_send;
+        cpl_lk = 1'b1;
         expect_cpl(8'h0C, 3'b001, 1'b0, 32'h0, 12'd4, 7'h10, 16'h0300);
+        cpl_lk = 1'b0;
         tlp_dw[0] = dw0(3'b010, 5'b01100, 3'd0, 1'b0, 1'b0, 2'b00, 10'd1);
         tlp_dw[1] = dw_req(RC_ID, 8'h0D, 4'b0000, 4'b1111);
         tlp_dw[2] = dw_addr(BAR0 + 32'h10);

@@ -23,7 +23,7 @@ fails=0
 
 # the runs that fail today, and why
 declare -A KNOWN=(
-    [rtl-tester]="#24 #26 #38-#40 #42"
+    [rtl-tester]="#24 #26 #38 #40 #42"
     [rtl-serial]="#38"
     [dll-stp]="#24"
     [dll-end]="#24"

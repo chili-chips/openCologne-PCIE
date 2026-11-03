@@ -56,7 +56,7 @@ module cpl_gen
   always_comb begin
     cpl_dw0 = '0;
     cpl_dw0.fmt = cpl.with_data ? TLP_FMT_3DW_DATA : TLP_FMT_3DW;
-    cpl_dw0.tlp_type = TLP_TYPE_CPL;
+    cpl_dw0.tlp_type = cpl.locked ? TLP_TYPE_CPL_LK : TLP_TYPE_CPL;
     cpl_dw0.tc = cpl.tc;
     cpl_dw0.attr = cpl.attr;
     cpl_dw0.length = cpl.with_data ? 10'd1 : 10'd0;

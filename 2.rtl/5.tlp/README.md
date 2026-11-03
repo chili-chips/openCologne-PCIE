@@ -124,7 +124,8 @@ Posted requests and completions go to one queue, non-posted requests to the othe
 | CfgRd0 / CfgWr0 to function 0               | Configuration access, CplD / Cpl with Successful Completion |
 | CfgRd0 / CfgWr0 to another function         | Cpl with Unsupported Request                                |
 | CfgWr0 with poisoned data                   | Not written, Cpl with Unsupported Request                   |
-| CfgRd1 / CfgWr1, IORd / IOWr, MRdLk, AtomicOp | Cpl with Unsupported Request                              |
+| CfgRd1 / CfgWr1, IORd / IOWr, AtomicOp      | Cpl with Unsupported Request                                |
+| MRdLk                                       | CplLk with Unsupported Request                              |
 | MRd that hits BAR0                          | To the SOC                                                  |
 | MRd that misses BAR0                        | Cpl with Unsupported Request                                |
 | MWr that hits BAR0                          | To the SOC                                                  |
@@ -219,7 +220,7 @@ Build products and the waveform go to `$SERDES_BUILD_DIR/tl` (default `~/.cache/
 | 3    | Capability list: PM, PCI Express, Device and Link registers, extended space             |
 | 4    | Memory read with Memory Space disabled, Unsupported Request completion                    |
 | 5    | Memory writes and reads through the SOC, 1 and 4 DWs, 64-bit address                    |
-| 6    | Unsupported requests with completion: BAR miss, other function, Type 1, I/O, MRdLk, AtomicOp, Byte Count and Lower Address |
+| 6    | Unsupported requests with completion: BAR miss, other function, Type 1, I/O, MRdLk (CplLk), AtomicOp, Byte Count and Lower Address |
 | 7    | Posted Unsupported Request, Device Status, ERR_NONFATAL                                 |
 | 8    | Malformed TLPs, ERR_FATAL                                                                |
 | 9    | PME_Turn_Off and PME_TO_Ack, Set_Slot_Power_Limit, discarded and unsupported messages   |
