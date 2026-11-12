@@ -16,12 +16,15 @@
 #           cd eq
 #           equiv_add -try \u_x.ng_cur_state_gold \u_x.ng_q_gate[12]
 #           cd ..
-#   <gold 2.rtl>, <gate 2.rtl>  copies of 2.rtl, with the submodule, e.g.
+#   <gold 2.rtl>, <gate 2.rtl>  copies of 2.rtl, e.g.
 #                               cp -r 2.rtl /tmp/gold   (before the change)
 #   [sed script]                renames gold objects to their gate names, for a
 #                               change that moves logic between modules, e.g.
 #                               's|^u_pcie_top\.u_core\.u_x\.|u_pcie_top.u_core.|'
 #
+# GOLD_SOURCES=<sources.sh> lists the gold tree with an older sources.sh, for a
+# change that moves or renames files (default: this one, for both), e.g.
+#   git show HEAD:4.build/hw_build/sources.sh > /tmp/gold-sources.sh
 # Both versions use the same generated CSR (4.build/csr_build/generated-files)
 # and the same firmware.hex (4.build/sw_build) for the RAM contents.
 #
@@ -59,16 +62,17 @@ cp "$HERE/../sw_build/firmware.hex" .
   printf '(* blackbox *)\nmodule CC_BUFG (input I, output O);\nendmodule\n'
 } > bb.v
 
-files() {  # $1 = 2.rtl dir
-  echo bb.v $(design_rtl "$1" "$CSR" | tr '\n' ' ')
+files() {  # $1 = 2.rtl dir, $2 = the sources.sh that lists it
+  echo bb.v $(. "$2"; design_rtl "$1" "$CSR" | tr '\n' ' ')
 }
+GOLD_SRC=${GOLD_SOURCES:-$HERE/sources.sh}
 BB="t:CC_SERDES t:CC_USR_RSTN t:CC_BUFG"
 PREP="hierarchy -top $TOP; proc; flatten; memory; async2sync"
 
 REN=""
 if [ -n "$MAP" ]; then   # rename gold objects to their gate names (skip names the gold already has)
   cat > names.ys <<EOF
-read_slang -D SYNTHESIS --top $TOP $(files $GOLD)
+read_slang -D SYNTHESIS --top $TOP $(files $GOLD $GOLD_SRC)
 $PREP
 tee -q -o names.txt select -list $TOP/w:* $TOP/c:*
 EOF
@@ -84,11 +88,11 @@ EXTRA=""
 [ -n "${LEQ_EXTRA:-}" ] && EXTRA="script $(cd "$(dirname "$LEQ_EXTRA")" && pwd)/$(basename "$LEQ_EXTRA")"
 
 cat > eq.ys <<EOF
-read_slang -D SYNTHESIS --top $TOP $(files $GOLD)
+read_slang -D SYNTHESIS --top $TOP $(files $GOLD $GOLD_SRC)
 $PREP
 $REN
 expose -evert $BB; opt_clean; rename $TOP gold; design -stash gold
-read_slang -D SYNTHESIS --top $TOP $(files $GATE)
+read_slang -D SYNTHESIS --top $TOP $(files $GATE $HERE/sources.sh)
 $PREP
 expose -evert $BB; opt_clean; rename $TOP gate; design -stash gate
 design -copy-from gold -as gold gold

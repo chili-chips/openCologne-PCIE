@@ -43,150 +43,74 @@
 //     pipe <-> MAC <-> DLL <-- dll --> TL <-- trn --> trn_bridge <-> s_axis_tx / m_axis_rx
 //                                       \--- cfg ---------------------------------> SOC
 //
-//   - MAC (ccfpga_LTSSM_logic, Cologne Chip): the LTSSM trains the link,
+//   - MAC (ccfpga_mac_top, Cologne Chip): the LTSSM trains the link,
 //     then sends and receives the ordered sets and scrambled data on PIPE.
-//   - DLL (dll_logic, Cologne Chip): sequence numbers and LCRC, Ack/Nak and
+//   - DLL (dll_top): sequence numbers and LCRC, Ack/Nak and
 //     replay, flow-control DLLPs; it starts once the LTSSM is in L0.
-//   - TL (pcie_tl): flow control, the configuration space, and the TLPs to
-//     and from the SOC, on the TRN bus of the PCIE_2_1 hard block (trn_if).
+//   - TL (tl_top): flow control, the configuration space, and the TLPs to
+//     and from the SOC, on trn_tx_if / trn_rx_if (derived from the TRN bus
+//     of the PCIE_2_1 hard block).
 //   - trn_bridge (openPCIE): AXI-Stream to and from TRN, and the SOC's TX
-//     throttle. There is no power management: the link state it sees is L0.
+//     throttle.
 //
 //   The data link is up (dll_up, UG477 trn_lnk_up) when the DLL is in
-//   DL_Active. core_rst_n, the reset of the TL, trn_bridge and the SOC,
-//   follows it one PCLK later; a link drop or mac_rst_n asserts it again.
+//   DL_Active. core_rst_n, the reset of trn_bridge and the SOC, follows it
+//   one PCLK later; a link drop or mac_rst_n asserts it again. The TL runs on
+//   mac_rst_n: it resets its parts on DL_Down itself, and takes the link
+//   partner's InitFC credit limits in DL_Init (3.2.1).
 //==========================================================================
 
 module pcie_core
-  import pcie_pkg::*;
-#(
-    parameter int DATA_BYTES = 8
-) (
+  import pipe_pkg::*;
+  import tl_pkg::*;
+  import trn_pkg::*;
+  import dll_pkg::*;
+(
     input logic rst_pipe_n,  // PIPE Reset#
     input logic mac_rst_n,   // PCLK: MAC and DLL
 
     pipe_if.mac pipe,
 
-    output logic dll_up,      // PCLK: data link up (DL_Active)
-    output logic core_rst_n,  // PCLK: TL, trn_bridge and the SOC, follows dll_up
+    output logic dll_up,     // PCLK: data link up (DL_Active)
+    output logic core_rst_n, // PCLK: trn_bridge and the SOC, follows dll_up
 
-    axis_if.slave  s_axis_tx,  // TLPs from the SOC (tuser: pcie_tx_tuser_t)
-    axis_if.master m_axis_rx,  // TLPs to the SOC   (tuser: pcie_rx_tuser_t)
+    axis_if.slave  s_axis_tx,  // TLPs from the SOC (tuser: tx_tuser_t)
+    axis_if.master m_axis_rx,  // TLPs to the SOC   (tuser: rx_tuser_t)
 
     cfg_if.core cfg  // status sideband to the SOC
 );
 
-  localparam logic [4:0] LTSSM_L0  = 5'b01010;        // ccfpga_LTSSM_fsm
-  localparam logic [2:0] DL_ACTIVE = 3'b011;          // dll_fsm
-  localparam logic [2:0] PM_L0     = 3'b000;          // UG477 cfg_pcie_link_state
 
-  localparam int         DATA_W    = DATA_BYTES * 8;
+  mac_if mac ();
+  dll_if dll ();
 
-  // The TL's receive buffers, advertised by the DLL's InitFC (Cpl infinite)
-  localparam logic [ 7:0] INIT_PH  = 8'd8;
-  localparam logic [11:0] INIT_PD  = 12'd32;
-  localparam logic [ 7:0] INIT_NPH = 8'd8;
-  localparam logic [11:0] INIT_NPD = 12'd8;
-
-  logic                  mac_link_up;
-  logic                  dll_link_up;  // L0 reached, held through Recovery (#35)
-  logic [           4:0] ltssm_state;
-  logic [    DATA_W-1:0] mac_rx_data;
-  logic [DATA_BYTES-1:0] mac_rx_datak;
-  logic [    DATA_W-1:0] dll_tx_data;
-  logic [DATA_BYTES-1:0] dll_tx_datak;
-
-  dll_if #(.DATA_BYTES(DATA_BYTES)) dll ();
-
-  trn_if #(
-      .DATA_W(TRN_DATA_W),
-      .REM_W (TRN_REM_W)
-  ) trn ();
+  trn_tx_if trn_tx ();
+  trn_rx_if trn_rx ();
 
   // The MAC drives PIPE Reset#
   assign pipe.reset_n = rst_pipe_n;
 
-  ccfpga_LTSSM_logic #(
-      .DATA_BYTES   (DATA_BYTES),
-      .PATTERN_WIDTH(128)
-  ) u_mac (
-      .i_Reset_n     (mac_rst_n),
-      .i_PCLK        (pipe.pclk),
-      .i_RxValid     (pipe.rx_valid),
-      .i_PhyStatus   (pipe.phy_status),
-      .i_RxStatus    (pipe.rx_status),
-      .i_RxElecIdle  (pipe.rx_elec_idle),
-      .i_RxData      (pipe.rx_data),
-      .i_RxDataK     (pipe.rx_datak),
-      .i_TxData      (dll_tx_data),
-      .i_TxDataK     (dll_tx_datak),
-      .o_PowerDown   (pipe.power_down),
-      .o_TxDetectRx  (pipe.tx_detect_rx),
-      .o_TxElecIdle  (pipe.tx_elec_idle),
-      .o_TxCompliance(pipe.tx_compliance),
-      .o_RxPolarity  (pipe.rx_polarity),
-      .o_TxData      (pipe.tx_data),
-      .o_TxDataK     (pipe.tx_datak),
-      .o_RxData      (mac_rx_data),
-      .o_RxDataK     (mac_rx_datak),
-      .o_LinkUp      (mac_link_up),
-      .o_LTSSM_State (ltssm_state)
+  ccfpga_mac_top u_mac (
+      .i_reset_n(mac_rst_n),
+      .pipe     (pipe),
+      .mac      (mac)
   );
 
-  // The DLL's link up: set on reaching L0, held through Recovery, cleared
-  // when the MAC drops o_LinkUp (back to Detect). The MAC also raises
-  // o_LinkUp in PRE_L0; the DLL starts only in L0
-  always_ff @(posedge pipe.pclk or negedge mac_rst_n) begin
-    if (!mac_rst_n) begin
-      dll_link_up <= 1'b0;
-    end
-    else begin
-      dll_link_up <= mac_link_up && (dll_link_up || (ltssm_state == LTSSM_L0));
-    end
-  end
+  logic dll_reset;  // the DLL resets active high
+  assign dll_reset = ~mac_rst_n;
 
-  dll_logic #(
-      .DATA_BYTES                (DATA_BYTES),
-      .NUMBER_OF_VIRTUAL_CHANNELS(1),
-      .PATTERN_WIDTH             (64),
-      .INIT_PH                   (INIT_PH),
-      .INIT_PD                   (INIT_PD),
-      .INIT_NPH                  (INIT_NPH),
-      .INIT_NPD                  (INIT_NPD)
+  dll_top #(
+      .NUMBER_OF_VIRTUAL_CHANNELS(1)
   ) u_dll (
-      .phy_clk            (pipe.pclk),
-      .phy_reset          (~mac_rst_n),
-      .phy_linkup         (dll_link_up),
-      .phy_rx_data        (mac_rx_data),
-      .phy_rx_data_k      (mac_rx_datak),                              // K flags for framing (#9)
-      .tl_tx_data         (dll.tx_data),
-      .tl_tx_tlp_valid    (dll.tx_tlp_valid),
-      .tl_tx_tlp_first    (dll.tx_tlp_first),
-      .tl_tx_tlp_last     (dll.tx_tlp_last),
-      .tl_tx_tlp_last_half(dll.tx_tlp_last_half),
-      .tl_tx_tlp_ready    (dll.tx_tlp_ready),
-      .tl_tx_hdr_credit   (dll.tx_hdr_credit),
-      .tl_tx_data_credit  (dll.tx_data_credit),
-      .tl_tx_update_type  (dll.tx_update_type),
-      .tl_tx_packet_type  (dll.tx_packet_type),
-      .tl_tx_dllp_valid   (dll.tx_dllp_valid),
-      .phy_tx_data        (dll_tx_data),
-      .phy_tx_data_k      (dll_tx_datak),
-      .tl_rx_data         (dll.rx_data),
-      .tl_rx_tlp_valid    (dll.rx_tlp_valid),
-      .tl_rx_tlp_first    (dll.rx_tlp_first),
-      .tl_rx_tlp_last     (dll.rx_tlp_last),
-      .tl_rx_hdr_credit   (dll.rx_hdr_credit),
-      .tl_rx_data_credit  (dll.rx_data_credit),
-      .tl_rx_update_type  (dll.rx_update_type),
-      .tl_rx_packet_type  (dll.rx_packet_type),
-      .tl_rx_dllp_valid   (dll.rx_dllp_valid),
-      .o_DL_State         (dll.dl_state)
+      .phy_clk  (pipe.pclk),
+      .phy_reset(dll_reset),
+      .mac      (mac),
+      .tl       (dll)
   );
 
   assign dll_up = (dll.dl_state == DL_ACTIVE);
 
-  // core_rst_n: the TL, trn_bridge and SOC reset, follows the data link
+  // core_rst_n: the trn_bridge and SOC reset, follows the data link
   always_ff @(posedge pipe.pclk or negedge mac_rst_n) begin
     if (!mac_rst_n) begin
       core_rst_n <= 1'b0;
@@ -196,26 +120,22 @@ module pcie_core
     end
   end
 
-  pcie_tl #(
-      .INIT_PH (INIT_PH),
-      .INIT_PD (INIT_PD),
-      .INIT_NPH(INIT_NPH),
-      .INIT_NPD(INIT_NPD)
-  ) u_tl (
-      .clk  (pipe.pclk),
-      .rst_n(core_rst_n),
-      .dll  (dll),
-      .trn  (trn),
-      .cfg  (cfg)
+  tl_top u_tl (
+      .clk   (pipe.pclk),
+      .rst_n (mac_rst_n),
+      .dll   (dll),
+      .trn_tx(trn_tx),
+      .trn_rx(trn_rx),
+      .cfg   (cfg)
   );
 
   trn_bridge u_trn_bridge (
-      .s_axis_tx          (s_axis_tx),
-      .m_axis_rx          (m_axis_rx),
-      .trn                (trn),
-      .cfg_pcie_link_state(PM_L0),
-      .clk62m5            (pipe.pclk),
-      .core_rst_n         (core_rst_n)
+      .s_axis_tx (s_axis_tx),
+      .m_axis_rx (m_axis_rx),
+      .trn_tx    (trn_tx),
+      .trn_rx    (trn_rx),
+      .clk       (pipe.pclk),
+      .core_rst_n(core_rst_n)
   );
 
 endmodule

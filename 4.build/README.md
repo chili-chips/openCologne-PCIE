@@ -19,7 +19,7 @@ We aim for Linux-native tools throughout, and accept WSL for convenience and inc
 | 2. SW | [`sw_build`](./sw_build) | `firmware.elf`, `firmware.bin`, `firmware.hex` |
 | 3. HW | [`hw_build`](./hw_build):<br>`run-lint.sh`<br>`run-format.sh`<br>`run-leq.sh`<br>`run-synth.sh`<br>`run-pnr.sh` | lint, format and equivalence reports, the GateMate netlist (`top.json`); the placed and routed design and the bitstream (`top.bit`), on mock pins for the GateMate A1 EVB (`GateMateA1-EVB.ccf`) until the board exists |
 
-eduBOS5 is a copy of openPCIE's, in [`2.rtl/6.soc/CPU.eduBOS5`](../2.rtl/6.soc/CPU.eduBOS5).
+eduBOS5 is a copy of openPCIE's, in [`2.rtl/7.soc/CPU.eduBOS5`](../2.rtl/7.soc/CPU.eduBOS5).
 
 ### Build Structure
 
@@ -36,7 +36,7 @@ The versions this repo has been run with so far. "Runs" means the step completes
 | GCC | 15.2 | co-sim C/C++: VProc, pcieVHost, the RC model; `-O0`/`-O2`, UBSan, ASan | builds |
 | Yosys | 0.70, with `read_slang` | 8b/10b proofs, standalone SerDes test synthesis, `run-synth.sh`, `run-lint.sh`, `run-leq.sh` | runs |
 | Verible | v0.0-4296-g0f262651 | `run-lint.sh`, `run-format.sh` | runs |
-| Icarus Verilog | 13.0 | PHY and DLL-over-PHY simulations, co-sim (`make SIM=icarus run`) | runs |
+| Icarus Verilog | 14.0 (devel, OSS CAD Suite 2026-11-02) | PHY and DLL-over-PHY simulations, co-sim (`make SIM=icarus run`); 14 or later for the PIPE, MAC and DLL interface ports | runs |
 | Verilator | 5.052 | co-sim (`make run`, default), SOC lint; its FST writer needs `liblz4-dev` | runs, checks |
 | OSS CAD Suite | 2026-11-02 | Cologne Chip's toolchain package ([UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf)): nextpnr-himbaechel `nextpnr-0.11.1-85-ga2c64799`, GateMate, for `run-pnr.sh` (`NEXTPNR=`); its Yosys is a development build, not used | places and routes; timing fails |
 | gmpack | OSS CAD Suite, or Project Peppercorn v1.14 | bitstream (`run-pnr.sh`) | not yet run: P&R stops on timing |
@@ -61,8 +61,8 @@ Out of 40,960 CPE_LT and CPE_FF, and 64 RAM_HALF.
 | Block | CPE_LT | CPE_FF | RAM_HALF |
 |---|---|---|---|
 | SOC (`riscv_pcie_soc`: eduBOS5, RAM, CSR) | 5,999 (27%) | 2,091 (30%) | 12 |
-| TL (`pcie_tl`) | 4,588 (20%) | 1,789 (26%) | 6 |
-| DLL (`dll_logic`) | 7,286 (32%) | 1,695 (24%) | 4 |
+| TL (`tl_top`) | 4,588 (20%) | 1,789 (26%) | 6 |
+| DLL (`dll_top`) | 7,286 (32%) | 1,695 (24%) | 4 |
 | Other (MAC, PHY, `trn_bridge`, clocks and resets) | 4,597 (20%) | 1,365 (20%) | 0 |
 | Total | 22,470 | 6,940 | 22 |
 

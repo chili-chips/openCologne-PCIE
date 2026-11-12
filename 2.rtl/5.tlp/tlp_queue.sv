@@ -1,16 +1,56 @@
+// SPDX-FileCopyrightText: 2026 Chili.CHIPS
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
+//==========================================================================
+// openCologne-PCIE * NLnet-sponsored open-source implementation
+//--------------------------------------------------------------------------
+//                   Copyright (C) 2026 Chili.CHIPS
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//
+// 1. Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+// contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+// IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+// PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+//              https://opensource.org/license/bsd-3-clause
+//==========================================================================
+
 module tlp_queue
   import tl_pkg::*;
 #(
     parameter int ADDR_W = 7
 ) (
-    input  logic    clk,
-    input  logic    rst_n,
-    input  tl_qwr_t wr,
-    output logic    wr_full,
-    output logic    commit,
-    input  logic    pop,
-    output tl_qrd_t rd,
-    output logic    done
+    input  logic                 clk,
+    input  logic                 rst_n,
+    input  tl_qwr_t              wr,
+    output logic                 wr_full,
+    output logic    [ADDR_W-1:0] free,     // words the RAM can still take
+    output logic                 commit,
+    input  logic                 pop,
+    output tl_qrd_t              rd,
+    output logic                 done
 );
 
   localparam int DEPTH = 1 << ADDR_W;
@@ -36,17 +76,18 @@ module tlp_queue
   logic                   fetch;
 
   assign wr_ptr_next = wr_ptr + 1'b1;
-  assign write       = wr.en && !wr.drop && !wr_full;
-  assign commit      = write && wr.word.last;
-  assign take        = pop && out0_valid;
-  assign done        = take && out0.last;
+  assign write       = wr.en & !wr.drop & !wr_full;
+  assign commit      = write & wr.word.last;
+  assign take        = pop & out0_valid;
+  assign done        = take & out0.last;
 
   assign held        = {1'b0, out0_valid} + {1'b0, out1_valid} + {1'b0, ram_q_valid} - {1'b0, take};
-  assign fetch       = (fetch_ptr != commit_ptr) && (held < 2'd2);
+  assign fetch       = (fetch_ptr != commit_ptr) & (held < 2'd2);
 
   assign wr_full     = (wr_ptr_next == fetch_ptr);
+  assign free        = fetch_ptr - wr_ptr - 1'b1;
   assign rd.valid    = out0_valid;
-  assign rd.avail    = (tlp_cnt != '0) && out0_valid && (out1_valid || out0.last);
+  assign rd.avail    = (tlp_cnt != '0) & out0_valid & (out1_valid | out0.last);
   assign rd.head     = out0;
   assign rd.next     = out1.data;
 
@@ -139,3 +180,10 @@ module tlp_queue
   end
 
 endmodule
+
+// -----------------------------------------------------------------------------
+// Project:     openCologne-PCIE
+// Description: NLnet-sponsored open-source implementation
+// Version:     1.0
+// Date:        Oct 21, 2026
+// -----------------------------------------------------------------------------

@@ -15,8 +15,8 @@
 #ifndef A7RC_EP_H
 #define A7RC_EP_H
 
-#define EP_VENDOR_ID          0x1234
-#define EP_DEVICE_ID          0x0001
+#define EP_VENDOR_ID          0xCC00  // = PCIE_VENDOR_ID in 2.rtl/5.tlp/tl_pkg.sv
+#define EP_DEVICE_ID          0xCC00  // = PCIE_DEVICE_ID in 2.rtl/5.tlp/tl_pkg.sv
 
 // BAR sizing reads: BAR0 4 KB, 32-bit, non-prefetchable; BAR1-5 not implemented
 static const uint32_t ep_bar_size[FW_NUM_BARS] = {0xfffff000, 0x00000000, 0x00000000,

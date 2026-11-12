@@ -5,11 +5,11 @@
 #
 # PHY block-level simulation (tb_phy.sv), Icarus Verilog:
 #
-#   pipe16 / pipe64   the PIPE layer of gatemate-pipe on the SerDes, 16- or
-#                     64-bit PIPE: TS1 ordered sets, test data, error detection
+#   pipe64            the PIPE layer of gatemate-pipe on the SerDes, 64-bit PIPE
+#                     (DATA_BYTES in pipe_pkg): TS1 ordered sets, test data, error detection
 #   equiv             the opensource SerDes BFM alone, looped back (self-check)
 #
-# usage:  bash run-phy.sh pipe16|pipe64 [--vendor] [--dump]
+# usage:  bash run-phy.sh pipe64 [--vendor] [--dump]
 #         bash run-phy.sh equiv [--ref] [--cross] [--dump] [--keep]
 #
 #   --vendor  pipe: the vendor SerDes model instead of the open one
@@ -26,11 +26,16 @@ set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 MODEL_DIR="${REPO_ROOT}/2.rtl/1.phy/2.serdes-model"
-PIPE_DIR="${REPO_ROOT}/2.rtl/2.pipe/pipe_src/src/pipe_src"
+PIPE_DIR="${REPO_ROOT}/2.rtl/2.pipe"
 
 . "${HERE}/serdes_nda_env.sh"
 
 IVL=${IVL:-iverilog}
+# Icarus 14 or later: the PIPE, MAC and DLL take SystemVerilog interface ports
+case "$("${IVL}" -V 2>&1 | head -1)" in
+  *"version 1"[4-9]*|*"version "[2-9][0-9]*) ;;
+  *) echo "$(basename "$0"): Icarus 14 or later needed (interface ports), e.g. the OSS CAD Suite's; set IVL" >&2; exit 2 ;;
+esac
 VVP=${VVP:-vvp}
 
 TEST=${1:-}
@@ -52,7 +57,6 @@ for arg in "$@"; do
 done
 
 case "${TEST}" in
-  pipe16) BYTES=2 ;;
   pipe64) BYTES=8 ;;
   equiv)  ;;
   *) sed -n '/^# usage/,/^#   --keep/p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
@@ -95,7 +99,7 @@ if [ "${TEST}" = equiv ]; then
     echo "==> vendor model NOT compiled in; running behavioural self-check only"
   fi
   echo "==> compiling"
-  ${IVL} -g2012 -gspecify -Ttyp ${DEFS} -I "${MODEL_DIR}" -o "${BUILD}/equiv.vvp" \
+  ${IVL} -g2012 -c <(echo +timescale+1ns/1ps) -gspecify -Ttyp ${DEFS} -I "${MODEL_DIR}" -o "${BUILD}/equiv.vvp" \
          ${OPEN_SRC} ${REF_SRC} "${HERE}/tb_phy.sv"
   echo "==> running"
   cd "${BUILD}"
@@ -116,10 +120,10 @@ else
   SERDES_SRC="${OPEN_SRC}"
   SERDES_INC="${MODEL_DIR}"
 fi
-PIPE_SRC=$(find "${PIPE_DIR}" -type f \( -name '*.v' -o -name '*.sv' \) ! -name 'ccfpga_pipe_wrapper.v')
+PIPE_SRC="${PIPE_DIR}/pipe_pkg.sv $(find "${PIPE_DIR}" -maxdepth 1 -type f \( -name '*.v' -o -name '*.sv' \) ! -name pipe_pkg.sv)"
 
 echo "==> PIPE test, $((BYTES * 8))-bit PIPE, $([ "${VENDOR}" = 1 ] && echo vendor || echo open) SerDes model"
-${IVL} -g2012 -gspecify -Ttyp -Ptb_phy.DATA_BYTES=${BYTES} -DPIPE ${DUMP} -I"${SERDES_INC}" \
+${IVL} -g2012 -c <(echo +timescale+1ns/1ps) -gspecify -Ttyp -DPIPE ${DUMP} -I"${SERDES_INC}" \
        -o "${BUILD}/sim/vlog_sim.vvp" ${SERDES_SRC} ${PIPE_SRC} "${HERE}/tb_phy.sv"
 cd "${BUILD}"
 ${VVP} -N sim/vlog_sim.vvp -fst

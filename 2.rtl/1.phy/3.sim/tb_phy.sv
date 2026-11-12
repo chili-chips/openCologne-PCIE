@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2026 Chili.CHIPS
+// SPDX-FileCopyrightText: Cologne Chip AG and RacyICs GmbH (original PIPE testbench)
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
 //==========================================================================
 // openCologne-PCIE * PHY block-level testbench: PIPE + SerDes
 //--------------------------------------------------------------------------
@@ -5,7 +10,7 @@
 //
 //   PIPE test (default)  the PIPE layer of gatemate-pipe on the SerDes:
 //                        TS1 ordered sets, test data, error detection;
-//                        DATA_BYTES = 2 (16-bit) or 8 (64-bit) PIPE
+//                        DATA_BYTES (pipe_pkg) wide PIPE
 //   TB_PHY_EQUIV         the opensource SerDes BFM alone, looped back, as a
 //                        self-check; with HAVE_VENDOR_SERDES also the vendor
 //                        model side by side, CROSS_LINK links the two
@@ -29,12 +34,7 @@
 //
 //                > The PIPE test needs the PIPE macro (run-phy.sh sets it).
 //
-//                > For PIPE test define Datapath width through Parameter DATA_BYTES.
-//
-//                8 > 64 Bit Datapath (PIPE)
-//                4 > 32 Bit Datapath (PIPE)
-//                2 > 16 Bit Datapath (PIPE)
-//                1 >  8 Bit Datapath (PIPE)
+//                > The PIPE width is DATA_BYTES in pipe_pkg.
 //
 // Abreviations : [i_] > input,
 //                [o_] > output,
@@ -687,7 +687,7 @@ module tb_phy;
 
    initial begin : bhv_progress
       @(posedge bhv_tx_resetdone);
-      $display("[%0t] BHV: tx_resetdone asserted", $time);
+      $display("[%0t] BHV: tx_reset_done asserted", $time);
       @(posedge bhv_aligned);
       $display("[%0t] BHV: rx_byte_is_aligned asserted", $time);
    end
@@ -735,7 +735,7 @@ module tb_phy;
 
    initial begin : ref_progress
       @(posedge ref_tx_resetdone);
-      $display("[%0t] REF: tx_resetdone asserted", $time);
+      $display("[%0t] REF: tx_reset_done asserted", $time);
       @(posedge ref_aligned);
       $display("[%0t] REF: rx_byte_is_aligned asserted", $time);
    end
@@ -921,47 +921,46 @@ endmodule
 
 `else
 
-module tb_phy ();
+module tb_phy;
+  import pipe_pkg::*;
 
 `ifdef PIPE
 
    // PIPE Parameter
 
-   parameter        DATA_BYTES = 8;
-   parameter        DATA_WIDTH = DATA_BYTES*8;
 
    // Signals
 
    // PIPE Interface
-   logic                  o_PCLK;               // PCLK (user side)
-   logic                   i_Reset;              // Async. Reset for Transceiver (Tx/Rx)
-   logic            [ 1:0] i_PowerDown;          // Power States (P0 - P2)
-   logic                   i_TxDetectRx;         // Receiver Detection (P0) or Loopback (P1)
-   logic                   i_TxElecIdle;         // Tx Electrical Idle, Valid Data (P0) or Beacon (P2)
-   logic  [DATA_BYTES-1:0] i_TxCompliance;       // Tx negative Disparity LSB (Compliance Pattern)
+   logic                  o_pclk;               // PCLK (user side)
+   logic                   i_reset;              // Async. Reset for Transceiver (Tx/Rx)
+   logic            [ 1:0] i_power_down;          // Power States (P0 - P2)
+   logic                   i_tx_detect_rx;         // Receiver Detection (P0) or Loopback (P1)
+   logic                   i_tx_elec_idle;         // Tx Electrical Idle, Valid Data (P0) or Beacon (P2)
+   pipe_flags_t i_tx_compliance;       // Tx negative Disparity LSB (Compliance Pattern)
    //  wire                  i_TxSwing;        // Tx Voltage Swing Level [Optional by Spec]
-   logic                   i_RxPolarity;         // Rx Polarity Inversion
-   logic                  o_RxValid;            // Symbol Lock and Valid Data on RxData and RxDataK
-   logic                  o_PhyStatus;          // Status of several PHY functions (Transition)
-   logic                  o_RxElecIdle;         // Rx Detection of Electrical Idle
-   logic           [ 2:0] o_RxStatus;           // Receiver Status and Received Data Status
-   logic  [DATA_WIDTH-1:0] i_TxData;             // Tx Data
-   logic  [DATA_BYTES-1:0] i_TxDataK;            // Tx K Data
-   logic [DATA_WIDTH-1:0] o_RxData;             // Rx Data
-   logic [DATA_BYTES-1:0] o_RxDataK;            // Rx K Data
+   logic                   i_rx_polarity;         // Rx Polarity Inversion
+   logic                  o_rx_valid;            // Symbol Lock and Valid Data on RxData and RxDataK
+   logic                  o_phy_status;          // Status of several PHY functions (Transition)
+   logic                  o_rx_elec_idle;         // Rx Detection of Electrical Idle
+   logic           [ 2:0] o_rx_status;           // Receiver Status and Received Data Status
+   pipe_data_t  i_tx_data;             // Tx Data
+   pipe_flags_t i_tx_data_k;            // Tx K Data
+   pipe_data_t  o_rx_data;             // Rx Data
+   pipe_flags_t o_rx_data_k;            // Rx K Data
 
    // Support Interface
 
-   logic                  o_tx_buf_error;       // Tx Buffer Error
+   logic                  o_tx_buf_err;       // Tx Buffer Error
    logic                  o_clk_core_rx_rec;    // Rx Recovered Clock
    logic                   i_rx_buf_reset;       // Rx Buffer Reset
    logic                  o_rx_buf_err;         // Rx Buffer Error
-   logic           [ 3:0] o_fsm_state_pipe;     // State of PIPE FSM
-   logic           [ 1:0] o_fsm_state_align;    // State of Align FSM
+   pipe_fsm_state_e o_fsm_state_pipe;     // State of PIPE FSM
+   align_state_e o_fsm_state_align;    // State of Align FSM
 
-   logic [DATA_BYTES-1:0] o_RxDataComma;        // Rx Byte Comma Indication
-   logic [DATA_BYTES-1:0] o_RxDataDispErr;      // Rx Byte Disparity Error Indication
-   logic [DATA_BYTES-1:0] o_RxDataDecErr;       // Rx Byte Decode Error Indication
+   pipe_flags_t o_rx_comma;        // Rx Byte Comma Indication
+   pipe_flags_t o_rx_disp_err;      // Rx Byte Disparity Error Indication
+   pipe_flags_t o_rx_dec_err;       // Rx Byte Decode Error Indication
 
    // Used by PIPE Logic (SerDes)
 
@@ -998,7 +997,7 @@ module tb_phy ();
    logic  [2:0] rx_prbs_sel;
    logic        rx_prbs_cnt_reset;
    logic        rx_powerdown_n;
-   logic        rx_en_ei_detector;
+   logic        rx_ei_detect_en;
    logic        rx_comma_detect_en;
    logic        rx_slide;
    logic        rx_polarity;
@@ -1008,7 +1007,7 @@ module tb_phy ();
    logic        rx_pcomma_align;
 
    logic        tx_buf_err;
-   logic        tx_resetdone;
+   logic        tx_reset_done;
    logic        rx_detect_done;
    logic        rx_present;
    logic        rx_prbs_err;
@@ -1021,7 +1020,7 @@ module tb_phy ();
    logic        rx_byte_is_aligned;
    logic        rx_byte_realign;
    logic        rx_resetdone;
-   logic        rx_ei_en;
+   logic        rx_elec_idle;
 
 `endif
 
@@ -1386,7 +1385,7 @@ module tb_phy ();
       .tx_char_dispmode_i    ( tx_char_dispmode   ),
       .tx_char_dispval_i     ( tx_char_dispval    ),
       .tx_buf_err_o          ( tx_buf_err         ),
-      .tx_resetdone_o        ( tx_resetdone       ),
+      .tx_resetdone_o        ( tx_reset_done      ),
       .rx_detect_done_o      ( rx_detect_done     ),
       .rx_present_o          ( rx_present         ),
 
@@ -1401,7 +1400,7 @@ module tb_phy ();
       .rx_prbs_sel_i         ( rx_prbs_sel        ),
       .rx_prbs_cnt_reset_i   ( rx_prbs_cnt_reset  ),
       .rx_powerdown_n_i      ( rx_powerdown_n     ),
-      .rx_en_ei_detector_i   ( rx_en_ei_detector  ),
+      .rx_en_ei_detector_i   ( rx_ei_detect_en    ),
       .rx_comma_detect_en_i  ( rx_comma_detect_en ),
       .rx_slide_i            ( rx_slide           ),
       .rx_polarity_i         ( rx_polarity        ),
@@ -1419,51 +1418,58 @@ module tb_phy ();
       .rx_byte_is_aligned_o  ( rx_byte_is_aligned ),
       .rx_byte_realign_o     ( rx_byte_realign    ),
       .rx_resetdone_o        ( rx_resetdone       ),
-      .rx_ei_en_o            ( rx_ei_en           )
+      .rx_ei_en_o            ( rx_elec_idle       )
       );
 
 `ifdef PIPE
 
    // PIPE Logic Instantiation
-   ccfpga_pipe_logic #(
-      .DATA_BYTES ( DATA_BYTES )
-   )
-   pipe_logic_inst ( 
-      .o_PCLK               ( o_PCLK             ),
+   pipe_if pipe ();
+
+   // the PIPE takes the SerDes symbols as structs; the BFM keeps flat ports
+
+   serdes_tx_t pipe_tx;
+
+   serdes_rx_t pipe_rx;
+
+   assign tx_data          = pipe_tx.data;
+
+   assign tx_char_is_k     = pipe_tx.kcode;
+
+   assign tx_char_dispmode = pipe_tx.dispmode;
+
+   assign pipe_rx.data     = rx_data;
+
+   assign pipe_rx.kcode    = rx_char_is_k;
+
+   assign pipe_rx.comma    = rx_char_is_comma;
+
+   assign pipe_rx.disp_err = rx_disp_err;
+
+   assign pipe_rx.dec_err  = rx_not_in_table;
+
+
+   ccfpga_pipe_top u_pipe_logic (
+      .pipe (pipe),
       .o_tx_clk             ( clk_core_tx        ),
-      .i_Reset              ( i_Reset            ),
-      .i_PowerDown          ( i_PowerDown        ),
-      .i_TxDetectRx         ( i_TxDetectRx       ),
-      .i_TxElecIdle         ( i_TxElecIdle       ),
-      .i_TxCompliance       ( i_TxCompliance     ), 
       //.i_TxSwing          ( i_TxSwing          ),
-      .i_RxPolarity         ( i_RxPolarity       ),
-      .o_RxValid            ( o_RxValid          ),
-      .o_PhyStatus          ( o_PhyStatus        ),
-      .o_RxElecIdle         ( o_RxElecIdle       ),
-      .o_RxStatus           ( o_RxStatus         ),
-      .i_TxData             ( i_TxData           ),
-      .i_TxDataK            ( i_TxDataK          ),
-      .o_RxData             ( o_RxData           ),
-      .o_RxDataK            ( o_RxDataK          ),
-      .o_tx_buf_err         ( o_tx_buf_error     ),
+      .o_tx_buf_err         ( o_tx_buf_err       ),
       .o_clk_core_rx_rec    ( o_clk_core_rx_rec  ),
       .i_rx_buf_reset       ( i_rx_buf_reset     ),
       .o_rx_buf_err         ( o_rx_buf_err       ),
       .o_fsm_state_pipe     ( o_fsm_state_pipe   ),
       .o_fsm_state_align    ( o_fsm_state_align  ),
-      .o_RxDataComma        ( o_RxDataComma      ),
-      .o_RxDataDispErr      ( o_RxDataDispErr    ),
-      .o_RxDataDecErr       ( o_RxDataDecErr     ),
+      .o_rx_comma           ( o_rx_comma         ),
+      .o_rx_disp_err        ( o_rx_disp_err      ),
+      .o_rx_dec_err         ( o_rx_dec_err       ),
       .i_clk_core_pll       ( clk_core_pll       ),
       .i_clk_core_rx_rec    ( clk_core_rx_rec    ),
       .o_clk_core_tx        (                    ),
       .o_clk_core_rx        (                    ),
       .o_pll_reset          ( pll_reset          ),
       .o_tx_reset           ( tx_reset           ),
-      .i_tx_reset_done      ( tx_resetdone       ),
+      .i_tx_reset_done      ( tx_reset_done      ),
       .o_rx_reset           ( rx_reset           ),
-      .i_rx_reset_done      ( rx_resetdone       ),
       .o_tx_pcs_reset       ( tx_pcs_reset       ),
       .o_tx_pma_reset       ( tx_pma_reset       ),
       .o_rx_pcs_reset       ( rx_pcs_reset       ),
@@ -1480,9 +1486,7 @@ module tb_phy ();
       .o_rx_buf_reset       ( rx_buf_reset       ),
       .i_rx_buf_err         ( rx_buf_err         ),
       .i_tx_buf_err         ( tx_buf_err         ),
-      .o_tx_data            ( tx_data            ),
-      .o_tx_char_is_k       ( tx_char_is_k       ),
-      .o_tx_char_dispmode   ( tx_char_dispmode   ),
+      .o_tx                 ( pipe_tx            ),
       .o_tx_char_dispval    ( tx_char_dispval    ),
       .o_tx_8b10b_en        ( tx_8b10b_en        ),
       .o_tx_8b10b_bypass    ( tx_8b10b_bypass    ),
@@ -1491,23 +1495,33 @@ module tb_phy ();
       .o_tx_detect_rx       ( tx_detect_rx       ),
       .i_rx_detect_done     ( rx_detect_done     ),
       .i_rx_present         ( rx_present         ),
-      .i_rx_data            ( rx_data            ),
-      .i_rx_char_is_k       ( rx_char_is_k       ),
-      .i_rx_char_is_comma   ( rx_char_is_comma   ),
-      .i_rx_disp_err        ( rx_disp_err        ),
-      .i_rx_not_in_table    ( rx_not_in_table    ),
+      .i_rx                 ( pipe_rx            ),
       .o_rx_8b10b_en        ( rx_8b10b_en        ),
       .o_rx_8b10b_bypass    ( rx_8b10b_bypass    ),
       .i_rx_byte_is_aligned ( rx_byte_is_aligned ),
-      .i_rx_byte_realign    ( rx_byte_realign    ),
       .o_rx_mcomma_align    ( rx_mcomma_align    ),
       .o_rx_pcomma_align    ( rx_pcomma_align    ),
       .o_rx_comma_detect_en ( rx_comma_detect_en ),
       .o_rx_slide           ( rx_slide           ),
       .o_rx_polarity        ( rx_polarity        ),
-      .o_rx_en_ei_detector  ( rx_en_ei_detector  ),
-      .i_rx_ei_en           ( rx_ei_en           )
+      .o_rx_ei_detect_en    ( rx_ei_detect_en    ),
+      .i_rx_elec_idle       ( rx_elec_idle       )
       );
+   assign o_pclk = pipe.pclk;
+   assign pipe.reset_n = i_reset;
+   assign pipe.power_down = power_state_e'(i_power_down);
+   assign pipe.tx_detect_rx = i_tx_detect_rx;
+   assign pipe.tx_elec_idle = i_tx_elec_idle;
+   assign pipe.tx_compliance = i_tx_compliance;
+   assign pipe.rx_polarity = i_rx_polarity;
+   assign o_rx_valid = pipe.rx_valid;
+   assign o_phy_status = pipe.phy_status;
+   assign o_rx_elec_idle = pipe.rx_elec_idle;
+   assign o_rx_status = pipe.rx_status;
+   assign pipe.tx.data = i_tx_data;
+   assign pipe.tx.kcode = i_tx_data_k;
+   assign o_rx_data = pipe.rx.data;
+   assign o_rx_data_k = pipe.rx.kcode;
 
 `endif
 
@@ -2021,7 +2035,7 @@ function [7:0] setControlByte(input integer pos);
 endfunction 
 
 integer                lat_pclk;
-logic [DATA_WIDTH-1:0] lat_word;
+pipe_data_t  lat_word;
 
 task find_latency (input integer bytes);
     begin
@@ -2029,11 +2043,11 @@ task find_latency (input integer bytes);
                             : {testdata[7], testdata[6], testdata[5], testdata[4],
                                testdata[3], testdata[2], testdata[1], testdata[0]};
     lat_pclk = 0;
-    while ((o_RxData !== lat_word) && (lat_pclk < 200)) begin
-        @(posedge o_PCLK); #1;
+    while ((o_rx_data !== lat_word) && (lat_pclk < 200)) begin
+        @(posedge o_pclk); #1;
         lat_pclk = lat_pclk + 1;
     end
-    if (o_RxData !== lat_word) begin
+    if (o_rx_data !== lat_word) begin
         $display("ERROR: test data did not come back within 200 PCLK cycles.");
         errors = errors + 1;
         finalize;
@@ -2051,25 +2065,25 @@ task send_testdata (input integer bytes);
 
         for ( k = 0; k < 40; k = k + 2 ) begin
        //     i = k + 1;
-            @(posedge o_PCLK); #1;
-            i_TxData   = {testdata[k], testdata[k+1]}; 
-            i_TxDataK  = {testdata_k[k], testdata_k[k+1]};
+            @(posedge o_pclk); #1;
+            i_tx_data   = {testdata[k], testdata[k+1]}; 
+            i_tx_data_k  = {testdata_k[k], testdata_k[k+1]};
         end
     end
     else begin // PIPE 64-Bit
         for ( k = 0; k < 40; k = k + 8 ) begin
             //i = k + 1;
-            @(posedge o_PCLK); #1;
-            i_TxData   = { testdata[k+7],testdata[k+6],testdata[k+5],testdata[k+4],
+            @(posedge o_pclk); #1;
+            i_tx_data   = { testdata[k+7],testdata[k+6],testdata[k+5],testdata[k+4],
                            testdata[k+3],testdata[k+2],testdata[k+1],testdata[k]}; 
-            i_TxDataK  = { testdata_k[k+7],testdata_k[k+6],testdata_k[k+5],testdata_k[k+4],
+            i_tx_data_k  = { testdata_k[k+7],testdata_k[k+6],testdata_k[k+5],testdata_k[k+4],
                            testdata_k[k+3],testdata_k[k+2],testdata_k[k+1],testdata_k[k]};
         end
     end
 
-    @(posedge o_PCLK); #1;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    @(posedge o_pclk); #1;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
   end
 endtask
 
@@ -2080,31 +2094,31 @@ task send_TS1_OS (input integer bytes);
 
     if ( bytes == 2) begin  // PIPE 16-Bit
         for ( k = 0; k < 1023; k = k + 1 ) begin // Create TS1 Ordered Set
-            @(posedge o_PCLK); #1;
+            @(posedge o_pclk); #1;
 
-            i_TxData   = 16'h01BC; // TS1 first two bytes
-            i_TxDataK  = 2'b01;
+            i_tx_data   = 16'h01BC; // TS1 first two bytes
+            i_tx_data_k  = 2'b01;
 
             for ( j = 0; j < 15; j = j + 1 ) begin 
                 #8;
-                i_TxData   = 16'h23CA;
-                i_TxDataK  = 8'b00;
+                i_tx_data   = 16'h23CA;
+                i_tx_data_k  = 8'b00;
             end
         end
     end
     else begin // PIPE 64-Bit
         for ( k = 0; k < 1024; k = k + 1 ) begin // Create TS1 Ordered Set
-            @(posedge o_PCLK); #1;
+            @(posedge o_pclk); #1;
 
-            i_TxData   = 64'h0802_0100_012A_01BC; // TS1 first part
-            i_TxDataK  = 8'b0000_0001;
+            i_tx_data   = 64'h0802_0100_012A_01BC; // TS1 first part
+            i_tx_data_k  = 8'b0000_0001;
             #32;
-            i_TxData   = 64'h162B_F45F_238A_0103; // TS1 second part
-            i_TxDataK  = 8'b00_00_00_00;
+            i_tx_data   = 64'h162B_F45F_238A_0103; // TS1 second part
+            i_tx_data_k  = 8'b00_00_00_00;
             end
     end
-   // i_TxData   = 64'h0000_0000_0000_0000; 
-   // i_TxDataK  = 8'b0000_0000;
+   // i_tx_data   = 64'h0000_0000_0000_0000; 
+   // i_tx_data_k  = 8'b0000_0000;
 end
 endtask
 
@@ -2128,7 +2142,7 @@ task check_testdata (input integer bytes);
 
 
         for ( k = 0; k < 40; k = k + 2 ) begin
-            @(posedge o_PCLK); #1;
+            @(posedge o_pclk); #1;
 
             testdata_16 = {testdata[k], testdata[k+1]};
 
@@ -2137,52 +2151,52 @@ task check_testdata (input integer bytes);
             testdata_com_16 = {testdata_com[k], testdata_com[k+1]};
 
             // Check RxData
-            if ( o_RxData != testdata_16 ) begin
+            if ( o_rx_data != testdata_16 ) begin
 
                 checks_done = checks_done + 1;
                 $display("ERROR: Received Data does not match Test Data.");
-                $display("     o_RxData : %h", o_RxData);
+                $display("     o_rx_data : %h", o_rx_data);
                 $display("     Testdata : %h", testdata_16);
                 errors = errors + 1;
                 finalize;
                 end
             else begin
                 checks_done = checks_done + 1;
-                $display("     o_RxData : %h", o_RxData);
+                $display("     o_rx_data : %h", o_rx_data);
                 $display("     Testdata : %h", testdata_16);
                 $display("");
             end
 
             // Check RxDataK
-            if ( o_RxDataK != testdata_k_16 ) begin
+            if ( o_rx_data_k != testdata_k_16 ) begin
 
                 checks_done = checks_done + 1;
                 $display("ERROR: Received K Data does not match Test Data.");
-                $display("    o_RxDataK : %b", o_RxDataK);
+                $display("    o_rx_data_k : %b", o_rx_data_k);
                 $display("     Testdata : %b", testdata_k_16);
                 errors = errors + 1;
                 finalize;
                 end
             else begin
                 checks_done = checks_done + 1;
-                $display("    o_RxDataK : %b", o_RxDataK);
+                $display("    o_rx_data_k : %b", o_rx_data_k);
                 $display("     Testdata : %b", testdata_k_16);
                 $display("");
             end
 
-            // Check o_RxDataComma
-            if ( o_RxDataComma != testdata_com_16 ) begin
+            // Check o_rx_comma
+            if ( o_rx_comma != testdata_com_16 ) begin
 
                 checks_done = checks_done + 1;
                 $display("ERROR: Received COM Data does not match Test Data.");
-                $display("o_RxDataComma : %b", o_RxDataComma);
+                $display("o_rx_comma : %b", o_rx_comma);
                 $display("     Testdata : %b", testdata_com_16);
                 errors = errors + 1;
                 finalize;
                 end
             else begin
                 checks_done = checks_done + 1;
-                $display("o_RxDataComma : %b", o_RxDataComma);
+                $display("o_rx_comma : %b", o_rx_comma);
                 $display("     Testdata : %b", testdata_com_16);
                 $display("---------------------------------------------");
             end
@@ -2192,7 +2206,7 @@ task check_testdata (input integer bytes);
     else begin // PIPE 64-Bit
 
         for ( k = 0; k < 40; k = k + 8 ) begin
-            @(posedge o_PCLK); #1;
+            @(posedge o_pclk); #1;
 
             testdata_64 = { testdata[k+7],testdata[k+6],testdata[k+5],
                             testdata[k+4],testdata[k+3],testdata[k+2],
@@ -2207,49 +2221,49 @@ task check_testdata (input integer bytes);
                                 testdata_com[k+1],testdata_com[k] };
 
             // Check RxData
-            if ( o_RxData != testdata_64 ) begin
+            if ( o_rx_data != testdata_64 ) begin
                 checks_done = checks_done + 1;
                 $display("ERROR: Received Data does not match Test Data.");
-                $display("     o_RxData : %h", o_RxData);
+                $display("     o_rx_data : %h", o_rx_data);
                 $display("     Testdata : %h", testdata_64);
                 errors = errors + 1;
                 finalize;
                 end
             else begin
                 checks_done = checks_done + 1;
-                $display("     o_RxData : %h", o_RxData);
+                $display("     o_rx_data : %h", o_rx_data);
                 $display("     Testdata : %h", testdata_64);
                 $display("");
             end
 
             // Check RxDataK
-            if ( o_RxDataK != testdata_k_64) begin
+            if ( o_rx_data_k != testdata_k_64) begin
                 checks_done = checks_done + 1;
                 $display("ERROR: Received K Data does not match Test Data.");
-                $display("    o_RxDataK : %b", o_RxDataK);
+                $display("    o_rx_data_k : %b", o_rx_data_k);
                 $display("     Testdata : %b", testdata_k_64);
                 errors = errors + 1;
                 finalize;
                 end
             else begin
                 checks_done = checks_done + 1;
-                $display("    o_RxDataK : %b", o_RxDataK);
+                $display("    o_rx_data_k : %b", o_rx_data_k);
                 $display("     Testdata : %b", testdata_k_64);
                 $display("");
             end
 
-            // Check o_RxDataComma
-            if ( o_RxDataComma != testdata_com_64) begin
+            // Check o_rx_comma
+            if ( o_rx_comma != testdata_com_64) begin
                 checks_done = checks_done + 1;
                 $display("ERROR: Received COM Data does not match Test Data.");
-                $display("o_RxDataComma : %b", o_RxDataComma);
+                $display("o_rx_comma : %b", o_rx_comma);
                 $display("     Testdata : %b", testdata_com_64);
                 errors = errors + 1;
                 finalize;
                 end
             else begin
                 checks_done = checks_done + 1;
-                $display("o_RxDataComma : %b", o_RxDataComma);
+                $display("o_rx_comma : %b", o_rx_comma);
                 $display("     Testdata : %b", testdata_com_64);
                 $display("---------------------------------------------");
                 $display("");
@@ -2300,7 +2314,7 @@ task check_err_detect (input integer checks, bytes);
         // Included Delay Time
         #466;
 
-        @(posedge o_PCLK);
+        @(posedge o_pclk);
 
         for ( k = 0; k < checks; k = k + 1 ) begin
 
@@ -2310,67 +2324,67 @@ task check_err_detect (input integer checks, bytes);
             v_rx_disp_err     = rx_disp_err[m -: 2];
 
 
-            @(posedge o_PCLK); #1;
+            @(posedge o_pclk); #1;
 
                     // Check 8b/10b Error
-                    if ( o_RxDataDecErr !=  v_rx_not_in_table) begin
+                    if ( o_rx_dec_err !=  v_rx_not_in_table) begin
                         checks_done = checks_done + 1;
                         $display("ERROR: 8b/10b Error of SerDes and PIPE do not match.");
-                        $display(" o_RxDataDecErr : %b", o_RxDataDecErr);
+                        $display(" o_rx_dec_err : %b", o_rx_dec_err);
                         $display("rx_not_in_table : %b", v_rx_not_in_table);
                         errors = errors + 1;
                         finalize;
                         end
                     else begin
                         checks_done = checks_done + 1;
-                        $display(" o_RxDataDecErr : %b", o_RxDataDecErr);
+                        $display(" o_rx_dec_err : %b", o_rx_dec_err);
                         $display("rx_not_in_table : %b", v_rx_not_in_table);
                         $display("");
                     end
 
                     // Check Disparity Error
-                    if ( o_RxDataDispErr != v_rx_disp_err) begin
+                    if ( o_rx_disp_err != v_rx_disp_err) begin
 
                         checks_done = checks_done + 1;
                         $display("ERROR: Disparity Error of SerDes and PIPE do not match.");
-                        $display("o_RxDataDispErr : %b", o_RxDataDispErr);
+                        $display("o_rx_disp_err : %b", o_rx_disp_err);
                         $display("    rx_disp_err : %b", v_rx_disp_err);
                         errors = errors + 1;
                         finalize;
                         end
                     else begin
                         checks_done = checks_done + 1;
-                        $display("o_RxDataDispErr : %b", o_RxDataDispErr);
+                        $display("o_rx_disp_err : %b", o_rx_disp_err);
                         $display("    rx_disp_err : %b", v_rx_disp_err);
                         $display("");
                     end
 
                     // Check RxStatus and RxData (8b/10b)
-                    if ( |o_RxDataDecErr == 1'b1 ) begin
+                    if ( |o_rx_dec_err == 1'b1 ) begin
 
-                        if (o_RxStatus != 3'b100 ) begin
+                        if (o_rx_status != 3'b100 ) begin
                             checks_done = checks_done + 1;
                             $display("ERROR: RxStatus does not match Error Detection.");
-                            $display("     o_RxStatus : %b", o_RxStatus);
+                            $display("     o_rx_status : %b", o_rx_status);
                             $display("      Should be : 100");
                             errors = errors + 1;
                             finalize;
                             end
                         else begin
                             checks_done = checks_done + 1;
-                            $display("     o_RxStatus : %b", o_RxStatus);
+                            $display("     o_rx_status : %b", o_rx_status);
                             $display("");
                             end
 
                             // Check EDB Symbol Insertion
                             j = 7;
                             for (i = 0; i < 2; i = i + 1) begin
-                                if ( o_RxDataDecErr[i] == 1'b1 ) begin
-                                    if ( o_RxData[j -: 8] != 8'hFE ) begin
+                                if ( o_rx_dec_err[i] == 1'b1 ) begin
+                                    if ( o_rx_data[j -: 8] != 8'hFE ) begin
                                         checks_done = checks_done + 1;
                                         $display("ERROR: EDB Symbol not inserted for 8b/10b Error.");
-                                        $display("       o_RxData : %h", o_RxData);
-                                        $display(" o_RxDataDecErr : %b", o_RxDataDecErr);
+                                        $display("       o_rx_data : %h", o_rx_data);
+                                        $display(" o_rx_dec_err : %b", o_rx_dec_err);
                                         errors = errors + 1;
                                         finalize;
                                         end
@@ -2380,7 +2394,7 @@ task check_err_detect (input integer checks, bytes);
                                         $display(" INFO: EDB Symbol inserted for 8b/10b Error. ");
                                         $display("---------------------------------------------");
                                         $display("");
-                                        $display("   o_RxData[%0d:%0d]: %h",j,j-7,o_RxData[j -: 8]);
+                                        $display("   o_rx_data[%0d:%0d]: %h",j,j-7,o_rx_data[j -: 8]);
                                         $display("");
                                         $display("---------------------------------------------");
                                         end
@@ -2389,36 +2403,36 @@ task check_err_detect (input integer checks, bytes);
                             end
                         end
 
-                    else if ( |o_RxDataDispErr == 1'b1) begin
+                    else if ( |o_rx_disp_err == 1'b1) begin
 
-                        if (o_RxStatus != 3'b111 ) begin
+                        if (o_rx_status != 3'b111 ) begin
                             checks_done = checks_done + 1;
                             $display("ERROR: RxStatus does not match Error Detection.");
-                            $display("     o_RxStatus : %b", o_RxStatus);
+                            $display("     o_rx_status : %b", o_rx_status);
                             $display("      Should be : 111");
                             errors = errors + 1;
                             finalize;
                             end
                         else begin
                             checks_done = checks_done + 1;
-                            $display("     o_RxStatus : %b", o_RxStatus);
+                            $display("     o_rx_status : %b", o_rx_status);
                             $display("---------------------------------------------");
                             end
                         end
 
-                    else if (|o_RxDataDispErr == 1'b0 && |o_RxDataDecErr == 1'b0) begin
+                    else if (|o_rx_disp_err == 1'b0 && |o_rx_dec_err == 1'b0) begin
 
-                        if (o_RxStatus != 3'b000 ) begin
+                        if (o_rx_status != 3'b000 ) begin
                             checks_done = checks_done + 1;
                             $display("ERROR: RxStatus does not match Error Detection.");
-                            $display("     o_RxStatus : %b", o_RxStatus);
+                            $display("     o_rx_status : %b", o_rx_status);
                             $display("      Should be : 000");
                             errors = errors + 1;
                             finalize;
                             end
                         else begin
                             checks_done = checks_done + 1;
-                            $display("     o_RxStatus : %b", o_RxStatus);
+                            $display("     o_rx_status : %b", o_rx_status);
                             $display("---------------------------------------------");
                             end
                         end
@@ -2442,67 +2456,67 @@ task check_err_detect (input integer checks, bytes);
         #450;
 
         for ( k = 0; k < checks; k = k + 1 ) begin
-            @(posedge o_PCLK); #1;
+            @(posedge o_pclk); #1;
 
             // Check 8b/10b Error
-            if ( o_RxDataDecErr !=  rx_not_in_table) begin
+            if ( o_rx_dec_err !=  rx_not_in_table) begin
                 checks_done = checks_done + 1;
                 $display("ERROR: 8b/10b Error of SerDes and PIPE do not match.");
-                $display(" o_RxDataDecErr : %b", o_RxDataDecErr);
+                $display(" o_rx_dec_err : %b", o_rx_dec_err);
                 $display("rx_not_in_table : %b", rx_not_in_table);
                 errors = errors + 1;
                 finalize;
                 end
             else begin
                 checks_done = checks_done + 1;
-                $display(" o_RxDataDecErr : %b", o_RxDataDecErr);
+                $display(" o_rx_dec_err : %b", o_rx_dec_err);
                 $display("rx_not_in_table : %b", rx_not_in_table);
                 $display("");
             end
 
             // Check Disparity Error
-            if ( o_RxDataDispErr != rx_disp_err ) begin
+            if ( o_rx_disp_err != rx_disp_err ) begin
 
                 checks_done = checks_done + 1;
                 $display("ERROR: Disparity Error of SerDes and PIPE do not match.");
-                $display("o_RxDataDispErr : %b", o_RxDataDispErr);
+                $display("o_rx_disp_err : %b", o_rx_disp_err);
                 $display("    rx_disp_err : %b", rx_disp_err);
                 errors = errors + 1;
                 finalize;
                 end
             else begin
                 checks_done = checks_done + 1;
-                $display("o_RxDataDispErr : %b", o_RxDataDispErr);
+                $display("o_rx_disp_err : %b", o_rx_disp_err);
                 $display("    rx_disp_err : %b", rx_disp_err);
                 $display("");
             end
 
             // Check RxStatus and RxData (8b/10b)
-            if ( |o_RxDataDecErr == 1'b1 ) begin
+            if ( |o_rx_dec_err == 1'b1 ) begin
 
-                if (o_RxStatus != 3'b100 ) begin
+                if (o_rx_status != 3'b100 ) begin
                     checks_done = checks_done + 1;
                     $display("ERROR: RxStatus does not match Error Detection.");
-                    $display("     o_RxStatus : %b", o_RxStatus);
+                    $display("     o_rx_status : %b", o_rx_status);
                     $display("      Should be : 100");
                     errors = errors + 1;
                     finalize;
                     end
                 else begin
                     checks_done = checks_done + 1;
-                    $display("     o_RxStatus : %b", o_RxStatus);
+                    $display("     o_rx_status : %b", o_rx_status);
                     $display("");
                     end
 
                     // Check EDB Symbol Insertion
                     j = 7;
                     for (i = 0; i < 8; i = i + 1) begin
-                        if ( o_RxDataDecErr[i] == 1'b1 ) begin
-                            if ( o_RxData[j -: 8] != 8'hFE ) begin
+                        if ( o_rx_dec_err[i] == 1'b1 ) begin
+                            if ( o_rx_data[j -: 8] != 8'hFE ) begin
                                 checks_done = checks_done + 1;
                                 $display("ERROR: EDB Symbol not inserted for 8b/10b Error.");
-                                $display("       o_RxData : %h", o_RxData);
-                                $display(" o_RxDataDecErr : %b", o_RxDataDecErr);
+                                $display("       o_rx_data : %h", o_rx_data);
+                                $display(" o_rx_dec_err : %b", o_rx_dec_err);
                                 errors = errors + 1;
                                 finalize;
                                 end
@@ -2512,7 +2526,7 @@ task check_err_detect (input integer checks, bytes);
                                 $display(" INFO: EDB Symbol inserted for 8b/10b Error. ");
                                 $display("---------------------------------------------");
                                 $display("");
-                                $display("   o_RxData[%0d:%0d]: %h",j,j-7,o_RxData[j -: 8]);
+                                $display("   o_rx_data[%0d:%0d]: %h",j,j-7,o_rx_data[j -: 8]);
                                 $display("");
                                 $display("---------------------------------------------");
                                 end
@@ -2521,36 +2535,36 @@ task check_err_detect (input integer checks, bytes);
                     end
                 end
 
-            else if ( |o_RxDataDispErr == 1'b1) begin
+            else if ( |o_rx_disp_err == 1'b1) begin
 
-                if (o_RxStatus != 3'b111 ) begin
+                if (o_rx_status != 3'b111 ) begin
                     checks_done = checks_done + 1;
                     $display("ERROR: RxStatus does not match Error Detection.");
-                    $display("     o_RxStatus : %b", o_RxStatus);
+                    $display("     o_rx_status : %b", o_rx_status);
                     $display("      Should be : 111");
                     errors = errors + 1;
                     finalize;
                     end
                 else begin
                     checks_done = checks_done + 1;
-                    $display("     o_RxStatus : %b", o_RxStatus);
+                    $display("     o_rx_status : %b", o_rx_status);
                     $display("---------------------------------------------");
                     end
                 end
 
-            else if (|o_RxDataDispErr == 1'b0 && |o_RxDataDecErr == 1'b0) begin
+            else if (|o_rx_disp_err == 1'b0 && |o_rx_dec_err == 1'b0) begin
 
-                if (o_RxStatus != 3'b000 ) begin
+                if (o_rx_status != 3'b000 ) begin
                     checks_done = checks_done + 1;
                     $display("ERROR: RxStatus does not match Error Detection.");
-                    $display("     o_RxStatus : %b", o_RxStatus);
+                    $display("     o_rx_status : %b", o_rx_status);
                     $display("      Should be : 000");
                     errors = errors + 1;
                     finalize;
                     end
                 else begin
                     checks_done = checks_done + 1;
-                    $display("     o_RxStatus : %b", o_RxStatus);
+                    $display("     o_rx_status : %b", o_rx_status);
                     $display("---------------------------------------------");
                     end
                 end
@@ -2577,23 +2591,23 @@ initial
     $printtimescale(tb_phy);
 
 
-    i_Reset =  1'b0;  // Low active
+    i_reset =  1'b0;  // Low active
 
     // Reset Values PIPE Control Signals
 
-    i_PowerDown          =  2'b10;
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b1;
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b10;
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b1;
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     i_rx_buf_reset       =  1'b0;
 
     #20;
 
-    i_Reset =  1'b1;    // Release Reset
+    i_reset =  1'b1;    // Release Reset
 
     // Wait for different Resets to be done.
 
@@ -2616,13 +2630,13 @@ initial
 
     #35200; // Lock Time PLL
 
-    if (o_PhyStatus == 1'b1) begin
+    if (o_phy_status == 1'b1) begin
         checks_done = checks_done + 1;
         $display("ERROR: PhyStatus did not signal sucessive Reset");
         errors = errors + 1;
         finalize;
         end
-    else if (o_PhyStatus == 1'b0) begin
+    else if (o_phy_status == 1'b0) begin
         checks_done = checks_done + 1;
         $display("INFO: PhyStatus turned to 0 after Reset");
         end
@@ -2638,86 +2652,86 @@ status_flag_1 = 1'b1;
 
     // Transit to Powerstate P0 (IDLE)
 
-    @(posedge o_PCLK);
+    @(posedge o_pclk);
 
-    i_PowerDown          =  2'b00;     // P0
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b1;      // Elec Idle
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b00;     // P0
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b1;      // Elec Idle
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     #128;
 
     // Transit to Powerstate P1
 
-    @(posedge o_PCLK);
+    @(posedge o_pclk);
 
-    i_PowerDown          =  2'b10;     // P1
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b1;      // Elec Idle
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b10;     // P1
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b1;      // Elec Idle
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     #128;
 
     // Transit to Powerstate P0 (Normal Transmission)
 
-    @(posedge o_PCLK); 
+    @(posedge o_pclk); 
 
-    i_PowerDown          =  2'b00;     // P0
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b0;      // Elec Idle
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b00;     // P0
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b0;      // Elec Idle
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     #128;
 
 
     // Transit to Powerstate P1
 
-    @(posedge o_PCLK);
+    @(posedge o_pclk);
 
-    i_PowerDown          =  2'b10;     // P1
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b1;      // Elec Idle
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b10;     // P1
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b1;      // Elec Idle
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     #256;
 
     // Transit to Powerstate P0 (Loopback)
 
-    @(posedge o_PCLK);
+    @(posedge o_pclk);
 
-    i_PowerDown          =  2'b00;     // P0
-    i_TxDetectRx         =  1'b1;      // Loopmode
-    i_TxElecIdle         =  1'b0;      // Elec Idle
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b00;     // P0
+    i_tx_detect_rx         =  1'b1;      // Loopmode
+    i_tx_elec_idle         =  1'b0;      // Elec Idle
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     #128;
 
     // Transit to Powerstate P1
 
-    @(posedge o_PCLK);
+    @(posedge o_pclk);
 
-    i_PowerDown          =  2'b10;     // P1
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b1;      // Elec Idle
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b10;     // P1
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b1;      // Elec Idle
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     #384; 
 
@@ -2726,29 +2740,29 @@ status_flag_1 = 1'b1;
 
     // Transit to Powerstate P0 (Idle)
 
-    //@(posedge o_PCLK);
+    //@(posedge o_pclk);
 
-    i_PowerDown          =  2'b00;     // P0
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b1;      // Elec Idle
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b00;     // P0
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b1;      // Elec Idle
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     #128;
 
     // Transit to Powerstate P0 (Normal)
 
-    @(posedge o_PCLK); #1;
+    @(posedge o_pclk); #1;
 
-    i_PowerDown          =  2'b00;     // P0
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b0;      // Elec Idle
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b00;     // P0
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b0;      // Elec Idle
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     #128;
 
@@ -2766,7 +2780,7 @@ status_flag_1 = 1'b1;
     for (i = 0; i < 100 ; i = i + 1) begin
         generate_data;
         send_testdata(DATA_BYTES);
-        repeat (lat_pclk - 1) @(posedge o_PCLK);
+        repeat (lat_pclk - 1) @(posedge o_pclk);
         //#534;
         //#16;
         //#64;
@@ -2778,43 +2792,43 @@ status_flag_1 = 1'b1;
 
     // Reset Test ( During Normal Operation )
 
-    @(posedge o_PCLK); 
-    i_TxData             =  64'hB59C_A235_FBB5_F6D3;
-    i_TxDataK            =  8'b0100_1000;
+    @(posedge o_pclk); 
+    i_tx_data             =  64'hB59C_A235_FBB5_F6D3;
+    i_tx_data_k            =  8'b0100_1000;
 
     #1000;
 
-    i_Reset              =  1'b0;  // Low Active
-    i_PowerDown          =  2'b10;
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b1;
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_reset              =  1'b0;  // Low Active
+    i_power_down          =  2'b10;
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b1;
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     #20;
-    i_Reset              =  1'b1;  // Release Reset
+    i_reset              =  1'b1;  // Release Reset
 
     // Wait for end of Reset
 
-    while (o_PhyStatus == 1'b1) begin
-        @(posedge o_PCLK); #1;
+    while (o_phy_status == 1'b1) begin
+        @(posedge o_pclk); #1;
     end
 
     #128;
 
     // Transition to P0 (Normal Transmission)
 
-    @(posedge o_PCLK);
+    @(posedge o_pclk);
 
-    i_PowerDown          =  2'b00;
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b0;
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b00;
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b0;
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     // Reestablish Word Alignment
 
@@ -2826,10 +2840,10 @@ status_flag_1 = 1'b1;
 
     // Error Detection Test
 
-    @(posedge o_PCLK);
+    @(posedge o_pclk);
 
-    i_TxData             =  64'hB5B5_B5B5_B5B5_B5B5;
-    i_TxDataK            =  8'b0000_0000;
+    i_tx_data             =  64'hB5B5_B5B5_B5B5_B5B5;
+    i_tx_data_k            =  8'b0000_0000;
 
     #212;
 
@@ -2846,37 +2860,37 @@ status_flag_1 = 1'b1;
 
         for (i = 0; i < 4; i = i + 1) begin
 
-        @(posedge o_PCLK);
-        i_TxData             =  16'hBCBC;
-        i_TxDataK            =  2'b11;
-        i_TxCompliance       =  2'b11;
+        @(posedge o_pclk);
+        i_tx_data             =  16'hBCBC;
+        i_tx_data_k            =  2'b11;
+        i_tx_compliance       =  2'b11;
         end
 
         #500;
 
         for (i = 0; i < 4; i = i + 1) begin
 
-        @(posedge o_PCLK);
-        i_TxData             =  16'hBCBC;
-        i_TxDataK            =  2'b11;
-        i_TxCompliance       =  2'b01;
+        @(posedge o_pclk);
+        i_tx_data             =  16'hBCBC;
+        i_tx_data_k            =  2'b11;
+        i_tx_compliance       =  2'b01;
         end
 
     end
 
     else begin
 
-        @(posedge o_PCLK);
-        i_TxData             =  64'hBCBC_BCBC_BCBC_BCBC;
-        i_TxDataK            =  8'b1111_1111;
-        i_TxCompliance       =  8'b1111_1111;
+        @(posedge o_pclk);
+        i_tx_data             =  64'hBCBC_BCBC_BCBC_BCBC;
+        i_tx_data_k            =  8'b1111_1111;
+        i_tx_compliance       =  8'b1111_1111;
 
         #500;
 
-        @(posedge o_PCLK);
-        i_TxData             =  64'hBCBC_BCBC_BCBC_BCBC;
-        i_TxDataK            =  8'b0101_0101;
-        i_TxCompliance       =  8'b0101_0101;
+        @(posedge o_pclk);
+        i_tx_data             =  64'hBCBC_BCBC_BCBC_BCBC;
+        i_tx_data_k            =  8'b0101_0101;
+        i_tx_compliance       =  8'b0101_0101;
 
     end
 
@@ -2889,65 +2903,65 @@ status_flag_1 = 1'b1;
 
     // Transition to P0 (Loopback)
 
-    @(posedge o_PCLK);
+    @(posedge o_pclk);
 
-    i_TxData             =  64'hB5B5_B5B5_B5B5_B5B5;
-    //i_TxData             =  64'hD1B4_C345_DE_E545;
-    i_TxDataK            =  8'b0000_0000;
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
+    i_tx_data             =  64'hB5B5_B5B5_B5B5_B5B5;
+    //i_tx_data             =  64'hD1B4_C345_DE_E545;
+    i_tx_data_k            =  8'b0000_0000;
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
 
     #1000;
 
     // Activate Loopback Mode
 
-    @(posedge o_PCLK); 
-    i_PowerDown          =  2'b00;
-    i_TxDetectRx         =  1'b1;   // Loopback Modus
-    i_TxElecIdle         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
+    @(posedge o_pclk); 
+    i_power_down          =  2'b00;
+    i_tx_detect_rx         =  1'b1;   // Loopback Modus
+    i_tx_elec_idle         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
 
     #1500;
 
     // Deactivate Loopback Mode
 
-    @(posedge o_PCLK);
-    i_PowerDown          =  2'b00;
-    i_TxDetectRx         =  1'b0;   // Loopback Modus
-    i_TxElecIdle         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
+    @(posedge o_pclk);
+    i_power_down          =  2'b00;
+    i_tx_detect_rx         =  1'b0;   // Loopback Modus
+    i_tx_elec_idle         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
 
     #500;
 /*
     // Receiver Detection Test
 
-    @(posedge o_PCLK);
+    @(posedge o_pclk);
 
-    i_PowerDown          =  2'b10;     // P1
-    i_TxDetectRx         =  1'b0;
-    i_TxElecIdle         =  1'b1;      // Elec Idle
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b10;     // P1
+    i_tx_detect_rx         =  1'b0;
+    i_tx_elec_idle         =  1'b1;      // Elec Idle
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
     #256;
 
     // Start Detection
 
-    @(posedge o_PCLK);
+    @(posedge o_pclk);
     init_status_flag_done = 1'b1;
 
-    i_PowerDown          =  2'b10;     // P1
-    i_TxDetectRx         =  1'b1;
-    i_TxElecIdle         =  1'b1;      // Elec Idle
-    i_TxCompliance       =  {DATA_BYTES{1'b0}};
-    i_RxPolarity         =  1'b0;
-    i_TxData             =  {DATA_WIDTH{1'b0}};
-    i_TxDataK            =  {DATA_BYTES{1'b0}};
+    i_power_down          =  2'b10;     // P1
+    i_tx_detect_rx         =  1'b1;
+    i_tx_elec_idle         =  1'b1;      // Elec Idle
+    i_tx_compliance       =  {DATA_BYTES{1'b0}};
+    i_rx_polarity         =  1'b0;
+    i_tx_data             =  {DATA_WIDTH{1'b0}};
+    i_tx_data_k            =  {DATA_BYTES{1'b0}};
 */
     #30000;
 
@@ -2961,3 +2975,10 @@ status_flag_1 = 1'b1;
 endmodule
 
 `endif
+
+// -----------------------------------------------------------------------------
+// Project:     openCologne-PCIE
+// Description: NLnet-sponsored open-source implementation
+// Version:     1.0
+// Date:        Oct 17, 2026
+// -----------------------------------------------------------------------------

@@ -75,7 +75,7 @@ module PIPEx1__pcieVHost #(
     input  logic                     nreset,
 
     // the PIPE link of this node: electrical idle is NOSIG (K flag, 0xFF) per
-    // symbol, on every simulator (pcieVHostPipex1.v)
+    // symbol, on every simulator (pcieVHostPipex1.sv)
     input  logic [  DataWidth-1:0]   RxData,
     input  logic [DataWidth/8-1:0]   RxDataK,
     output logic [  DataWidth-1:0]   TxData,
@@ -238,7 +238,7 @@ module PIPEx1__pcieVHost #(
   int         dll_tlps;     // whole TLPs in dll_q: 0 at time 0
   // Plain always below: dll_q and dll_tlps are filled on pcieclk and drained
   // on dll_clk, two processes, which always_ff does not allow (as the taps
-  // in pcieVHost.v)
+  // in pcieVHost.sv)
 
   always @(posedge pcieclk) begin
     if (tlp_dn_valid) begin
@@ -285,7 +285,7 @@ module PIPEx1__pcieVHost #(
 
   // ---- Data Link: RC -> EP DLLPs as an EP's DLL hands them to its TL ------
   // One DLLP per dll_clk, the fields Cologne Chip's DLL forwards (DLL draft
-  // v2, slide 7; virtual_channel_rx.v): DLLP Type = {packet_type,
+  // v2, slide 7; virtual_channel_rx.sv): DLLP Type = {packet_type,
   // update_type, 1'b0, VC}, HdrFC, DataFC. Like that DLL, every DLLP raises
   // dll_rx_dllp_valid, Ack/Nak too; for those the credit fields carry the
   // other bytes (the Ack/Nak sequence number is in dll_rx_data_credit).

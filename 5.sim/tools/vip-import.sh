@@ -18,6 +18,8 @@
 #   - pcie_vhost_map.v: generated from pcie_vhost_map.h, as upstream's make
 #     files do
 #   - rv32: openPCIE's rv32-openpcie.patch (models/rv32)
+#   - SystemVerilog names, after the patches (they name upstream's files):
+#     modules .sv, `include headers .svh, the `include lines to match
 # pcieVHost's src/ltssm.c is not copied: the make file compiles openPCIE's
 # models/pcievhost/ltssm/ltssm.c, with its LTSSM patch (see 5.sim/README.md).
 #
@@ -97,6 +99,20 @@ sed "s/0x/32'h/;s/#/\`/;s/DEFINES/AUTO GENERATED. DO NOT EDIT!/;" "$P/src/pcie_v
 
 # ---- mem_model (its C model is part of pcieVHost) -------------------------------
 for f in mem_model.v mem_model_dpi.vh LICENSE README.md; do cp_lf "$U/mem_model/$f" "$D/mem_model/$f"; done
+
+# ---- SystemVerilog names: modules .sv, `include headers .svh ------------------
+for f in "$D"/vproc/f_VProc.v "$P"/verilog/pcieVHost/*.v "$P"/verilog/lib/*.v; do
+  mv "$f" "${f%.v}.sv"
+done
+mv "$D/mem_model/mem_model.v" "$D/mem_model/f_mem_model.sv"  # upstream has a mem_model.sv of its own
+for f in "$D"/vproc/extradefs.v "$P"/verilog/headers/*.v "$P"/verilog/test/test_defs.v; do
+  mv "$f" "${f%.v}.svh"
+done
+sed -i -E 's/(`include "\w+)\.v"/\1.svh"/' "$D"/vproc/vprocdefs.vh "$P"/verilog/headers/allheaders.svh \
+  "$P"/verilog/lib/*.sv "$P"/verilog/pcieVHost/*.sv
+if grep -rqE '`include "\w+\.v"' "$D"/vproc "$P"/verilog "$D"/mem_model; then
+  echo "ERROR: an \`include of a .v file is left"; exit 1
+fi
 
 # ---- rv32 ISS -------------------------------------------------------------------
 for f in "$U"/rv32/iss/src/*; do cp_lf "$f" "$D/rv32/iss/src/$(basename "$f")"; done

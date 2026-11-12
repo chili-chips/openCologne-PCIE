@@ -21,11 +21,13 @@ mkdir -p $LOG
 fails=0
 KNOWN="#38"   # the runs marked known38 below; empty once #38 closes
 
-known38() {  # log, result line: only SVA #38 fired, PL.SKP holds every error, the firmware done
+known38() {  # log, result line: only SVA #38 fired (no other assertion either),
+             # PL.SKP holds every error, the firmware done
     local e s
     e=$(echo "$2" | sed -n 's/.*FAIL, \([0-9]*\) errors.*/\1/p')
     s=$(grep -a '===>   PL.SKP ' $1 | awk '{print $5}')
-    grep -a -q 'SVA #38' $1 && ! grep -a '\*\*\*\* SVA #' $1 | grep -q -v 'SVA #38' &&
+    grep -a -q 'SVA #38' $1 && ! grep -a '\*\*\*\* SVA ' $1 | grep -q -v 'SVA #38' &&
+        ! grep -a 'Assertion failed in tb\.dut' $1 | grep -q -v '\*\*\*\* SVA #38' &&
         grep -a -q 'firmware result 0x0000face' $1 &&
         [ -n "$e" ] && [ "$e" -gt 0 ] && [ "$e" = "$s" ]
 }

@@ -4,13 +4,13 @@ Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's 
 
 | Here | What |
 |---|---|
-| [`phy_top.sv`](phy_top.sv) | the PHY: `ccfpga_pipe_logic` + one `ccfpga_serdes` |
+| [`phy_top.sv`](phy_top.sv) | the PHY: `ccfpga_pipe_top` + one `ccfpga_serdes` |
 | [`1.serdes-test.STANDALONE`](1.serdes-test.STANDALONE/README.md) | SerDes PRBS loopback on the GateMate EVB, tested on the board |
 | [`2.serdes-model`](2.serdes-model) | the SerDes BFM (simulation) and `ccfpga_serdes.SYNTH.sv` (chip) |
 | [`3.sim`](3.sim/README.md) | PHY tests |
 
 #### References:
-- gatemate-pipe: [Cologne Chip's](https://github.com/colognechip/gatemate-pipe) (`dll_test`), and [our fork](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration) (`ocp-integration`), which this repo uses
+- gatemate-pipe: [Cologne Chip's](https://github.com/colognechip/gatemate-pipe) (`dll_test`), and [our fork](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration) (`ocp-integration`), which carries our changes to it
 - [GateMate datasheet, DS1001](https://colognechip.com/docs/ds1001-gatemate1-datasheet-latest.pdf) (copy: [September 2026](../../0.doc/2.rtl/ds1001-GateMate-datasheet.Sep2026.pdf))
 - Cologne Chip: [PHY/PIPE overview](0.doc/PIPE_overview.pdf), [PHY block diagram](0.doc/Physical_layer_block_diagram.pdf), [MAC overview](0.doc/MAC_Overview.pdf)
 - [Unified PIPE Spec, Sept.2025, v7.1](0.doc/Intel.643108_PIPE_Arch_Spec_Rev_7_1.pdf)
@@ -20,22 +20,22 @@ Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's 
 - [Yumewatari (whitequark) PHY segments with rudimentary LTSSM](https://github.com/whitequark/Yumewatari/tree/master/yumewatari/gateware)
 
 <p align="center">
-  <img alt="PCIe physical layer sub-blocks" width="90%" src="0.doc/images/PHY-Layers.drawio.png">
+  <img alt="PCIe physical layer sub-blocks" width="90%" src="0.doc/PHY-Layers.drawio.png">
 </p>
 
 <p align="center">
-  <img alt="PCIe physical layer mapped onto GateMate" width="60%" src="0.doc/images/PHY-Layers-GateMate.drawio.png">
+  <img alt="PCIe physical layer mapped onto GateMate" width="60%" src="0.doc/PHY-Layers-GateMate.drawio.png">
 </p>
 
 ## phy_top
 
 - **PCLK** is the SerDes PLL clock, `PLL_CLK_O`: 31.25 MHz at 2.5 Gb/s with the 64-bit PIPE ([gatemate-pipe#19](https://github.com/colognechip/gatemate-pipe/pull/19)). It is also the SerDes TX and RX core clock.
 - **Set up by parameters**, as on the chip; no register-file writes (`clk_reg_i` tied to 0): the SerDes and PLL on from reset (`SERDES_ENABLE`, `PLL_EN_ADPLL_CTRL`, `PLL_CONFIG_SEL`), the PLL for 2.5 Gb/s (`PLL_FCNTRL` 0x3A), a 64-bit datapath, the comma aligned on a 32-bit word, the RX electrical-idle detector on (`RX_EI_BIAS` 4).
-- **`ccfpga_pipe_logic`** runs the SerDes resets and comma alignment, receiver detection, the power states (P1 in Detect, P0 otherwise), PhyStatus and RxStatus ([2.pipe](../2.pipe/README.md)).
+- **`ccfpga_pipe_top`** runs the SerDes resets and comma alignment, receiver detection, the power states (P1 in Detect, P0 otherwise), PhyStatus and RxStatus ([2.pipe](../2.pipe/README.md)).
 - **`phy_rdy`** is the SerDes `TX_RESET_DONE_O`.
 
 <p align="center">
-  <img alt="GateMate SerDes block diagram" width="60%" src="0.doc/images/SerDes-BlockDiagram.png">
+  <img alt="GateMate SerDes block diagram" width="60%" src="0.doc/SerDes-BlockDiagram.png">
 </p>
 
 ### Where it departs from PCIe 2.1
@@ -55,13 +55,13 @@ Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's 
 A lane is a differential pair, P and N. Keeping P on P from pin to pin often means crossing the pair on the board: two vias and their stubs on a 2.5 or 5 Gb/s line. On the openPCIE backplane we did not take the chance and routed every P to P, at the cost of crossings like 1 to 5 below ([openPCIE 1.pcb](https://github.com/chili-chips-ba/openPCIE/tree/main/1.pcb#the-p-and-n-swaps)).
 
 <p align="center">
-  <img alt="P and N crossings on a PCB" width="50%" src="0.doc/images/PCIE-P-and-N-swaps.png">
+  <img alt="P and N crossings on a PCB" width="50%" src="0.doc/PCIE-P-and-N-swaps.png">
 </p>
 
 The GateMate SerDes makes these crossings unnecessary:
 
 - **RX:** every PCIe receiver must take a swapped pair (Base 2.1, 4.2.4.4). Our MAC finds inverted TS1/TS2 in Polling and drives PIPE `RxPolarity`; `phy_top` passes it to `rx_polarity_i`, and the SerDes inverts the incoming bits (DS1001 Table 2.49). No fabric logic, no board change.
-- **TX:** PCIe never inverts on transmit, but a pair swapped on the board can be undone with `tx_polarity_i` (DS1001 Table 2.35), one static setting per board. `ccfpga_pipe_logic.v` ties it to 0 today.
+- **TX:** PCIe never inverts on transmit, but a pair swapped on the board can be undone with `tx_polarity_i` (DS1001 Table 2.35), one static setting per board. `ccfpga_pipe_top.sv` ties it to 0 today.
 
 So a GateMate board can route each pair the short way: no crossing vias, no stubs.
 
@@ -292,7 +292,7 @@ HM only, not set through the wrapper: 95 of the 208 parameters. The TX driver se
 | `PLL_CP` | 80 | 80 | 60 | 60 | 80 | no |
 | `RX_CDR_CKP` | `8'hF8` | `8'hF8` | `8'hAF` | `8'hAF` | `8'hF8` | no |
 
-**`RX_EI_BIAS`: set it.** Left unset, the BFM's RX electrical-idle detector runs (4, as DS1001) while SYNTH gives the chip the Yosys default, 0. `rx_ei_en_o` is the PIPE's `RxElecIdle` (`ccfpga_pipe_logic.v`), so `phy_top` sets 4, as Cologne Chip's `ccfpga_pipe_wrapper.v` does. It also sets `PLL_SET_OP_LOCK` (0); the other four are not modelled.
+**`RX_EI_BIAS`: set it.** Left unset, the BFM's RX electrical-idle detector runs (4, as DS1001) while SYNTH gives the chip the Yosys default, 0. `rx_ei_en_o` is the PIPE's `RxElecIdle` (`ccfpga_pipe_top.sv`), so `phy_top` sets 4, as Cologne Chip's `ccfpga_pipe_wrapper.sv` does. It also sets `PLL_SET_OP_LOCK` (0); the other four are not modelled.
 
 **2. Where the BFM differs from the vendor model** (ports: none)
 

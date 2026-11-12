@@ -36,12 +36,20 @@ declare -A KNOWN_SIG=(
     [dll-end]="end corrupted: EP did not replay"
 )
 
+other_assert() {  # name: the first design assertion that is not an SVA of its
+    local re      # known issues (the bench's own ends are KNOWN_SIG's business)
+    re=$(echo "${KNOWN[$1]}" | sed 's/#\([0-9]*\)/SVA #\1:/g; s/ /|/g')
+    grep -a 'Assertion failed in tb\.dut' $LOG/$1.log | grep -a -v -E "\*\*\*\* ($re)" | head -1 | sed -E 's/^\[[0-9]+\] //' | cut -c1-100
+}
+
 report() {  # name, seconds, pass (0/1), what, result
     local n=$1 t=$2 ok=$3 what=$4 r=$5 st
     if [ -n "${KNOWN[$n]:-}" ]; then
         if [ $ok = 1 ]; then st="PASS, known ${KNOWN[$n]}: update KNOWN"; fails=$((fails + 1))
         elif ! grep -a -q -F "${KNOWN_SIG[$n]}" $LOG/$n.log; then
             st="FAIL, not as known ${KNOWN[$n]}: no \"${KNOWN_SIG[$n]}\""; fails=$((fails + 1))
+        elif other=$(other_assert $n) && [ -n "$other" ]; then
+            st="FAIL, not as known ${KNOWN[$n]}: $other"; fails=$((fails + 1))
         else st="known: ${KNOWN[$n]}"; fi
     elif [ $ok = 1 ]; then st="PASS"
     else st="FAIL"; fails=$((fails + 1)); fi

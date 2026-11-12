@@ -1,6 +1,6 @@
 # PCIe MAC Layer
 
-The sources are Cologne Chip's, in the gatemate-pipe submodule: [`2.pipe/pipe_src/src/mac_src`](https://github.com/colognechip/gatemate-pipe/tree/dll_test/src/mac_src).
+The sources are Cologne Chip's, from [gatemate-pipe](https://github.com/colognechip/gatemate-pipe): this folder (`ccfpga_*`).
 
 ## Description
 The **Media Access Control (MAC)** is the logical sub-block of the PCIe **Physical Layer**, between the **Data Link Layer (DLL)** above and the **PIPE interface / SerDes PHY** below.
@@ -10,54 +10,55 @@ The **Media Access Control (MAC)** is the logical sub-block of the PCIe **Physic
 - **Soft RTL** in the FPGA fabric. **8b/10b** encode/decode, the **elastic buffer** and **word alignment** are done by the GateMate SerDes, behind [PIPE](../2.pipe/README.md).
 
 <p align="center">
-  <img alt="Position of the MAC layer in the PCIe stack" width="50%" src="../1.phy/0.doc/images/PHY-Layers-GateMate.drawio.png">
+  <img alt="Position of the MAC layer in the PCIe stack" width="50%" src="../1.phy/0.doc/PHY-Layers-GateMate.drawio.png">
 </p>
 
 ## Architecture
 A transmit datapath, a receive datapath, and the control plane binding them.
 
-<img alt="MAC block diagram" src="./images/MAC_Block_Diagram.png" width=700 height=457 />
+<img alt="MAC block diagram" src="./0.doc/MAC_Block_Diagram.png" width=700 height=457 />
 
 - **TX datapath**: receive framed packets from DLL → scrambling → `TxData`/`TxDataK` to the PIPE interface.
 - **RX datapath**: `RxData`/`RxDataK` from the PIPE interface → descrambling → packet detection → packet stream to the DLL.
-- **LTSSM**: drives the PIPE command signals (`i_PowerDown`, `i_TxDetectRx`, `i_TxElecIdle`, `i_RxPolarity`, `i_TxCompliance`) and consumes the PIPE status signals (`o_PhyStatus`, `o_RxValid`, `o_RxElecIdle`, `o_RxStatus`) to sequence the link through Detect → Polling → Configuration → L0, and Recovery.
+- **LTSSM**: drives the PIPE command signals (`pipe.power_down`, `pipe.tx_detect_rx`, `pipe.tx_elec_idle`, `pipe.rx_polarity`, `pipe.tx_compliance`) and consumes the PIPE status signals (`pipe.phy_status`, `pipe.rx_valid`, `pipe.rx_elec_idle`, `pipe.rx_status`) to sequence the link through Detect → Polling → Configuration → L0, and Recovery.
 - **Ordered-set generator/detector**: builds and recognises TS1/TS2, SKP used during link training.
 - **Scrambler/descrambler**: LFSR applied to data symbols only; reset by COM and bypassed for training sequences and control symbols (RX in L0: see [Scrambling](#scrambling)).
 
 ## The Interface
-**Upstream** to the Data Link Layer, **downstream** to the PIPE / PHY.
+**Upstream** to the Data Link Layer, **downstream** to the PIPE / PHY. `ccfpga_mac_top` takes two interfaces, `mac_if.mac mac` (DLL side) and `pipe_if.mac pipe`; its reset `i_reset_n` stays a plain port.
 
 ### Upstream — Data Link Layer
 | Signal            | Dir | Description |
 | ----------------- |:---:|:----------- |
-| `i_TxData`        | in  | Byte stream of the packet to transmit. |
-| `i_TxDataK`       | in  | Control flags of the byte stream to transmit. |
-| `o_RxData`        | out | Descrambled byte stream from PHY, in L0 only: whole words, from the one holding STP or SDP to the one holding END; zero otherwise. |
-| `o_RxDataK`       | out | Control flags of the received byte stream. |
-| `o_LinkUp`        | out | LTSSM in L0 or Recovery. `pcie_core` raises the DLL's link up in L0 and holds it through Recovery, until `o_LinkUp` drops ([#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)). |
+| `mac.tx.data`     | in  | Byte stream of the packet to transmit. |
+| `mac.tx.kcode`    | in  | Control flags of the byte stream to transmit. |
+| `mac.rx.data`     | out | Descrambled byte stream from PHY, in L0 only: whole words, from the one holding STP or SDP to the one holding END; zero otherwise. |
+| `mac.rx.kcode`    | out | Control flags of the received byte stream. |
+| `mac.link_up`     | out | LTSSM in L0 or Recovery. `pcie_core` raises the DLL's link up in L0 and holds it through Recovery, until `mac.link_up` drops ([#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)). |
+| `mac.ltssm_state` | out | LTSSM state (`ccfpga_LTSSM_fsm` encoding); `pcie_core` raises the DLL's link up when it reaches L0. |
 
 ### Downstream — PIPE / PHY
-The PIPE interface: `PCLK`, `TxData[63:0]`/`TxDataK[7:0]`, `RxData[63:0]`/`RxDataK[7:0]`, the command signals (`i_Reset`, `i_PowerDown[1:0]`, `i_TxElecIdle`, `i_TxDetectRx`, `i_TxCompliance[7:0]`, `i_RxPolarity`) and the status signals (`o_PhyStatus`, `o_RxElecIdle`, `o_RxValid`, `o_RxStatus[2:0]`). Descriptions, 32-/64-bit datapath handling and `RxStatus` encoding: [PIPE](../2.pipe/README.md).
+`pipe_if.mac pipe`: `pclk`, `tx`/`rx` (`pipe_sym_t`: `data[63:0]`, `kcode[7:0]`), the command signals (`reset_n`, driven by `pcie_core`, `power_down[1:0]`, `tx_elec_idle`, `tx_detect_rx`, `tx_compliance[7:0]`, `rx_polarity`) and the status signals (`phy_status`, `rx_elec_idle`, `rx_valid`, `rx_status[2:0]`). Descriptions, 32-/64-bit datapath handling and `RxStatus` encoding: [PIPE](../2.pipe/README.md).
 
 ## LTSSM
 The heart of the MAC control plane. Top-level states for endpoint bring-up:
 
 | State           | Description |
 | --------------- |:----------- |
-| Detect          | Detect the presence of a receiver on the link via the PHY's receiver-detection sequence (`i_TxDetectRx` → `o_PhyStatus` / `o_RxStatus = 011`). |
+| Detect          | Detect the presence of a receiver on the link via the PHY's receiver-detection sequence (`pipe.tx_detect_rx` → `pipe.phy_status` / `pipe.rx_status` `RX_DETECTED`). |
 | Polling         | Establish bit lock, symbol lock and lane polarity; exchange TS1/TS2 ordered sets. |
 | Configuration   | Assign link and lane numbers and configure link width; TS1/TS2 carry the assigned numbers. |
 | L0              | Fully active operational state; TLPs and DLLPs flow. |
 | Recovery        | Retrain the link from L0: RcvrLock, RcvrCfg, Idle. |
 
 <p align="center">
-  <img alt="Our LTSSM: Detect, Polling, Configuration, L0, Recovery, with the PIPE power state of each" width="60%" src="./images/MAC_LTSSM.drawio.png">
+  <img alt="Our LTSSM: Detect, Polling, Configuration, L0, Recovery, with the PIPE power state of each" width="60%" src="./0.doc/MAC_LTSSM.drawio.png">
 </p>
 
 **Against the full LTSSM** (Base 2.1, 4.2.5), with the PIPE power state of each state:
 
 <p align="center">
-  <img alt="The full PCIe LTSSM with the PIPE power states" width="50%" src="./images/MAC_LTSSM_full.png">
+  <img alt="The full PCIe LTSSM with the PIPE power states" width="50%" src="./0.doc/MAC_LTSSM_full.png">
 </p>
 
 | | Full LTSSM | Ours |
@@ -71,7 +72,7 @@ The heart of the MAC control plane. Top-level states for endpoint bring-up:
 ## Symbols and Ordered Sets
 The MAC uses the PHY's control-symbol flags (`TxDataK`/`RxDataK`); 8b/10b lives in the SerDes. The control symbols (K-codes), by who handles them:
 
-**Ordered-set symbols**: the MAC builds them (`ccfpga_send_OS.v`) and detects COM, TS1/TS2 and PAD (`ccfpga_OS_process.v`); SKP it only sends.
+**Ordered-set symbols**: the MAC builds them (`ccfpga_send_OS.sv`) and detects COM, TS1/TS2 and PAD (`ccfpga_OS_process.sv`); SKP it only sends.
 
 | Symbol | Code   | Name          | Use |
 | ------ |:------ |:------------- |:--- |
@@ -79,7 +80,7 @@ The MAC uses the PHY's control-symbol flags (`TxDataK`/`RxDataK`); 8b/10b lives 
 | PAD    | K23.7  | Pad           | Link and Lane numbers not yet set, in TS1/TS2 during Configuration |
 | SKP    | K28.0  | Skip          | The SKP ordered set, for clock-tolerance compensation |
 
-**Framing symbols**: the DLL inserts and checks them (`retry_buffer.v`, `send_DLLP.v`, `packet_handler.v`); the MAC only watches them for where a packet starts and ends (`ccfpga_send_data.v`, `ccfpga_rx_MAC_data.v`). Base 2.1 puts framing in the Physical Layer (4.2.2); our design puts it in the DLL.
+**Framing symbols**: the DLL inserts and checks them (`retry_buffer.sv`, `send_dllp.sv`, `packet_handler.sv`); the MAC only watches them for where a packet starts and ends (`ccfpga_send_data.sv`, `ccfpga_rx_MAC_data.sv`). Base 2.1 puts framing in the Physical Layer (4.2.2); our design puts it in the DLL.
 
 | Symbol | Code   | Name          | Use |
 | ------ |:------ |:------------- |:--- |
@@ -122,12 +123,12 @@ The simulation can be run using the pcieVHost ... TODO
 make -f makefile.ica run
 
 ## Testbench description
-The testbench drives the MAC from both sides. On the downstream side it models the PIPE/SerDes responses (`o_PhyStatus`, `o_RxValid`, `o_RxStatus`, `RxData`/`RxDataK`) so the LTSSM can be walked through Detect → Polling → Configuration → L0, including receiver detection and TS1/TS2 exchange. On the upstream side it injects TLP/DLLP packets to exercise framing, scrambling and the return path. Fault injection on the modelled receive symbols (bad 8b/10b, disparity, EDB) is used to check the error-handling and Recovery transitions.-->
+The testbench drives the MAC from both sides. On the downstream side it models the PIPE/SerDes responses (`pipe.phy_status`, `pipe.rx_valid`, `pipe.rx_status`, `pipe.rx`) so the LTSSM can be walked through Detect → Polling → Configuration → L0, including receiver detection and TS1/TS2 exchange. On the upstream side it injects TLP/DLLP packets to exercise framing, scrambling and the return path. Fault injection on the modelled receive symbols (bad 8b/10b, disparity, EDB) is used to check the error-handling and Recovery transitions.-->
 
 ## References
 - [PIPE Specs, Sept. 2025, v7.1](https://cdrdv2-public.intel.com/643108/643108_PIPE_Arch_Spec_Rev_7_1.pdf)
 - [Simon Southwell's Primer](https://www.linkedin.com/pulse/pci-express-primer-1-overview-physical-layer-simon-southwell/)
-- [MAC Overview](./Doc/MAC_Overview.pdf)
+- [MAC Overview](./0.doc/MAC_Overview.pdf)
 
 --------------------
 #### End of Document

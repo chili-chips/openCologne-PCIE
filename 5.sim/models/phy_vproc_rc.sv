@@ -75,15 +75,15 @@ module phy_vproc_rc #(
       .rate         (1'b0),               // Gen1 only
       .tx_detect_rx (pipe.tx_detect_rx),
       .tx_elec_idle (pipe.tx_elec_idle),
-      .tx_data      (pipe.tx_data),
-      .tx_datak     (pipe.tx_datak),
+      .tx_data      (pipe.tx.data),
+      .tx_datak     (pipe.tx.kcode),
 
       .phy_status   (pipe.phy_status),
       .rx_status    (pipe.rx_status),
       .rx_valid     (pipe.rx_valid),
       .rx_elec_idle (pipe.rx_elec_idle),
-      .rx_data      (pipe.rx_data),
-      .rx_datak     (pipe.rx_datak),
+      .rx_data      (pipe.rx.data),
+      .rx_datak     (pipe.rx.kcode),
 
       .rcvr_present (1'b1),
       .host_rxdata  (host_rxdata),

@@ -1,20 +1,59 @@
+// SPDX-FileCopyrightText: 2026 Chili.CHIPS
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
+//==========================================================================
+// openCologne-PCIE * NLnet-sponsored open-source implementation
+//--------------------------------------------------------------------------
+//                   Copyright (C) 2026 Chili.CHIPS
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//
+// 1. Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+// contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+// IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+// PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+//              https://opensource.org/license/bsd-3-clause
+//==========================================================================
+
 module tlp_rx_handler
-  import pcie_pkg::*;
   import tl_pkg::*;
+  import dll_pkg::*;
 (
-    input  logic           clk,
-    input  logic           rst_n,
-    input  tl_beat_t       rx,
-    input  logic     [2:0] max_payload_size,
-    input  fc_cred_t       p_alloc,
-    input  fc_cred_t       np_alloc,
-    output tl_qwr_t        p_wr,
-    input  logic           p_full,
-    output tl_qwr_t        np_wr,
-    input  logic           np_full,
-    output fc_rel_t        rel,
-    output logic           err_malformed,
-    output logic           err_overflow
+    input  logic       clk,
+    input  logic       rst_n,
+    input  tl_beat_t   rx,
+    input  pcie_size_e max_payload_size,
+    input  fc_cred_t   p_alloc,
+    input  fc_cred_t   np_alloc,
+    output tl_qwr_t    p_wr,
+    input  logic       p_full,
+    output tl_qwr_t    np_wr,
+    input  logic       np_full,
+    output fc_rel_t    rel,
+    output logic       err_malformed,
+    output logic       err_overflow
 );
 
   typedef enum logic {
@@ -22,153 +61,147 @@ module tlp_rx_handler
     RECEIVE
   } state_e;
 
-  pcie_trn_desc_t        rx_hdr_dw01;
-  pcie_req_dw1_t         rx_req_dw1;
-  pcie_msg_dw1_t         rx_msg_dw1;
+  hdr_dw01_t   rx_hdr_dw01;
 
-  tlp_kind_e             d_kind;
-  fc_class_e             d_class;
-  logic           [10:0] d_length_dw;
-  logic           [11:0] d_data_credits;
-  logic           [10:0] d_words;
+  tlp_kind_e   d_kind;
+  tlp_dw_cnt_t d_length_dw;
 
-  logic           [10:0] mps_dw;
-  logic                  d_cfg_io;
-  logic                  d_bad_cfg_io;
-  logic                  d_bad_mps;
-  logic                  d_bad_msg;
-  logic                  d_static_bad;
+  tlp_dw_cnt_t mps_dw;
+  logic        d_cfg_io;
+  logic        d_cfg_io_hdr_bad;
+  logic        d_bad_cfg_io;
+  logic        d_bad_mps;
+  logic        d_bad_msg;
 
-  state_e                state;
-  logic                  known_r;
-  fc_class_e             class_r;
-  logic           [10:0] words_expected_r;
-  logic           [10:0] words_seen_r;
-  logic                  static_bad_r;
-  logic           [11:0] need_data_r;
-  logic                  full_r;
+  // a TLP, from its first word on: what the rest of it is checked against
+  typedef struct packed {
+    logic       known;       // [26]
+    fc_class_e  fc_class;    // [25:24]
+    tlp_words_t words;       // [23:13] the TLP length in words
+    logic       static_bad;  // [12]   a header check failed
+    fc_data_t   need_data;   // [11:0] its data credits
+  } rx_ctx_t;
 
-  fc_cred_t              p_recv;
-  fc_cred_t              np_recv;
+  state_e     state;
+  rx_ctx_t    d_ctx;  // from the first word's header
+  rx_ctx_t    ctx_r;  // held for the rest of the TLP
+  rx_ctx_t    cur;
+  tlp_words_t words_seen_r;
+  logic       full_r;
 
-  logic                  first_word;
-  logic                  in_tlp;
-  logic                  cur_known;
-  fc_class_e             cur_class;
-  logic                  cur_np;
-  logic           [10:0] cur_expect;
-  logic           [10:0] cur_seen;
-  logic                  cur_bad;
-  logic           [11:0] cur_need;
-  logic                  cur_qfull;
+  fc_cred_t   p_recv;
+  fc_cred_t   np_recv;
 
-  logic                  write;
-  logic                  last_word;
-  logic                  full_now;
+  logic       first_word;
+  logic       in_tlp;
+  logic       cur_np;
+  tlp_words_t cur_seen;
+  logic       cur_qfull;
 
-  fc_cred_t              alloc;
-  fc_cred_t              recv;
-  fc_cred_t              recv_new;
-  logic                  credit_ovf;
+  logic       write;
+  logic       last_word;
+  logic       full_now;
 
-  logic                  overflow;
-  logic                  malformed;
-  logic                  accept;
-  logic                  counted;
-  logic                  drop;
+  fc_cred_t   alloc;
+  fc_cred_t   recv;
+  fc_cred_t   recv_new;
+  logic       past_alloc;
+  logic       credit_ovf;
 
-  assign rx_hdr_dw01    = rx.data;
-  assign rx_req_dw1     = rx_hdr_dw01.dw1;
-  assign rx_msg_dw1     = rx_hdr_dw01.dw1;
+  logic       overflow;
+  logic       malformed;
+  logic       accept;
+  logic       counted;
+  logic       drop;
 
-  assign d_kind         = tlp_kind(rx_hdr_dw01.dw0);
-  assign d_class        = tlp_class(d_kind);
-  assign d_length_dw    = tlp_length_dw(rx_hdr_dw01.dw0);
-  assign d_data_credits = tlp_data_credits(rx_hdr_dw01.dw0);
-  assign d_words        = tlp_words(rx_hdr_dw01.dw0);
+  assign rx_hdr_dw01     = rx.data;
+
+  assign d_kind          = tlp_kind(rx_hdr_dw01.dw0);
+  assign d_length_dw     = tlp_length_dw(rx_hdr_dw01.dw0);
+
+  assign d_ctx.known     = d_kind != K_UNKNOWN;
+  assign d_ctx.fc_class  = tlp_class(d_kind);
+  assign d_ctx.words     = tlp_words(rx_hdr_dw01.dw0);
+  assign d_ctx.need_data = tlp_data_credits(rx_hdr_dw01.dw0);
 
   always_comb begin
     mps_dw = 11'd1024;
     unique0 case (max_payload_size)
-      3'd0: mps_dw = 11'd32;
-      3'd1: mps_dw = 11'd64;
-      3'd2: mps_dw = 11'd128;
-      3'd3: mps_dw = 11'd256;
-      3'd4: mps_dw = 11'd512;
+      SZ_128B:  mps_dw = 11'd32;
+      SZ_256B:  mps_dw = 11'd64;
+      SZ_512B:  mps_dw = 11'd128;
+      SZ_1024B: mps_dw = 11'd256;
+      SZ_2048B: mps_dw = 11'd512;
     endcase
   end
 
-  assign d_cfg_io = (d_kind == K_CFGRD0) || (d_kind == K_CFGWR0) || (d_kind == K_CFGRD1) ||
-      (d_kind == K_CFGWR1) || (d_kind == K_IORD) || (d_kind == K_IOWR);
+  assign d_cfg_io = (d_kind == K_CFGRD0)
+                  | (d_kind == K_CFGWR0)
+                  | (d_kind == K_CFGRD1)
+                  | (d_kind == K_CFGWR1)
+                  | (d_kind == K_IORD)
+                  | (d_kind == K_IOWR);
 
-  assign d_bad_cfg_io = d_cfg_io && ((rx_hdr_dw01.dw0.tc != 3'd0) ||
-      (rx_hdr_dw01.dw0.attr != 2'd0) || (rx_hdr_dw01.dw0.length != 10'd1) ||
-      (rx_req_dw1.last_be != 4'd0));
-  assign d_bad_mps = tlp_has_data(
-      rx_hdr_dw01.dw0
-  ) && (d_kind != K_ATOMIC) && (d_length_dw > mps_dw);
-  assign d_bad_msg = (d_kind == K_MSGD) && (rx_msg_dw1.msg_code == MSG_SET_SLOT_POWER) &&
-      (rx_hdr_dw01.dw0.tc != 3'd0);
-  assign d_static_bad = d_bad_cfg_io || d_bad_mps || d_bad_msg;
+  // a Cfg or I/O request must have TC 0, no attributes, Length 1, Last BE 0
+  assign d_cfg_io_hdr_bad = (rx_hdr_dw01.dw0.tc          != 3'd0)
+                          | (rx_hdr_dw01.dw0.attr        != 2'd0)
+                          | (rx_hdr_dw01.dw0.length      != 10'd1)
+                          | (rx_hdr_dw01.dw1.req.last_be != 4'd0);
+  assign d_bad_cfg_io = d_cfg_io & d_cfg_io_hdr_bad;
+  assign d_bad_mps = tlp_has_data(rx_hdr_dw01.dw0) & (d_kind != K_ATOMIC) & (d_length_dw > mps_dw);
+  assign d_bad_msg = (d_kind == K_MSGD)
+                   & (rx_hdr_dw01.dw1.msg.msg_code == MSG_SET_SLOT_POWER)
+                   & (rx_hdr_dw01.dw0.tc != 3'd0);
+  assign d_ctx.static_bad = d_bad_cfg_io | d_bad_mps | d_bad_msg;
 
-  assign first_word = rx.valid && rx.first;
-  assign in_tlp = first_word || (state == RECEIVE);
-  assign cur_known = first_word ? (d_kind != K_UNKNOWN) : known_r;
-  assign cur_class = first_word ? d_class : class_r;
-  assign cur_np = (cur_class == FC_NP);
-  assign cur_expect = first_word ? d_words : words_expected_r;
+  assign first_word = rx.valid & rx.first;
+  assign in_tlp = first_word | (state == RECEIVE);
+  assign cur = first_word ? d_ctx : ctx_r;
+  assign cur_np = (cur.fc_class == FC_NP);
   assign cur_seen = first_word ? 11'd1 : words_seen_r + 11'd1;
-  assign cur_bad = first_word ? d_static_bad : static_bad_r;
-  assign cur_need = first_word ? d_data_credits : need_data_r;
   assign cur_qfull = cur_np ? np_full : p_full;
 
-  assign write = rx.valid && in_tlp && cur_known;
-  assign last_word = rx.valid && rx.last && in_tlp;
-  assign full_now = full_r || (write && cur_qfull);
+  assign write = rx.valid & in_tlp & cur.known;
+  assign last_word = rx.valid & rx.last & in_tlp;
+  assign full_now = full_r | (write & cur_qfull);
 
   assign alloc = cur_np ? np_alloc : p_alloc;
   assign recv = cur_np ? np_recv : p_recv;
   assign recv_new.hdr = recv.hdr + 8'd1;
-  assign recv_new.data = recv.data + cur_need;
-  assign credit_ovf = (cur_class != FC_CPL) &&
-      ((alloc.hdr - recv_new.hdr) >= 8'd128 || (alloc.data - recv_new.data) >= 12'd2048);
+  assign recv_new.data = recv.data + cur.need_data;
+  // received past the advertised limit: the distance wraps past half the counter
+  assign past_alloc = ((alloc.hdr - recv_new.hdr)   >= FC_HDR_HALF)
+                    | ((alloc.data - recv_new.data) >= FC_DATA_HALF);
+  assign credit_ovf = (cur.fc_class != FC_CPL) & past_alloc;
 
-  assign overflow = credit_ovf || full_now;
-  assign malformed = !cur_known || (cur_seen != cur_expect) || cur_bad;
-  assign accept = last_word && cur_known && !overflow && !malformed;
-  assign counted = last_word && cur_known && !overflow && (cur_class != FC_CPL);
-  assign drop = last_word && !accept;
+  assign overflow = credit_ovf | full_now;
+  assign malformed = !cur.known | (cur_seen != cur.words) | cur.static_bad;
+  assign accept = last_word & cur.known & !overflow & !malformed;
+  assign counted = last_word & cur.known & !overflow & (cur.fc_class != FC_CPL);
+  assign drop = last_word & !accept;
 
-  assign p_wr.en = write && !cur_np;
-  assign p_wr.drop = drop && !cur_np;
+  assign p_wr.en = write & !cur_np;
+  assign p_wr.drop = drop & !cur_np;
   assign p_wr.word.last = rx.last;
   assign p_wr.word.data = rx.data;
 
-  assign np_wr.en = write && cur_np;
-  assign np_wr.drop = drop && cur_np;
+  assign np_wr.en = write & cur_np;
+  assign np_wr.drop = drop & cur_np;
   assign np_wr.word.last = rx.last;
   assign np_wr.word.data = rx.data;
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      state            <= IDLE;
-      known_r          <= 1'b0;
-      class_r          <= FC_P;
-      words_expected_r <= 11'd0;
-      words_seen_r     <= 11'd0;
-      static_bad_r     <= 1'b0;
-      need_data_r      <= 12'd0;
-      full_r           <= 1'b0;
+      state        <= IDLE;
+      ctx_r        <= '0;
+      words_seen_r <= 11'd0;
+      full_r       <= 1'b0;
     end
     else if (rx.valid && in_tlp) begin
-      known_r          <= cur_known;
-      class_r          <= cur_class;
-      words_expected_r <= cur_expect;
-      words_seen_r     <= cur_seen;
-      static_bad_r     <= cur_bad;
-      need_data_r      <= cur_need;
-      full_r           <= full_now && !rx.last;
-      state            <= rx.last ? IDLE : RECEIVE;
+      ctx_r        <= cur;
+      words_seen_r <= cur_seen;
+      full_r       <= full_now & !rx.last;
+      state        <= rx.last ? IDLE : RECEIVE;
     end
   end
 
@@ -194,12 +227,19 @@ module tlp_rx_handler
       err_overflow  <= 1'b0;
     end
     else begin
-      rel.valid     <= counted && malformed;
-      rel.fc_class  <= cur_class;
-      rel.data      <= cur_need;
-      err_malformed <= last_word && malformed && !(cur_known && overflow);
-      err_overflow  <= last_word && cur_known && overflow;
+      rel.valid     <= counted & malformed;
+      rel.fc_class  <= cur.fc_class;
+      rel.data      <= cur.need_data;
+      err_malformed <= last_word & malformed & !(cur.known & overflow);
+      err_overflow  <= last_word & cur.known & overflow;
     end
   end
 
 endmodule
+
+// -----------------------------------------------------------------------------
+// Project:     openCologne-PCIE
+// Description: NLnet-sponsored open-source implementation
+// Version:     1.0
+// Date:        Oct 21, 2026
+// -----------------------------------------------------------------------------

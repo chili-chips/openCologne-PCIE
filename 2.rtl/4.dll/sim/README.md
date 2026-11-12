@@ -2,7 +2,7 @@
 
 | testbench | what it exercises | run |
 |---|---|---|
-| `tb_dll_wavecrux.v` | a fork of gatemate-pipe's `tb_dll_logic.v` with real TLP headers, makes the WaveCrux pictures | see [../README.md](../README.md#viewing-the-dll-in-wavecrux) |
+| `tb_dll_wavecrux.sv` | a fork of gatemate-pipe's `tb_dll_logic.v` with real TLP headers, makes the WaveCrux pictures | see [../README.md](../README.md#viewing-the-dll-in-wavecrux) |
 | `tb_dll_phy.sv` | the DLL over a real PHY: two link partners over a serial link | `bash run-dll-phy.sh` |
 
 ## DLL over the PHY: `run-dll-phy.sh`
@@ -13,12 +13,12 @@ Two complete stacks, an Endpoint and a Root Complex, connected by a bit-level se
        EP                                                    RC
   TL stimulus           tb_dll_phy.sv                   TL stimulus
        |                                                     |
-  dll_logic             2.rtl/2.pipe/pipe_src           dll_logic
+  dll_top               2.rtl/4.dll                     dll_top
        |                                                     |
-  ccfpga_LTSSM_logic    2.rtl/2.pipe/pipe_src           ccfpga_LTSSM_logic
+  ccfpga_mac_top        2.rtl/3.mac                     ccfpga_mac_top
        |                                                     |
   phy_model             2.rtl/4.dll/sim                 phy_model
-  (ccfpga_pipe_logic + ccfpga_serdes model)
+  (ccfpga_pipe_top + ccfpga_serdes model)
        |                                                     |
        +--------------- serial link, 2.5 Gb/s ---------------+
 ```
@@ -26,13 +26,12 @@ Two complete stacks, an Endpoint and a Root Complex, connected by a bit-level se
 `pcie_stack.sv` is one side: the DLL, the MAC and the test-bench PHY [`phy_model.sv`](phy_model.sv), which is the PIPE logic, the SerDes model and a small SerDes bring-up FSM, so the layers above see a plain PIPE interface. The synthesizable `phy_top` will be the same with the `CC_SERDES` primitive in place of the SerDes model.
 
 ```sh
-git submodule update --init                   # DLL, MAC and PIPE sources: the gatemate-pipe submodule
 bash 2.rtl/4.dll/sim/run-dll-phy.sh           # ~15 s
 bash 2.rtl/4.dll/sim/run-dll-phy.sh --dump    # with a waveform
 bash 2.rtl/4.dll/sim/run-dll-phy.sh --inject=end   # #24: in place of steps 4 to 7, a TLP with its END (or stp: STP) hit
 ```
 
-Build products and the waveform go to `$SERDES_BUILD_DIR/dll` (default `~/.cache/opencologne-pcie`). Tested with Icarus Verilog 13.
+Build products and the waveform go to `$SERDES_BUILD_DIR/dll` (default `~/.cache/opencologne-pcie`). Needs Icarus Verilog 14 or later (interface ports); tested with 14.0 from the OSS CAD Suite.
 
 The test first trains both LTSSMs from Detect.Quiet to L0, every state change is printed. Then:
 
@@ -70,8 +69,8 @@ Every TLP the two DLLs send has its LCRC checked on the way out against a CRC-32
 
 The MAC implements the upstream port. The Root Complex is a second instance of it, set to the downstream port role with `force`:
 
-* in Configuration it transmits link number 0, and from Config.Linkwidth.Accept on lane number 0 (`expected_Link`, `expected_Lane`)
-* in Config.Linkwidth.Accept and Config.Lanenum.Accept it accepts both TS1 and TS2 (`TS1_pattern_en`, `TS2_pattern_en`)
+* in Configuration it transmits link number 0, and from Config.Linkwidth.Accept on lane number 0 (`expected_link`, `expected_lane`)
+* in Config.Linkwidth.Accept and Config.Lanenum.Accept it accepts both TS1 and TS2 (`ts1_pattern_en`, `ts2_pattern_en`)
 
 ### Settings
 
@@ -79,7 +78,7 @@ The MAC implements the upstream port. The Root Complex is a second instance of i
 * the SerDes is set up and clocked as in `phy_top`: `PLL_FCNTRL = 6'h3A`, the PLL clock at the word rate, used as PCLK and as the SerDes TX and RX core clock, all 31.25 MHz
 * the PIPE reset is released 256 `clk_aon` cycles after the global reset, the MAC and DLL reset once the SerDes reports ready, synchronised to PCLK
 * the DLL gets `phy_linkup` when the MAC reports link up and the LTSSM is in L0; unlike `pcie_core` ([#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)), `pcie_stack.sv` does not hold it through Recovery
-* the errors in steps 4, 5 and 7 are forced on the RC's DLL input (`phy_rx_data`, `phy_rx_data_k`) for one PCLK, at a fixed byte from the frame's STP or SDP: a K symbol becomes a data byte, a data byte gets bit 0 flipped. The same field is hit every run, whatever the timing
+* the errors in steps 4, 5 and 7 are forced on the RC's DLL input (`u_vc.rx_sym`, data and K flags) for one PCLK, at a fixed byte from the frame's STP or SDP: a K symbol becomes a data byte, a data byte gets bit 0 flipped. The same field is hit every run, whatever the timing
 
 --------------------
 #### End of Document

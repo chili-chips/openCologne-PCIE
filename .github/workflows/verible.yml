@@ -19,8 +19,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive  # run-lint.sh copies the full design
 
       - name: Install Verible ${{ env.VERIBLE_VERSION }}
         run: |

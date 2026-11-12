@@ -24,12 +24,16 @@ done
 mkdir -p "${BUILD}/sim"
 cd "${BUILD}"
 
-${VERILATOR} --binary --timing -Wno-fatal -Wno-lint -Wno-style --timescale 1ns/100fs ${DUMP} \
-    --top-module tb_pcie_tl -Mdir obj -o tb_pcie_tl \
-    "${TLP}/pcie_pkg.sv" \
+${VERILATOR} --binary --timing -Wno-fatal -Wno-lint -Wno-style --timescale 1ns/1ps ${DUMP} \
+    --top-module tb_tl_top -Mdir obj -o tb_tl_top \
+    "${RTL}/2.pipe/pipe_pkg.sv" \
+    "${RTL}/4.dll/dll_pkg.sv" \
+    "${TLP}/trn_pkg.sv" \
     "${TLP}/tl_pkg.sv" \
-    "${TLP}/axis_if.sv" \
-    "${TLP}/trn_if.sv" \
+    "${RTL}/6.trn_bridge/axis_pkg.sv" \
+    "${RTL}/6.trn_bridge/axis_if.sv" \
+    "${TLP}/trn_tx_if.sv" \
+    "${TLP}/trn_rx_if.sv" \
     "${TLP}/cfg_if.sv" \
     "${RTL}/4.dll/dll_if.sv" \
     "${TLP}/tlp_queue.sv" \
@@ -40,14 +44,15 @@ ${VERILATOR} --binary --timing -Wno-fatal -Wno-lint -Wno-style --timescale 1ns/1
     "${TLP}/cpl_gen.sv" \
     "${TLP}/fc_credit.sv" \
     "${TLP}/tlp_tx_arbiter.sv" \
-    "${TLP}/pcie_tl.sv" \
-    "${TLP}/trn_rx.sv" \
-    "${TLP}/trn_tx.sv" \
-    "${TLP}/trn_tx_throttle.sv" \
-    "${TLP}/trn_bridge.sv" \
-    "${HERE}/tb_pcie_tl.sv" > verilator.log 2>&1 || { cat verilator.log; exit 1; }
+    "${TLP}/tl_top.sv" \
+    "${TLP}/trn_compat.sv" \
+    "${RTL}/6.trn_bridge/trn_rx.sv" \
+    "${RTL}/6.trn_bridge/trn_tx.sv" \
+    "${RTL}/6.trn_bridge/trn_tx_throttle.sv" \
+    "${RTL}/6.trn_bridge/trn_bridge.sv" \
+    "${HERE}/tb_tl_top.sv" > verilator.log 2>&1 || { cat verilator.log; exit 1; }
 
-./obj/tb_pcie_tl +seed="${SEED}"
+./obj/tb_tl_top +seed="${SEED}"
 if [ -n "${DUMP}" ]; then
-  echo "waveform: ${BUILD}/sim/tb_pcie_tl.fst"
+  echo "waveform: ${BUILD}/sim/tb_tl_top.fst"
 fi

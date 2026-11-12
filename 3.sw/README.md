@@ -13,6 +13,7 @@ The EP firmware runs bare-metal on the eduBOS5 core of our GateMate SOC. It is t
 | [`EP/main.c`](EP/main.c) | the PIO target, as large as BAR0 (4 KB): stores every DWORD of a MemWr, 3-DW or 4-DW header; answers a MemRd with CplDs, split at the 64-byte Read Completion Boundary; any other non-posted request with Unsupported Request |
 | [`common/pcie.c`](common/pcie.c), [`pcie.h`](common/pcie.h) | the request layer: wait for a TLP in the CSR Rx window, decode its header, build and send the Completion (with up to 64 DWORDs of data), release the window |
 | [`common/start.S`](common/start.S), [`sections.lds`](common/sections.lds) | set the stack, jump to `main()`; code and data in the 8 KB RAM at 0x0000_0000 |
+| [`tests/soc_tx/main.c`](tests/soc_tx/main.c) | a test, not the EP: sends 3-DW and 4-DW MWr and MRd, for `tb_soc`'s Tx check ([`run-soc.sh tx`](../2.rtl/7.soc/sim/run-soc.sh)) |
 
 What a reader should take from it:
 

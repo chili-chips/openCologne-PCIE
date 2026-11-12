@@ -5,31 +5,29 @@
 | test | what it exercises | run time |
 |---|---|---|
 | `pipe64` | 64-bit PIPE + SerDes: TS1 ordered sets, test data, error detection and RxStatus | ~14 s |
-| `pipe16` | the same with a 16-bit PIPE: **fails today**, see below | ~14 s |
 | `equiv` | the opensource SerDes BFM alone, looped back: training, alignment, a marker word, then 400 payload words compared; its latency | ~2 s |
 | `equiv --ref` | the open and the vendor model side by side, same stimulus, outputs and latency compared | ~30 s |
 | `equiv --ref --cross` | each model's TX into the other's RX: the two models talking to each other | ~30 s |
 
 ```sh
-git submodule update --init                # the PIPE sources are a submodule
 bash 2.rtl/1.phy/3.sim/run-phy.sh pipe64   # opensource SerDes BFM
 bash 2.rtl/1.phy/3.sim/run-phy.sh pipe64 --vendor
 bash 2.rtl/1.phy/3.sim/run-phy.sh equiv
 bash 2.rtl/1.phy/3.sim/run-phy.sh equiv --ref --cross
 ```
 
-`--dump` writes a waveform. Build products and waveforms go to `$SERDES_BUILD_DIR` (default `~/.cache/opencologne-pcie`), outside the repository. Tested with Icarus Verilog 13.
+`--dump` writes a waveform. Build products and waveforms go to `$SERDES_BUILD_DIR` (default `~/.cache/opencologne-pcie`), outside the repository. Needs Icarus Verilog 14 or later (interface ports); tested with 14.0 from the OSS CAD Suite.
 
 ## The two tests in `tb_phy.sv`
 
 One file, one `module tb_phy` per test, chosen at compile time:
 
-* **PIPE test** (default): the testbench and testcase of gatemate-pipe (`tb_ccfpga_serdes.v`, `testcase_pipe.v`, merged here). `DATA_BYTES` sets the PIPE width (`-Ptb_phy.DATA_BYTES=2` or `8`). The SerDes bring-up is done with `writeCfg` / `writeRegfile` tasks. The SerDes is set up and clocked as in `phy_top`: at 64 bits `PLL_FCNTRL = 6'h3A`, the PLL clock at the word rate (31.25 MHz), used as PCLK and as the SerDes TX and RX core clock (`o_tx_clk`); at 16 bits `6'h1A` and the PIPE logic's divider. testcase_pipe.v waits a fixed `#350` between sending a test packet and checking it; here the first packet measures that latency (12 PCLK cycles with the opensource BFM; 17 with the vendor model, measured with the earlier divided PCLK) and each of the 100 packets after it must come back with the same latency.
+* **PIPE test** (default): the testbench and testcase of gatemate-pipe (`tb_ccfpga_serdes.sv`, `testcase_pipe.sv`, merged here). The PIPE width is `DATA_BYTES` in `pipe_pkg` (8: 64 bits; the narrower datapaths are no longer built). The SerDes bring-up is done with `writeCfg` / `writeRegfile` tasks. The SerDes is set up and clocked as in `phy_top`: at 64 bits `PLL_FCNTRL = 6'h3A`, the PLL clock at the word rate (31.25 MHz), used as PCLK and as the SerDes TX and RX core clock (`o_tx_clk`); at 16 bits `6'h1A` and the PIPE logic's divider. testcase_pipe.sv waits a fixed `#350` between sending a test packet and checking it; here the first packet measures that latency (12 PCLK cycles with the opensource BFM; 17 with the vendor model, measured with the earlier divided PCLK) and each of the 100 packets after it must come back with the same latency.
 * **Model check** (`TB_PHY_EQUIV`): the open model with its TX looped back to its RX. Training words (a comma and fillers) until the receiver aligns, then a marker word and 400 payload words, each compared with what was sent; the latency is printed. With `HAVE_VENDOR_SERDES` the vendor model runs beside it, `CROSS_LINK` links the two.
 
-## Known failure: `pipe16`
+## The former 16-bit test (`pipe16`)
 
-The 16-bit PIPE gets its PCLK from a `CC_PLL` at 4x the SerDes core clock, which feeds a 4-to-1 multiplexer onto the 64-bit SerDes word. In gatemate-pipe (`ccfpga_pipe_logic.v`, 16-bit branch) that `CC_PLL` is commented out and PCLK is the SerDes PLL clock itself, 62.5 MHz instead of 125 MHz, so 16-bit words are lost. The fault is in the PIPE RTL ([#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18)); the test passes once the PLL is back.
+The 16-bit PIPE gets its PCLK from a `CC_PLL` at 4x the SerDes core clock, which feeds a 4-to-1 multiplexer onto the 64-bit SerDes word. In gatemate-pipe (`ccfpga_pipe_top.sv`, 16-bit branch) that `CC_PLL` is commented out and PCLK is the SerDes PLL clock itself, 62.5 MHz instead of 125 MHz, so 16-bit words are lost. The fault is in the PIPE RTL ([#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18)); the test passes once the PLL is back.
 
 ## The vendor model
 

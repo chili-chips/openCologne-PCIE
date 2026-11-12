@@ -60,8 +60,8 @@ module clk_rst_gen (
     input logic clk_brd,  // board oscillator, on a dedicated clock pin
     input logic perst_n,  // PERST# from the connector, active low
 
-    input logic pclk,        // PCLK, from the PHY
-    input logic phy_rdy,     // PCLK: SerDes TX out of reset
+    input logic pclk,    // PCLK, from the PHY
+    input logic phy_rdy, // PCLK: SerDes TX out of reset
 
     output logic rst_pipe_n,
     output logic mac_rst_n

@@ -40,8 +40,8 @@
 //--------------------------------------------------------------------------
 // Description:
 //   phy_model: test-bench model of one link partner's PHY, all below the
-//   PIPE interface. The Cologne Chip soft wrapper (ccfpga_pipe_logic,
-//   2.pipe/pipe_src) turns PIPE into the SerDes data path, the SerDes model
+//   PIPE interface. The Cologne Chip soft wrapper (ccfpga_pipe_top,
+//   2.pipe) turns PIPE into the SerDes data path, the SerDes model
 //   (ccfpga_serdes: the open BFM or the vendor model) serializes it, and a
 //   small FSM brings the SerDes up through its config and regfile ports:
 //   SerDes enable, then the PLL. Used by pcie_stack.sv in this DLL-over-PHY
@@ -49,38 +49,21 @@
 //   the model.
 //==========================================================================
 
-module phy_model #(
-   parameter DATA_BYTES = 8,
-   parameter DATA_WIDTH = DATA_BYTES * 8
-   )
-   (
+module phy_model
+  import pipe_pkg::*;
+(
    input  logic                   clk_ref,
    input  logic                   clk_aon,
    input  logic                   clk_cfg,
    input  logic                   reset_n,
 
-   output logic                   o_PCLK,
-   input  logic                   i_Reset,
-   input  logic            [ 1:0] i_PowerDown,
-   input  logic                   i_TxDetectRx,
-   input  logic                   i_TxElecIdle,
-   input  logic  [DATA_BYTES-1:0] i_TxCompliance,
-   input  logic                   i_RxPolarity,
-   input  logic  [DATA_WIDTH-1:0] i_TxData,
-   input  logic  [DATA_BYTES-1:0] i_TxDataK,
+   pipe_if.phy pipe, // PIPE, PHY side
 
-   output logic                   o_RxValid,
-   output logic                   o_PhyStatus,
-   output logic                   o_RxElecIdle,
-   output logic            [ 2:0] o_RxStatus,
-   output logic  [DATA_WIDTH-1:0] o_RxData,
-   output logic  [DATA_BYTES-1:0] o_RxDataK,
-
-   output logic            [ 3:0] o_fsm_state_pipe,
-   output logic            [ 1:0] o_fsm_state_align,
-   output logic  [DATA_BYTES-1:0] o_RxDataComma,
-   output logic  [DATA_BYTES-1:0] o_RxDataDispErr,
-   output logic  [DATA_BYTES-1:0] o_RxDataDecErr,
+   output pipe_fsm_state_e o_fsm_state_pipe,
+   output align_state_e o_fsm_state_align,
+   output pipe_flags_t o_rx_comma,
+   output pipe_flags_t o_rx_disp_err,
+   output pipe_flags_t o_rx_dec_err,
    output logic                   o_tx_buf_err,
    output logic                   o_rx_buf_err,
    output logic                   o_serdes_ready,
@@ -118,17 +101,17 @@ module phy_model #(
    logic  [7:0] rx_char_is_k, rx_char_is_comma, rx_disp_err, rx_not_in_table;
    logic  [7:0] rx_8b10b_bypass;
    logic        rx_8b10b_en, rx_polarity, rx_slide, rx_comma_detect_en;
-   logic        rx_mcomma_align, rx_pcomma_align, rx_en_ei_detector, rx_ei_en;
+   logic        rx_mcomma_align, rx_pcomma_align, rx_ei_detect_en, rx_elec_idle;
    logic        rx_byte_is_aligned, rx_byte_realign;
    logic        rx_detect_done, rx_present;
-   logic        tx_resetdone, rx_resetdone;
+   logic        tx_reset_done, rx_resetdone;
    logic [15:0] regfile_do;
    logic        regfile_rdy;
    logic        tx_buf_err_pipe, rx_buf_err_pipe;
 
    assign o_tx_buf_err   = tx_buf_err;
    assign o_rx_buf_err   = rx_buf_err;
-   assign o_serdes_ready = tx_resetdone;
+   assign o_serdes_ready = tx_reset_done;
 
    logic        regfile_we, regfile_en;
    logic  [7:0] regfile_addr;
@@ -229,43 +212,49 @@ module phy_model #(
       end
    end
 
-   ccfpga_pipe_logic #(
-      .DATA_BYTES ( DATA_BYTES )
-   ) pipe_logic_inst (
-      .o_PCLK               ( o_PCLK             ),
+   // the PIPE takes the SerDes symbols as structs; the BFM keeps flat ports
+
+   serdes_tx_t pipe_tx;
+
+   serdes_rx_t pipe_rx;
+
+   assign tx_data          = pipe_tx.data;
+
+   assign tx_char_is_k     = pipe_tx.kcode;
+
+   assign tx_char_dispmode = pipe_tx.dispmode;
+
+   assign pipe_rx.data     = rx_data;
+
+   assign pipe_rx.kcode    = rx_char_is_k;
+
+   assign pipe_rx.comma    = rx_char_is_comma;
+
+   assign pipe_rx.disp_err = rx_disp_err;
+
+   assign pipe_rx.dec_err  = rx_not_in_table;
+
+
+   ccfpga_pipe_top u_pipe_logic (
+      .pipe (pipe),
       .o_tx_clk             ( tx_clk             ),
-      .i_Reset              ( i_Reset            ),
-      .i_PowerDown          ( i_PowerDown        ),
-      .i_TxDetectRx         ( i_TxDetectRx       ),
-      .i_TxElecIdle         ( i_TxElecIdle       ),
-      .i_TxCompliance       ( i_TxCompliance     ),
-      .i_RxPolarity         ( i_RxPolarity       ),
-      .o_RxValid            ( o_RxValid          ),
-      .o_PhyStatus          ( o_PhyStatus        ),
-      .o_RxElecIdle         ( o_RxElecIdle       ),
-      .o_RxStatus           ( o_RxStatus         ),
-      .i_TxData             ( i_TxData           ),
-      .i_TxDataK            ( i_TxDataK          ),
-      .o_RxData             ( o_RxData           ),
-      .o_RxDataK            ( o_RxDataK          ),
       .o_tx_buf_err         ( tx_buf_err_pipe    ),
       .o_clk_core_rx_rec    (                    ),
       .i_rx_buf_reset       ( 1'b0               ),
       .o_rx_buf_err         ( rx_buf_err_pipe    ),
       .o_fsm_state_pipe     ( o_fsm_state_pipe   ),
       .o_fsm_state_align    ( o_fsm_state_align  ),
-      .o_RxDataComma        ( o_RxDataComma      ),
-      .o_RxDataDispErr      ( o_RxDataDispErr    ),
-      .o_RxDataDecErr       ( o_RxDataDecErr     ),
+      .o_rx_comma           ( o_rx_comma         ),
+      .o_rx_disp_err        ( o_rx_disp_err      ),
+      .o_rx_dec_err         ( o_rx_dec_err       ),
       .i_clk_core_pll       ( clk_core_pll       ),
       .i_clk_core_rx_rec    ( clk_core_rx_rec    ),
       .o_clk_core_tx        (                    ),
       .o_clk_core_rx        (                    ),
       .o_pll_reset          ( pll_reset          ),
       .o_tx_reset           ( tx_reset           ),
-      .i_tx_reset_done      ( tx_resetdone       ),
+      .i_tx_reset_done      ( tx_reset_done      ),
       .o_rx_reset           ( rx_reset           ),
-      .i_rx_reset_done      ( rx_resetdone       ),
       .o_tx_pcs_reset       ( tx_pcs_reset       ),
       .o_tx_pma_reset       ( tx_pma_reset       ),
       .o_rx_pcs_reset       ( rx_pcs_reset       ),
@@ -282,9 +271,7 @@ module phy_model #(
       .o_rx_buf_reset       ( rx_buf_reset       ),
       .i_rx_buf_err         ( rx_buf_err         ),
       .i_tx_buf_err         ( tx_buf_err         ),
-      .o_tx_data            ( tx_data            ),
-      .o_tx_char_is_k       ( tx_char_is_k       ),
-      .o_tx_char_dispmode   ( tx_char_dispmode   ),
+      .o_tx                 ( pipe_tx            ),
       .o_tx_char_dispval    ( tx_char_dispval    ),
       .o_tx_8b10b_en        ( tx_8b10b_en        ),
       .o_tx_8b10b_bypass    ( tx_8b10b_bypass    ),
@@ -293,22 +280,17 @@ module phy_model #(
       .o_tx_detect_rx       ( tx_detect_rx       ),
       .i_rx_detect_done     ( rx_detect_done     ),
       .i_rx_present         ( rx_present         ),
-      .i_rx_data            ( rx_data            ),
-      .i_rx_char_is_k       ( rx_char_is_k       ),
-      .i_rx_char_is_comma   ( rx_char_is_comma   ),
-      .i_rx_disp_err        ( rx_disp_err        ),
-      .i_rx_not_in_table    ( rx_not_in_table    ),
+      .i_rx                 ( pipe_rx            ),
       .o_rx_8b10b_en        ( rx_8b10b_en        ),
       .o_rx_8b10b_bypass    ( rx_8b10b_bypass    ),
       .i_rx_byte_is_aligned ( rx_byte_is_aligned ),
-      .i_rx_byte_realign    ( rx_byte_realign    ),
       .o_rx_mcomma_align    ( rx_mcomma_align    ),
       .o_rx_pcomma_align    ( rx_pcomma_align    ),
       .o_rx_comma_detect_en ( rx_comma_detect_en ),
       .o_rx_slide           ( rx_slide           ),
       .o_rx_polarity        ( rx_polarity        ),
-      .o_rx_en_ei_detector  ( rx_en_ei_detector  ),
-      .i_rx_ei_en           ( rx_ei_en           )
+      .o_rx_ei_detect_en    ( rx_ei_detect_en    ),
+      .i_rx_elec_idle       ( rx_elec_idle       )
    );
 
    ccfpga_serdes #(
@@ -322,7 +304,7 @@ module phy_model #(
       .ALIGN_COMMA_ENABLE   ( ALIGN_COMMA_ENABLE   ),
       .ALIGN_COMMA_WORD     ( ALIGN_COMMA_WORD     ),
       .PLL_SET_OP_LOCK      ( 1'h0                 )
-   ) serdes_inst (
+   ) u_serdes (
       .clk_ref_i            ( clk_ref            ),
       .clk_reg_i            ( clk_aon            ),
       .clk_cfg_i            ( clk_cfg            ),
@@ -375,7 +357,7 @@ module phy_model #(
       .tx_char_dispmode_i   ( tx_char_dispmode   ),
       .tx_char_dispval_i    ( tx_char_dispval    ),
       .tx_buf_err_o         ( tx_buf_err         ),
-      .tx_resetdone_o       ( tx_resetdone       ),
+      .tx_resetdone_o       ( tx_reset_done      ),
       .rx_detect_done_o     ( rx_detect_done     ),
       .rx_present_o         ( rx_present         ),
       .TERM_SERIO_O         (                    ),
@@ -388,7 +370,7 @@ module phy_model #(
       .rx_prbs_sel_i        ( rx_prbs_sel        ),
       .rx_prbs_cnt_reset_i  ( rx_prbs_cnt_reset  ),
       .rx_powerdown_n_i     ( rx_powerdown_n     ),
-      .rx_en_ei_detector_i  ( rx_en_ei_detector  ),
+      .rx_en_ei_detector_i  ( rx_ei_detect_en    ),
       .rx_comma_detect_en_i ( rx_comma_detect_en ),
       .rx_slide_i           ( rx_slide           ),
       .rx_polarity_i        ( rx_polarity        ),
@@ -406,7 +388,7 @@ module phy_model #(
       .rx_byte_is_aligned_o ( rx_byte_is_aligned ),
       .rx_byte_realign_o    ( rx_byte_realign    ),
       .rx_resetdone_o       ( rx_resetdone       ),
-      .rx_ei_en_o           ( rx_ei_en           )
+      .rx_ei_en_o           ( rx_elec_idle       )
    );
 
 endmodule

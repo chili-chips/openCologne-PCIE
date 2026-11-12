@@ -12,7 +12,7 @@
         <mxCell id="pipex1" value="pcieVHostPipex1  (upstream PIPE wrapper)" style="rounded=1;arcSize=2;whiteSpace=wrap;html=0;fillColor=#ccccff;strokeColor=#6666cc;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontStyle=1;fontSize=13;" vertex="1" parent="1">
           <mxGeometry x="40" y="60" width="660" height="760" as="geometry"/>
         </mxCell>
-        <mxCell id="vhost" value="PcieVhost  (pcieVHost.v)" style="rounded=1;arcSize=2;whiteSpace=wrap;html=0;fillColor=#b3b3ff;strokeColor=#4d4dcc;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+        <mxCell id="vhost" value="PcieVhost  (pcieVHost.sv)" style="rounded=1;arcSize=2;whiteSpace=wrap;html=0;fillColor=#b3b3ff;strokeColor=#4d4dcc;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontStyle=1;fontSize=13;" vertex="1" parent="1">
           <mxGeometry x="60" y="100" width="620" height="580" as="geometry"/>
         </mxCell>
 

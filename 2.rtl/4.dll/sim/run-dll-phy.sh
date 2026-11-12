@@ -20,13 +20,18 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 PHY_DIR="${REPO_ROOT}/2.rtl/1.phy"
 MODEL_DIR="${PHY_DIR}/2.serdes-model"
-PIPE_DIR="${REPO_ROOT}/2.rtl/2.pipe/pipe_src/src/pipe_src"
-MAC_DIR="${REPO_ROOT}/2.rtl/2.pipe/pipe_src/src/mac_src"
-DLL_DIR="${REPO_ROOT}/2.rtl/2.pipe/pipe_src/src/dll_src"
+PIPE_DIR="${REPO_ROOT}/2.rtl/2.pipe"
+MAC_DIR="${REPO_ROOT}/2.rtl/3.mac"
+DLL_DIR="${REPO_ROOT}/2.rtl/4.dll"
 
 BUILD="${SERDES_BUILD_DIR:-$HOME/.cache/opencologne-pcie}/dll"
 
 IVL=${IVL:-iverilog}
+# Icarus 14 or later: the PIPE, MAC and DLL take SystemVerilog interface ports
+case "$("${IVL}" -V 2>&1 | head -1)" in
+  *"version 1"[4-9]*|*"version "[2-9][0-9]*) ;;
+  *) echo "$(basename "$0"): Icarus 14 or later needed (interface ports), e.g. the OSS CAD Suite's; set IVL" >&2; exit 2 ;;
+esac
 VVP=${VVP:-vvp}
 
 DUMP=""
@@ -43,25 +48,24 @@ for arg in "$@"; do
 done
 
 for d in "${PIPE_DIR}" "${MAC_DIR}" "${DLL_DIR}"; do
-  if [ -z "$(find "$d" -name '*.v' 2>/dev/null)" ]; then
+  if [ -z "$(find "$d" -maxdepth 1 -name '*.sv' 2>/dev/null)" ]; then
     echo "ERROR: no sources in $d"
-    echo "       run: git submodule update --init"
     exit 1
   fi
 done
 
 mkdir -p "${BUILD}/sim"
 
-DLL_SRC=$(find "${DLL_DIR}" -name '*.v' ! -name 'arbiter.v')
-MAC_SRC=$(find "${MAC_DIR}" -name '*.v')
-PIPE_SRC=$(find "${PIPE_DIR}" -name '*.v' ! -name 'ccfpga_pipe_wrapper.v')
+DLL_SRC="${DLL_DIR}/dll_pkg.sv $(find "${DLL_DIR}" -maxdepth 1 \( -name '*.v' -o -name '*.sv' \) ! -name dll_pkg.sv)"  # not sim/
+MAC_SRC="${MAC_DIR}/mac_pkg.sv $(find "${MAC_DIR}" -maxdepth 1 \( -name '*.v' -o -name '*.sv' \) ! -name mac_pkg.sv)"
+PIPE_SRC="${PIPE_DIR}/pipe_pkg.sv $(find "${PIPE_DIR}" -maxdepth 1 \( -name '*.v' -o -name '*.sv' \) ! -name pipe_pkg.sv)"
 
-${IVL} -g2012 -gspecify -Ttyp ${DUMP} ${DEFS} \
+${IVL} -g2012 -c <(echo +timescale+1ns/1ps) -gspecify -Ttyp ${DUMP} ${DEFS} \
        -I "${MODEL_DIR}" \
        -o "${BUILD}/dll_phy.vvp" \
-       ${DLL_SRC} \
-       ${MAC_SRC} \
        ${PIPE_SRC} \
+       ${MAC_SRC} \
+       ${DLL_SRC} \
        "${MODEL_DIR}/ccfpga_serdes_pkg.sv" \
        "${MODEL_DIR}/ccfpga_serdes.BFM.sv" \
        "${HERE}/phy_model.sv" \

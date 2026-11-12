@@ -32,8 +32,8 @@ SIM           ?= verilator
 #   EP=model    (default) a pcieVHost in EP mode at node 1, program VUserMain1.cpp:
 #               EPPIPEx1__pcieVHost_DUT at the PIPE, PcieVhostSerial on the line
 #   EP=rtl      the EP RTL + firmware: pcie_top (rtl.f); the firmware is copied
-#               in for the run. Verilator only: Icarus 13 parses neither the
-#               interface ports nor the generated csr_pkg.sv (unpacked structs)
+#               in for the run. Verilator only: Icarus 13 parsed neither the
+#               interface ports nor the generated csr_pkg.sv (unpacked structs); not retried on 14
 #   IFACE=pipe  (default) the host at the PIPE; with EP=rtl in the phy_top
 #               socket (models/phy_vproc_rc.sv)
 #   IFACE=serial the host on the serial line, 8b/10b and scrambling on. It adds
@@ -52,11 +52,11 @@ ifeq ($(EP),model)
   USER_C      ?= VUserMain1.cpp
 else ifeq ($(EP),rtl)
   ifneq ($(SIM),verilator)
-    $(error EP=rtl needs SIM=verilator: Icarus 13 parses neither our interface ports nor the generated csr_pkg.sv)
+    $(error EP=rtl needs SIM=verilator: Icarus 13 parsed neither our interface ports nor the generated csr_pkg.sv; not retried on 14)
   endif
   A7RC_EXPECT  = -DA7RC_EP_EXPECT='"a7rc_ep.h"' -DA7RC_PIPE_SCRAMBLE  # our EP scrambles at the PIPE too
   EP_FILES     = rtl.f
-  EP_VLT       = +define+EP_RTL --timescale 1ps/1ps -F rtl.f --assert models/ep_sva.sv
+  EP_VLT       = +define+EP_RTL --timescale 1ns/1ps -F rtl.f --assert models/ep_sva.sv
   EP_OBJ       = _rtl
   FW_IN        = cp $(CURDIR)/../4.build/sw_build/firmware.hex firmware.hex &&
   FW_OUT       = rm -f firmware.hex;

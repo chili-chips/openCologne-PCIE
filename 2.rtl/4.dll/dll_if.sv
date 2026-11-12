@@ -37,7 +37,7 @@
 //              https://opensource.org/license/bsd-3-clause
 //--------------------------------------------------------------------------
 // Description:
-//   dll_if: between the Data Link Layer (dll_logic, Cologne Chip) and the
+//   dll_if: between the Data Link Layer (dll_top) and the
 //   Transaction Layer, on PCLK. Two kinds of traffic cross it:
 //
 //   - TLPs, in DATA_BYTES-wide beats with first/last flags, and a flag for a
@@ -53,53 +53,35 @@
 //   DL_Active. TLPs flow only in DL_Active.
 //==========================================================================
 
-interface dll_if #(
-    parameter int DATA_BYTES = 8
-);
-  localparam int DATA_W = DATA_BYTES * 8;
+interface dll_if;
+  import pipe_pkg::*;
+  import dll_pkg::*;
 
   // TL -> DLL: TLPs
-  logic [DATA_W-1:0] tx_data;
-  logic              tx_tlp_valid;
-  logic              tx_tlp_first;
-  logic              tx_tlp_last;
-  logic              tx_tlp_last_half;
-  logic              tx_tlp_ready;  // DLL -> TL: the retry buffer has room
+  tlp_beat_t tx_tlp;
+  logic      tx_tlp_ready;  // DLL -> TL: the retry buffer has room
 
-  // TL -> DLL: the flow-control DLLP to send
-  logic [       7:0] tx_hdr_credit;
-  logic [      11:0] tx_data_credit;
-  logic [       1:0] tx_update_type;  // DLLP Type[5:4]: 00 P, 01 NP, 10 Cpl
-  logic [       1:0] tx_packet_type;  // DLLP Type[7:6]: 01 InitFC1, 11 InitFC2, 10 UpdateFC
-  logic              tx_dllp_valid;
+  fc_dllp_t  tx_dllp;  // TL -> DLL: the flow-control DLLP to send
 
   // DLL -> TL: TLPs
-  logic [DATA_W-1:0] rx_data;
-  logic              rx_tlp_valid;
-  logic              rx_tlp_first;
-  logic              rx_tlp_last;
+  tlp_beat_t rx_tlp;
 
-  // DLL -> TL: a flow-control DLLP received
-  logic [       7:0] rx_hdr_credit;
-  logic [      11:0] rx_data_credit;
-  logic [       1:0] rx_update_type;  // as tx_update_type
-  logic [       1:0] rx_packet_type;  // as tx_packet_type
-  logic              rx_dllp_valid;
+  fc_dllp_t  rx_dllp;  // DLL -> TL: a flow-control DLLP received
 
-  logic [       2:0] dl_state;  // DLL -> TL
+  dl_state_e dl_state;  // DLL -> TL
 
   modport dll(
-      input tx_data, tx_tlp_valid, tx_tlp_first, tx_tlp_last, tx_tlp_last_half,
-      input tx_hdr_credit, tx_data_credit, tx_update_type, tx_packet_type, tx_dllp_valid,
-      output tx_tlp_ready, rx_data, rx_tlp_valid, rx_tlp_first, rx_tlp_last,
-      output rx_hdr_credit, rx_data_credit, rx_update_type, rx_packet_type, rx_dllp_valid,
+      input tx_tlp,
+      input tx_dllp,
+      output tx_tlp_ready, rx_tlp,
+      output rx_dllp,
       output dl_state
   );
   modport tl(
-      output tx_data, tx_tlp_valid, tx_tlp_first, tx_tlp_last, tx_tlp_last_half,
-      output tx_hdr_credit, tx_data_credit, tx_update_type, tx_packet_type, tx_dllp_valid,
-      input tx_tlp_ready, rx_data, rx_tlp_valid, rx_tlp_first, rx_tlp_last,
-      input rx_hdr_credit, rx_data_credit, rx_update_type, rx_packet_type, rx_dllp_valid,
+      output tx_tlp,
+      output tx_dllp,
+      input tx_tlp_ready, rx_tlp,
+      input rx_dllp,
       input dl_state
   );
 endinterface

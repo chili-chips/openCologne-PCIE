@@ -13,8 +13,8 @@
 #
 #   $VIP_DIR/lib        libcosimlnx.a (VProc), libpcielnx.a (pcieVHost)
 #   $VIP_DIR/include    their C/C++ headers, ltssm.h
-#   $VIP_DIR/hdl        f_VProc.v, f_mem_model.v, pcieVHost*.v, clkmux.v,
-#                       Serialiser.v; headers/ for the include path
+#   $VIP_DIR/hdl        f_VProc.sv, f_mem_model.sv, pcieVHost*.sv, clkmux.sv,
+#                       Serialiser.sv; headers/ (.svh) for the include path
 #
 # Our changes to upstream are in 5.sim/vip (tools/vip-import.sh), but for
 # openPCIE's, VIP_PATCH below.
@@ -24,7 +24,8 @@
 # changed. Needs gcc, ar, and patch for VIP_PATCH.
 #
 # VIP_PATCH: a patch on the pcieVHost C sources, core, PIPE wrapper, serialiser
-# and headers (-p1, a/src/..., a/verilog/...), applied to a copy before the build: openPCIE's pcievhost-speed.patch for its Artix-7 RC
+# and headers (-p1, a/src/..., a/verilog/..., upstream's .v names: mapped to
+# our .sv and .svh), applied to a copy before the build: openPCIE's pcievhost-speed.patch for its Artix-7 RC
 # model, the host (the make file passes it). ltssm.c is not in the libraries:
 # the make file compiles openPCIE's with the user code.
 set -euo pipefail
@@ -56,7 +57,8 @@ if [ -n "$VIP_PATCH" ]; then
     mkdir -p "$OUT/pcievhost/verilog"
     cp -r "$P/src" "$OUT/pcievhost/"
     cp -r "$P/verilog/lib" "$P/verilog/pcieVHost" "$P/verilog/headers" "$OUT/pcievhost/verilog/"
-    patch -s -p1 -d "$OUT/pcievhost" < "$VIP_PATCH" >&2
+    sed -E '/^(---|\+\+\+) /{s#(/(headers|test)/\w+)\.v(\s|$)#\1.svh\3#;s#\.v(\s|$)#.sv\1#}' "$VIP_PATCH" |
+        patch -s -p1 -d "$OUT/pcievhost" >&2
     PS=$OUT/pcievhost/src
     PL=$OUT/pcievhost/verilog/lib
     PV=$OUT/pcievhost/verilog/pcieVHost
@@ -79,10 +81,10 @@ ar cr "$OUT/lib/libcosimlnx.a" "$OUT"/obj/VSched.o "$OUT"/obj/VUser.o
 for f in VProc.h VProcClass.h VProcIrqClass.h VSched_pli.h VUser.h; do
     lf "$VC/$f" > "$OUT/include/$f"
 done
-for f in f_VProc.v extradefs.v vprocdefs.vh vprocdpi.vh; do lf "$V/$f" > "$OUT/hdl/$f"; done
+for f in f_VProc.sv extradefs.svh vprocdefs.vh vprocdpi.vh; do lf "$V/$f" > "$OUT/hdl/$f"; done
 
 # ---- mem_model: HDL only (its C model is part of pcieVHost) ------------------
-lf "$SRC/mem_model/mem_model.v" > "$OUT/hdl/f_mem_model.v"
+lf "$SRC/mem_model/f_mem_model.sv" > "$OUT/hdl/f_mem_model.sv"
 lf "$SRC/mem_model/mem_model_dpi.vh" > "$OUT/hdl/mem_model_dpi.vh"
 
 # ---- pcieVHost: libpcielnx.a, headers, HDL, LTSSM helper ----------------------
@@ -95,14 +97,14 @@ for f in codec.h mem.h pci_express.h pcie.h pcieModelClass.h pcie_utils.h pcie_v
 done
 
 H=$OUT/hdl/headers
-for f in allheaders.v pciedispheader.v pciexpress_header.v timescale.v; do
+for f in allheaders.svh pciedispheader.svh pciexpress_header.svh timescale.svh; do
     lf "$PH/$f" > "$H/$f"
 done
-lf "$PH/pcie_vhost_map.v" > "$H/pcie_vhost_map.v"
-lf "$P/verilog/test/test_defs.v" > "$H/test_defs.v"
+lf "$PH/pcie_vhost_map.svh" > "$H/pcie_vhost_map.svh"
+lf "$P/verilog/test/test_defs.svh" > "$H/test_defs.svh"
 
-for f in pcieVHost.v pcieVHostPipex1.v; do lf "$PV/$f" > "$OUT/hdl/$f"; done
-for f in clkmux.v Serialiser.v; do lf "$PL/$f" > "$OUT/hdl/$f"; done
+for f in pcieVHost.sv pcieVHostPipex1.sv; do lf "$PV/$f" > "$OUT/hdl/$f"; done
+for f in clkmux.sv Serialiser.sv; do lf "$PL/$f" > "$OUT/hdl/$f"; done
 
 # ---- Icarus: the same C models, over VPI instead of DPI-C ------------------------
 #   libcosimica.a  VProc, its VPI table supplied by pcieVHost's veriuser.c

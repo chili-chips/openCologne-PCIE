@@ -32,7 +32,7 @@ This is work area for the PCB-related thoughts and explanations, including the s
 For comparison, see our [2.5Gbps SerDes settings](https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/2.rtl/1.phy/1.serdes-test.STANDALONE/README.md#serdes-loopback-tests) for a standalone PRBS loopback test on CologneChip EVK.
 
 ---
-#### Ver2
+#### Ver2 (WIP 🟠)
 For better Signal Integrity (SI) FPGA is moved next to edge connector, see [Issue#4](https://github.com/chili-chips-ba/openCologne-PCIE/issues/4#issuecomment-4604732435). Power filtering that came out of our experimentation with Ver1 was also added. With all that, we are hoping for 5Gbps on Take2🤞.
 
 <p align="center">
@@ -57,7 +57,7 @@ Just for illustration, and to get the ball rolling, here is an earlier attempt a
 </p>
 
 ---
-#### Ver1
+#### Ver1 (WIP 🟠)
 
 <p align="center">
   <img alt="Earlier ULX4M PCIe slot edge card prototype" width="45%" src="../0.doc/1.pcb/PCIe_1X.png">

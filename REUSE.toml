@@ -8,9 +8,8 @@
 #   precedence = "closest"  -> a file's own SPDX header wins; this is the fallback
 #   precedence = "override" -> this annotation applies even if the file says otherwise
 #
-# Cologne Chip's PIPE and MAC/LTSSM come in as a git submodule
-# (2.rtl/2.pipe/pipe_src), an independent repository
-# under their own terms; REUSE does not cover submodules.
+# Cologne Chip's PIPE and MAC/LTSSM (2.rtl/2.pipe, 2.rtl/3.mac)
+# come from gatemate-pipe: see section 2.
 
 version = 1
 
@@ -114,6 +113,14 @@ precedence = "override"
 SPDX-FileCopyrightText = "Google Inc."
 SPDX-License-Identifier = "Apache-2.0"
 
+# Cologne Chip's PIPE and MAC/LTSSM, from gatemate-pipe (BSD-3-Clause:
+# colognechip/gatemate-pipe#22). Our interfaces in them carry their own header.
+[[annotations]]
+path = ["2.rtl/2.pipe/**", "2.rtl/3.mac/ccfpga_*"]
+precedence = "closest"
+SPDX-FileCopyrightText = "Cologne Chip AG"
+SPDX-License-Identifier = "BSD-3-Clause"
+
 # =============================================================================
 # 3. Third-party material included for reference only (NOT open-licensed)
 # =============================================================================
@@ -155,9 +162,9 @@ path = [
   "0.doc/artwork/oshw-logo-*",
   "0.doc/artwork/wyvernSemi-logo-rounded.png",
   "2.rtl/1.phy/0.doc/Intel.*.pdf",
-  "2.rtl/1.phy/0.doc/images/SerDes-BlockDiagram.png",
-  "2.rtl/3.mac/images/MAC_LTSSM_full.png",
-  "2.rtl/4.dll/Doc/opensource-PCIE-Controller.applsci-*.pdf",
+  "2.rtl/1.phy/0.doc/SerDes-BlockDiagram.png",
+  "2.rtl/3.mac/0.doc/MAC_LTSSM_full.png",
+  "2.rtl/4.dll/0.doc/opensource-PCIE-Controller.applsci-*.pdf",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "Respective owners, as identified in each document"

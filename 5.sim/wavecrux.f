@@ -9,5 +9,5 @@
 models/tlp_dw_if.sv
 models/tlp_dw_monitor.sv
 models/tlp_wavecrux_view.sv
-../2.rtl/6.soc/CPU.eduBOS5/wavecrux/soc_cpu_view.sv
+../2.rtl/7.soc/CPU.eduBOS5/wavecrux/soc_cpu_view.sv
 models/ep_wavecrux_view.sv

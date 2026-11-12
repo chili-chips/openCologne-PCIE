@@ -90,7 +90,7 @@
 
 // -------------------------------------------------------------------------
 // TLP header fields (PCI Express Base Specification), the same layout as
-// the pcie_pkg structs of the RTL
+// the tl_pkg structs of the RTL
 // -------------------------------------------------------------------------
 // DW0, all TLPs
 #define TLP_FMT(dw0)       (((dw0) >> 29) & 0x3)   // [0]: 4-DW header, [1]: with data

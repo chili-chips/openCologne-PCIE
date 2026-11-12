@@ -21,6 +21,9 @@
 //             replayed within the REPLAY_TIMER limit: 711 Symbol Times at
 //             2.5 GT/s x1 and 128 bytes, +100% (3.5.2.1, Table 3-4), plus
 //             the TLP itself; the timer counts in L0 only (#24)
+//     FCINIT  when the DLL enters DL_Active, the TL holds the TX credit
+//             limits of P, NP and Cpl, taken in DL_Init: the DLL leaves
+//             FC_INIT1 only with an InitFC of each type (3.2.1, 3.3.1)
 //==========================================================================
 
 module ep_sva (
@@ -33,7 +36,8 @@ module ep_sva (
     input logic skp_gen,    // ccfpga_tx_MAC: the SKP generator's word, and the
     input logic tx_other,   // data, OS or IDLE its output mux puts first
     input logic buf_empty,  // the DLL's retry buffer
-    input logic replay      // the DLL replays the buffer
+    input logic replay,     // the DLL replays the buffer
+    input logic [2:0] fc_init  // the TL's TX credit limits of P, NP, Cpl are set
 );
 
   localparam int SKP_MAX    = (1538 + 128 + 28 + 7) / 8;     // PCLK
@@ -63,17 +67,24 @@ module ep_sva (
   else $error("**** SVA #24: a TLP in the EP's retry buffer neither Acked nor replayed in %0d PCLK in L0",
               REPLAY_MAX);
 
+  a_fc_init :
+  assert property (@(posedge pclk) disable iff (!rst_n) $rose(dl_active) |-> &fc_init)
+  else $error("**** SVA FCINIT: DL_Active, but the TL has not taken the InitFC credit limits (Cpl, NP, P: %b)",
+              fc_init);
+
 endmodule: ep_sva
 
 bind pcie_core ep_sva sva (
     .pclk     (pipe.pclk),
     .rst_n    (mac_rst_n),
-    .l0       (ltssm_state == LTSSM_L0),
+    .l0       (mac.ltssm_state == mac_pkg::L0),
     .dl_active(dll.dl_state == DL_ACTIVE),
-    .tx_data  (pipe.tx_data),
-    .tx_datak (pipe.tx_datak),
-    .skp_gen  (u_mac.tx_MAC_inst.sending_SKP),
-    .tx_other (u_mac.tx_MAC_inst.sending_data || u_mac.tx_MAC_inst.sending_OS || u_mac.tx_MAC_inst.sending_IDLE),
-    .buf_empty(u_dll.genblk1[0].vc_inst.retry_buffer_empty),
-    .replay   (u_dll.genblk1[0].vc_inst.tlp_retransmit_flag)
+    .tx_data  (pipe.tx.data),
+    .tx_datak (pipe.tx.kcode),
+    .skp_gen  (u_mac.u_tx_mac.sending_skp),
+    .tx_other (u_mac.u_tx_mac.sending_data || u_mac.u_tx_mac.o_sending_os || u_mac.u_tx_mac.sending_idle),
+    .buf_empty(u_dll.g_vc[0].u_vc.retry_buffer_empty),
+    .replay   (u_dll.g_vc[0].u_vc.tlp_retransmit_flag),
+    .fc_init  ({u_tl.u_fc_credit.tx_fc[2].init, u_tl.u_fc_credit.tx_fc[1].init,
+                u_tl.u_fc_credit.tx_fc[0].init})
 );

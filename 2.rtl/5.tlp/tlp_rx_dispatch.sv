@@ -1,6 +1,46 @@
+// SPDX-FileCopyrightText: 2026 Chili.CHIPS
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
+//==========================================================================
+// openCologne-PCIE * NLnet-sponsored open-source implementation
+//--------------------------------------------------------------------------
+//                   Copyright (C) 2026 Chili.CHIPS
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//
+// 1. Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+// contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+// IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+// PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+//              https://opensource.org/license/bsd-3-clause
+//==========================================================================
+
 module tlp_rx_dispatch
-  import pcie_pkg::*;
   import tl_pkg::*;
+  import trn_pkg::*;
+  import dll_pkg::*;
 #(
     parameter int BAR0_SIZE_BITS = 12
 ) (
@@ -46,12 +86,13 @@ module tlp_rx_dispatch
 
   localparam logic [31:0] BAR0_MASK = ~((32'd1 << BAR0_SIZE_BITS) - 32'd1);
 
-  function automatic logic bar0_hit(input pcie_trn_desc2_t addr_hdr_dw23, input logic four_dw,
+  function automatic logic bar0_hit(input hdr_dw23_t addr_hdr_dw23, input logic four_dw,
                                     input logic mem_en, input logic [31:0] base);
     logic [31:0] addr_lo;
-    addr_lo = four_dw ? addr_hdr_dw23.dw3 : addr_hdr_dw23.dw2;
-    return mem_en && (!four_dw || addr_hdr_dw23.dw2 == 32'h0000_0000) &&
-        (((addr_lo ^ base) & BAR0_MASK) == 32'h0000_0000);
+    addr_lo = four_dw ? addr_hdr_dw23.dw3.addr_lo : addr_hdr_dw23.dw2.addr_lo;
+    return mem_en
+         & (!four_dw | (addr_hdr_dw23.dw2.addr_hi == '0))
+         & (((addr_lo ^ base) & BAR0_MASK) == 32'h0000_0000);
   endfunction
 
   function automatic action_e msg_action(input logic [7:0] code, input logic with_data,
@@ -80,9 +121,9 @@ module tlp_rx_dispatch
     act = A_UR_CPL;
     unique0 case (kind)
       K_MRD:    act = bar_hit ? A_APP : A_UR_CPL;
-      K_MWR:    act = (bar_hit && !poisoned) ? A_APP : A_UR_DROP;
+      K_MWR:    act = (bar_hit & !poisoned) ? A_APP : A_UR_DROP;
       K_CFGRD0: act = func0 ? A_CFG_RD : A_UR_CPL;
-      K_CFGWR0: act = (func0 && !poisoned) ? A_CFG_WR : A_UR_CPL;
+      K_CFGWR0: act = (func0 & !poisoned) ? A_CFG_WR : A_UR_CPL;
       K_MSG:    act = msg_action(code, 1'b0, poisoned);
       K_MSGD:   act = msg_action(code, 1'b1, poisoned);
       K_CPL:    act = A_APP;
@@ -92,7 +133,7 @@ module tlp_rx_dispatch
   endfunction
 
   function automatic logic needs_cpl(input action_e act);
-    return (act == A_CFG_RD) || (act == A_CFG_WR) || (act == A_UR_CPL) || (act == A_PME);
+    return (act == A_CFG_RD) | (act == A_CFG_WR) | (act == A_UR_CPL) | (act == A_PME);
   endfunction
 
   function automatic logic action_ready(input action_e act, input logic app_ready,
@@ -110,162 +151,151 @@ module tlp_rx_dispatch
 
   function automatic logic [1:0] be_first_on(input logic [3:0] be);
     logic [1:0] pos;
-    casez (be)
-      4'b???1: pos = 2'd0;
-      4'b??10: pos = 2'd1;
-      4'b?100: pos = 2'd2;
-      default: pos = 2'd3;
+    pos = 2'd3;
+    unique casez (be)
+      4'b???1:          pos = 2'd0;
+      4'b??10:          pos = 2'd1;
+      4'b?100:          pos = 2'd2;
+      4'b1000, 4'b0000: pos = 2'd3;
+      default:          ;
     endcase
     return pos;
   endfunction
 
   function automatic logic [1:0] be_last_on(input logic [3:0] be);
     logic [1:0] pos;
-    casez (be)
-      4'b1???: pos = 2'd0;
-      4'b01??: pos = 2'd1;
-      4'b001?: pos = 2'd2;
-      default: pos = 2'd3;
+    pos = 2'd3;
+    unique casez (be)
+      4'b1???:          pos = 2'd0;
+      4'b01??:          pos = 2'd1;
+      4'b001?:          pos = 2'd2;
+      4'b0001, 4'b0000: pos = 2'd3;
+      default:          ;
     endcase
     return pos;
   endfunction
 
-  pcie_trn_desc_t                   p_hdr_dw01;
-  pcie_trn_desc2_t                  p_hdr_dw23;
-  pcie_msg_dw1_t                    p_msg_dw1;
-  pcie_cfg_dw2_t                    p_cfg_dw2;
-  pcie_trn_desc_t                   np_hdr_dw01;
-  pcie_trn_desc2_t                  np_hdr_dw23;
-  pcie_cfg_dw2_t                    np_cfg_dw2;
+  hdr_dw01_t                    p_hdr_dw01;
+  hdr_dw23_t                    p_hdr_dw23;
+  hdr_dw01_t                    np_hdr_dw01;
+  hdr_dw23_t                    np_hdr_dw23;
 
-  tlp_kind_e                        p_kind;
-  logic                             p_poisoned;
-  action_e                          p_act;
-  tlp_kind_e                        np_kind;
-  logic                             np_poisoned;
-  action_e                          np_act;
+  tlp_kind_e                    p_kind;
+  logic                         p_poisoned;
+  action_e                      p_act;
+  tlp_kind_e                    np_kind;
+  logic                         np_poisoned;
+  action_e                      np_act;
 
-  state_e                           state;
-  logic                             np_go;
-  logic                             p_go;
+  state_e                       state;
+  logic                         np_go;
+  logic                         p_go;
 
-  logic                             sel_np;
-  action_e                          act;
-  pcie_trn_desc_t                   cur_hdr_dw01;
-  pcie_trn_desc2_t                  cur_hdr_dw23;
-  tlp_kind_e                        kind_r;
-  fc_class_e                        class_r;
-  logic            [          11:0] credits_r;
-  logic                             poisoned_r;
-  logic                             hdr_4dw_r;
-  logic                             half_r;
+  logic                         sel_np;
+  action_e                      act;
+  hdr_dw01_t                    cur_hdr_dw01;
+  hdr_dw23_t                    cur_hdr_dw23;
+  tlp_kind_e                    kind_r;
+  fc_class_e                    class_r;
+  logic        [          11:0] credits_r;
+  logic                         poisoned_r;
+  logic                         hdr_4dw_r;
 
-  pcie_req_dw1_t                    cur_req_dw1;
-  pcie_cfg_dw2_t                    cur_cfg_dw2;
-  pcie_addr_dw_t                    cur_addr_dw2;
-  pcie_addr_dw_t                    cur_addr_dw3;
 
-  logic                             cur_valid;
-  logic                             cur_last;
-  logic            [TRN_DATA_W-1:0] cur_data;
-  logic                             to_app;
-  logic                             take;
-  logic                             finish;
+  logic                         cur_valid;
+  logic                         cur_last;
+  logic        [TRN_DATA_W-1:0] cur_data;
+  logic                         to_app;
+  logic                         take;
+  logic                         finish;
 
-  logic            [          10:0] h_length_dw;
-  logic            [           4:0] h_addr_6_2;
-  logic            [           1:0] fbe_lo;
-  logic            [           1:0] fbe_hi;
-  logic            [           1:0] lbe_hi;
-  logic            [          11:0] mrd_bytes;
-  logic            [           6:0] mrd_lower;
-  logic            [          11:0] atomic_bytes;
-  pcie_trn_desc2_t                  cur_data_dw23;
-  pcie_dw_bytes_t                   sspl_dw4;
+  logic        [          10:0] h_length_dw;
+  logic        [           4:0] h_addr_6_2;
+  logic        [           1:0] fbe_lo;
+  logic        [           1:0] fbe_hi;
+  logic        [           1:0] lbe_hi;
+  logic        [          11:0] mrd_bytes;
+  logic        [           6:0] mrd_lower;
+  logic        [          11:0] atomic_bytes;
+  hdr_dw23_t                    cur_data_dw23;
+  dw_bytes_t                    sspl_dw4;
 
-  logic                             cfg_write;
-  logic                             id_capture;
+  logic                         cfg_write;
+  logic                         id_capture;
 
-  logic                             cpl_is_msg;
-  logic                             cpl_with_data;
-  logic            [           2:0] cpl_status;
-  logic            [          11:0] cpl_byte_count;
-  logic            [           6:0] cpl_lower_addr;
-  logic            [          31:0] cpl_data;
+  logic                         cpl_is_msg;
+  logic                         cpl_with_data;
+  cpl_status_e                  cpl_status;
+  logic        [          11:0] cpl_byte_count;
+  logic        [           6:0] cpl_lower_addr;
+  logic        [          31:0] cpl_data;
 
   assign p_hdr_dw01 = p_rd.head.data;
   assign p_hdr_dw23 = p_rd.next;
-  assign p_msg_dw1 = p_hdr_dw01.dw1;
-  assign p_cfg_dw2 = p_hdr_dw23.dw2;
   assign np_hdr_dw01 = np_rd.head.data;
   assign np_hdr_dw23 = np_rd.next;
-  assign np_cfg_dw2 = np_hdr_dw23.dw2;
 
   assign p_kind = tlp_kind(p_hdr_dw01.dw0);
-  assign p_poisoned = p_hdr_dw01.dw0.ep && tlp_has_data(p_hdr_dw01.dw0);
+  assign p_poisoned = p_hdr_dw01.dw0.ep & tlp_has_data(p_hdr_dw01.dw0);
   assign p_act = tlp_action(
       p_kind,
       p_poisoned,
       bar0_hit(
           p_hdr_dw23, tlp_4dw(p_hdr_dw01.dw0), memory_enable, bar0_base
       ),
-      p_cfg_dw2.func == 3'd0,
-      p_msg_dw1.msg_code
+      p_hdr_dw23.dw2.cfg.id.func == 3'd0,
+      p_hdr_dw01.dw1.msg.msg_code
   );
 
   assign np_kind = tlp_kind(np_hdr_dw01.dw0);
-  assign np_poisoned = np_hdr_dw01.dw0.ep && tlp_has_data(np_hdr_dw01.dw0);
+  assign np_poisoned = np_hdr_dw01.dw0.ep & tlp_has_data(np_hdr_dw01.dw0);
   assign np_act = tlp_action(
       np_kind,
       np_poisoned,
       bar0_hit(
           np_hdr_dw23, tlp_4dw(np_hdr_dw01.dw0), memory_enable, bar0_base
       ),
-      np_cfg_dw2.func == 3'd0,
+      np_hdr_dw23.dw2.cfg.id.func == 3'd0,
       8'h00
   );
 
-  assign np_go = (state == IDLE) && np_rd.avail && np_ready && action_ready(
-      np_act, app_rx_ready, cpl_ready
-  );
-  assign p_go = (state == IDLE) && !np_go && p_rd.avail && action_ready(
-      p_act, app_rx_ready, cpl_ready
-  );
+  assign np_go = (state == IDLE)
+               & np_rd.avail
+               & np_ready
+               & action_ready(np_act, app_rx_ready, cpl_ready);
+  assign p_go = (state == IDLE)
+              & !np_go
+              & p_rd.avail
+              & action_ready(p_act, app_rx_ready, cpl_ready);
 
   assign cur_valid = sel_np ? np_rd.valid : p_rd.valid;
   assign cur_last = sel_np ? np_rd.head.last : p_rd.head.last;
   assign cur_data = sel_np ? np_rd.head.data : p_rd.head.data;
-  assign to_app = (state == XFER) && (act == A_APP) && cur_valid;
-  assign take = (state == XFER) && cur_valid && ((act != A_APP) || app_rx_ready);
-  assign finish = take && cur_last;
+  assign to_app = (state == XFER) & (act == A_APP) & cur_valid;
+  assign take = (state == XFER) & cur_valid & ((act != A_APP) | app_rx_ready);
+  assign finish = take & cur_last;
 
-  assign p_pop = take && !sel_np;
-  assign np_pop = take && sel_np;
+  assign p_pop = take & !sel_np;
+  assign np_pop = take & sel_np;
 
   assign app_rx.valid = to_app;
-  assign app_rx.last = to_app && cur_last;
-  assign app_rx.half = half_r;
-  assign app_rx.poisoned = poisoned_r;
-  assign app_rx.bar_hit = (kind_r == K_CPL || kind_r == K_CPLD) ? 6'b000000 : 6'b000001;
+  assign app_rx.last = to_app & cur_last;
   assign app_rx.data = cur_data;
 
-  assign cpl_hold = (state == XFER) && needs_cpl(act);
+  assign cpl_hold = (state == XFER) & needs_cpl(act);
 
-  assign cur_req_dw1 = cur_hdr_dw01.dw1;
-  assign cur_cfg_dw2 = cur_hdr_dw23.dw2;
-  assign cur_addr_dw2 = cur_hdr_dw23.dw2;
-  assign cur_addr_dw3 = cur_hdr_dw23.dw3;
 
   assign h_length_dw = tlp_length_dw(cur_hdr_dw01.dw0);
-  assign h_addr_6_2 = hdr_4dw_r ? cur_addr_dw3.addr[4:0] : cur_addr_dw2.addr[4:0];
+  assign h_addr_6_2 = hdr_4dw_r ? cur_hdr_dw23.dw3.addr_lo.addr[4:0] :
+                                cur_hdr_dw23.dw2.addr_lo.addr[4:0];
 
   assign cpl.is_msg = cpl_is_msg;
   assign cpl.with_data = cpl_with_data;
   assign cpl.locked = (kind_r == K_MRDLK);
   assign cpl.tc = cur_hdr_dw01.dw0.tc;
   assign cpl.attr = cur_hdr_dw01.dw0.attr;
-  assign cpl.requester_id = cur_req_dw1.requester_id;
-  assign cpl.tag = cur_req_dw1.tag;
+  assign cpl.requester_id = cur_hdr_dw01.dw1.req.requester_id;
+  assign cpl.tag = cur_hdr_dw01.dw1.req.tag;
   assign cpl.status = cpl_status;
   assign cpl.byte_count = cpl_byte_count;
   assign cpl.lower_addr = cpl_lower_addr;
@@ -274,21 +304,21 @@ module tlp_rx_dispatch
   assign cpl.msg_route = MSG_ROUTE_GATHER;
 
   assign cfg_acc.write = cfg_write;
-  assign cfg_acc.regnum = {cur_cfg_dw2.ext_reg, cur_cfg_dw2.reg_num};
-  assign cfg_acc.be = cur_req_dw1.first_be;
-  assign cfg_acc.wdata = dw_byte_swap(cur_hdr_dw23.dw3);
+  assign cfg_acc.regnum = cfg_reg_e'({cur_hdr_dw23.dw2.cfg.ext_reg, cur_hdr_dw23.dw2.cfg.reg_num});
+  assign cfg_acc.be = cur_hdr_dw01.dw1.req.first_be;
+  assign cfg_acc.wdata = dw_byte_swap(cur_hdr_dw23.dw3.data);
   assign id.capture = id_capture;
-  assign id.bus = cur_cfg_dw2.bus;
-  assign id.device = cur_cfg_dw2.device;
+  assign id.bus = cur_hdr_dw23.dw2.cfg.id.bus;
+  assign id.device = cur_hdr_dw23.dw2.cfg.id.device;
 
-  assign fbe_lo = be_first_on(cur_req_dw1.first_be);
-  assign fbe_hi = be_last_on(cur_req_dw1.first_be);
-  assign lbe_hi = be_last_on(cur_req_dw1.last_be);
+  assign fbe_lo = be_first_on(cur_hdr_dw01.dw1.req.first_be);
+  assign fbe_hi = be_last_on(cur_hdr_dw01.dw1.req.first_be);
+  assign lbe_hi = be_last_on(cur_hdr_dw01.dw1.req.last_be);
 
   assign mrd_bytes = (h_length_dw == 11'd1) ?
-      ((cur_req_dw1.first_be == 4'b0000) ? 12'd1 : 12'd4 - 12'(fbe_lo) - 12'(fbe_hi)) :
+      ((cur_hdr_dw01.dw1.req.first_be == 4'b0000) ? 12'd1 : 12'd4 - 12'(fbe_lo) - 12'(fbe_hi)) :
       12'({h_length_dw, 2'b00} - 13'(fbe_lo) - 13'(lbe_hi));
-  assign mrd_lower = {h_addr_6_2, (cur_req_dw1.first_be == 4'b0000) ? 2'd0 : fbe_lo};
+  assign mrd_lower = {h_addr_6_2, (cur_hdr_dw01.dw1.req.first_be == 4'b0000) ? 2'd0 : fbe_lo};
 
   assign atomic_bytes = (cur_hdr_dw01.dw0.tlp_type == TLP_TYPE_CAS) ? {h_length_dw, 1'b0} :
       12'({h_length_dw, 2'b00});
@@ -308,7 +338,6 @@ module tlp_rx_dispatch
       credits_r    <= 12'd0;
       poisoned_r   <= 1'b0;
       hdr_4dw_r    <= 1'b0;
-      half_r       <= 1'b0;
     end
     else begin
       unique case (state)
@@ -323,7 +352,6 @@ module tlp_rx_dispatch
             credits_r    <= tlp_data_credits(np_hdr_dw01.dw0);
             poisoned_r   <= np_poisoned;
             hdr_4dw_r    <= tlp_4dw(np_hdr_dw01.dw0);
-            half_r       <= tlp_last_half(np_hdr_dw01.dw0);
             state        <= XFER;
           end
           else if (p_go) begin
@@ -336,7 +364,6 @@ module tlp_rx_dispatch
             credits_r    <= tlp_data_credits(p_hdr_dw01.dw0);
             poisoned_r   <= p_poisoned;
             hdr_4dw_r    <= tlp_4dw(p_hdr_dw01.dw0);
-            half_r       <= tlp_last_half(p_hdr_dw01.dw0);
             state        <= XFER;
           end
         end
@@ -345,6 +372,7 @@ module tlp_rx_dispatch
             state <= IDLE;
           end
         end
+        default: ;
       endcase
     end
   end
@@ -369,7 +397,7 @@ module tlp_rx_dispatch
     end
     else begin
       cfg_write    <= 1'b0;
-      id_capture   <= np_go && np_kind == K_CFGWR0 && np_cfg_dw2.func == 3'd0;
+      id_capture   <= np_go & (np_kind == K_CFGWR0) & (np_hdr_dw23.dw2.cfg.id.func == 3'd0);
       sspl.capture <= 1'b0;
       cpl_req      <= 1'b0;
       rel.valid    <= 1'b0;
@@ -434,3 +462,10 @@ module tlp_rx_dispatch
   end
 
 endmodule
+
+// -----------------------------------------------------------------------------
+// Project:     openCologne-PCIE
+// Description: NLnet-sponsored open-source implementation
+// Version:     1.0
+// Date:        Oct 21, 2026
+// -----------------------------------------------------------------------------

@@ -222,6 +222,7 @@ module serdes_top (
         CFG_DONE: begin
           cfg_state <= CFG_DONE;
         end
+        default: ;
       endcase
     end
   end

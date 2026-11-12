@@ -45,39 +45,35 @@
 //   PCLK is a PHY output, and the MAC side runs on it.
 //==========================================================================
 
-interface pipe_if #(
-    parameter int DATA_BYTES = 8  // 8: 64-bit PIPE at 31.25 MHz for Gen1
-);
-  localparam int DATA_W = DATA_BYTES * 8;
+interface pipe_if;
+  import pipe_pkg::*;
 
   // MAC -> PHY
-  logic                  reset_n;  // PIPE Reset#
-  logic [           1:0] power_down;  // P0, P0s, P1, P2
-  logic                  tx_detect_rx;  // receiver detection (in P1)
-  logic                  tx_elec_idle;
-  logic [DATA_BYTES-1:0] tx_compliance;
-  logic                  rx_polarity;  // invert the received bits
-  logic [    DATA_W-1:0] tx_data;
-  logic [DATA_BYTES-1:0] tx_datak;  // per symbol: 1 = K (control) symbol
+  logic         reset_n;  // PIPE Reset#
+  power_state_e power_down;
+  logic         tx_detect_rx;  // receiver detection (in P1)
+  logic         tx_elec_idle;
+  pipe_flags_t  tx_compliance;
+  logic         rx_polarity;  // invert the received bits
+  pipe_sym_t    tx;  // TxData and TxDataK
 
   // PHY -> MAC
-  logic                  pclk;
-  logic                  rx_valid;
-  logic                  phy_status;
-  logic [           2:0] rx_status;
-  logic                  rx_elec_idle;
-  logic [    DATA_W-1:0] rx_data;
-  logic [DATA_BYTES-1:0] rx_datak;
+  logic         pclk;
+  logic         rx_valid;
+  logic         phy_status;
+  rx_status_e   rx_status;
+  logic         rx_elec_idle;
+  pipe_sym_t    rx;  // RxData and RxDataK
 
   modport mac(
       output reset_n, power_down, tx_detect_rx, tx_elec_idle, tx_compliance, rx_polarity,
-      output tx_data, tx_datak,
-      input pclk, rx_valid, phy_status, rx_status, rx_elec_idle, rx_data, rx_datak
+      output tx,
+      input pclk, rx_valid, phy_status, rx_status, rx_elec_idle, rx
   );
   modport phy(
       input reset_n, power_down, tx_detect_rx, tx_elec_idle, tx_compliance, rx_polarity,
-      input tx_data, tx_datak,
-      output pclk, rx_valid, phy_status, rx_status, rx_elec_idle, rx_data, rx_datak
+      input tx,
+      output pclk, rx_valid, phy_status, rx_status, rx_elec_idle, rx
   );
 endinterface
 

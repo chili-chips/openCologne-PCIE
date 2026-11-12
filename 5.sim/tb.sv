@@ -220,7 +220,7 @@ module tb #(
 `else
   logic       phy_rdy;
 
-  pipe_if #(.DATA_BYTES(PIPE_DATAWIDTH/8)) pipe_mac ();
+  pipe_if pipe_mac ();
 
   phy_vproc_rc #(
     .DATA_BYTES                        (PIPE_DATAWIDTH/8)
@@ -435,7 +435,7 @@ module tb #(
 `endif
 
 // Top level fatal task, which can be called from anywhere in verilog code.
-// via the `fatal definition in pciedispheader.v. Any data logging, error
+// via the `fatal definition in pciedispheader.svh. Any data logging, error
 // message displays etc., on a fatal, should be placed in here.
 task Fatal;
 begin

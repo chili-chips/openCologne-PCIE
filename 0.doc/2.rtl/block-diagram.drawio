@@ -54,7 +54,7 @@
             <mxPoint x="88" y="11" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="e2" edge="1" parent="1" source="sb" style="endArrow=classic;startArrow=classic;html=1;strokeWidth=3;strokeColor=#d62728;fontColor=#d62728;labelBackgroundColor=none;fontStyle=1;fontSize=13;exitX=0;exitY=0.728522;exitDx=0;exitDy=0;exitPerimeter=0;" value="&lt;div style=&quot;line-height: 100%;&quot;&gt;trn_if&lt;div&gt;&lt;span style=&quot;font-weight: normal;&quot;&gt;trn&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;">
+        <mxCell id="e2" edge="1" parent="1" source="sb" style="endArrow=classic;startArrow=classic;html=1;strokeWidth=3;strokeColor=#d62728;fontColor=#d62728;labelBackgroundColor=none;fontStyle=1;fontSize=13;exitX=0;exitY=0.728522;exitDx=0;exitDy=0;exitPerimeter=0;" value="&lt;div style=&quot;line-height: 100%;&quot;&gt;trn_tx_if&lt;div&gt;trn_rx_if&lt;/div&gt;&lt;/div&gt;">
           <mxGeometry relative="1" x="0.0304" y="-16" as="geometry">
             <mxPoint as="offset" />
             <mxPoint x="926.15" y="-237" as="sourcePoint" />
@@ -99,17 +99,23 @@
         <mxCell id="softlbl" parent="1" style="text;whiteSpace=wrap;html=1;align=center;fontSize=13;container=0;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;soft PCIE stack&lt;/font&gt;&lt;/b&gt;" vertex="1">
           <mxGeometry height="34.5" width="156.51416122004358" x="689.423" y="-369.5" as="geometry" />
         </mxCell>
-        <mxCell id="tl" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;container=0;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;TL&lt;/font&gt;&lt;/b&gt;&lt;div&gt;Transaction&lt;/div&gt;&lt;div&gt;Layer&lt;/div&gt;" vertex="1">
+        <mxCell id="tl" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;container=0;verticalAlign=top;spacingTop=2;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;TL&lt;/font&gt;&lt;/b&gt;&lt;div&gt;TLP checks&lt;/div&gt;&lt;div&gt;ordering&lt;/div&gt;&lt;div&gt;flow control&lt;/div&gt;" vertex="1">
           <mxGeometry height="105" width="60.649237472766885" x="808.765" y="-284" as="geometry" />
         </mxCell>
-        <mxCell id="dll" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;container=0;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;DLL&lt;/font&gt;&lt;/b&gt;&lt;div&gt;Data Link&lt;/div&gt;&lt;div&gt;Layer&lt;/div&gt;" vertex="1">
+        <mxCell id="tl_cfg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6c8ebf;fontSize=10;container=0;" value="Config&lt;br&gt;Space" vertex="1">
+          <mxGeometry height="30" width="50" x="814" y="-214" as="geometry" />
+        </mxCell>
+        <mxCell id="dll" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;container=0;verticalAlign=top;spacingTop=2;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;DLL&lt;/font&gt;&lt;/b&gt;&lt;div&gt;Ack/Nak&lt;/div&gt;&lt;div&gt;Seq#, LCRC&lt;/div&gt;&lt;div&gt;FC init&lt;/div&gt;" vertex="1">
           <mxGeometry height="105" width="60.649237472766885" x="740.29" y="-284" as="geometry" />
+        </mxCell>
+        <mxCell id="dll_retry" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6c8ebf;fontSize=10;container=0;" value="Retry&lt;br&gt;Buffer" vertex="1">
+          <mxGeometry height="30" width="50" x="745.6" y="-214" as="geometry" />
         </mxCell>
         <mxCell id="mac" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;container=0;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;MAC&lt;/font&gt;&lt;/b&gt;&lt;div&gt;LTSSM&lt;/div&gt;" vertex="1">
           <mxGeometry height="105" width="70.43137254901961" x="662.033" y="-284" as="geometry" />
         </mxCell>
-        <mxCell id="ccwrap" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;container=0;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b style=&quot;&quot;&gt;ccfpga_pipe_fsm&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;thin adaptation layer&lt;/span&gt;&lt;div&gt;by CologneChip&lt;/div&gt;&lt;div&gt;&amp;lt;2.pipe/pipe_src&amp;gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
-          <mxGeometry height="83" width="118.36383442265796" x="378.351" y="-278.5" as="geometry" />
+        <mxCell id="ccwrap" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;container=0;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b style=&quot;&quot;&gt;ccfpga_pipe_top&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;thin adaptation layer&lt;/span&gt;&lt;div&gt;by CologneChip&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;- power states P0, P1&lt;br&gt;- receiver detection&lt;br&gt;- electrical idle&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="95" width="118.36383442265796" x="378.351" y="-284.5" as="geometry" />
         </mxCell>
         <mxCell id="serdes" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;container=0;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;CC_SERDES&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&amp;lt;GateMate HM&amp;gt;&lt;/div&gt;&lt;div&gt;&lt;b style=&quot;color: rgb(255, 0, 0);&quot;&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;proprietary&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(51, 51, 51); font-size: 11px;&quot;&gt;complete design at RTL level. Closed-source&lt;/font&gt;&lt;/div&gt;" vertex="1">
           <mxGeometry height="105" width="150.02860566448803" x="152.696" y="-438" as="geometry" />
@@ -174,11 +180,11 @@
             <mxPoint x="1202.01" y="-165.5" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="W-DqrCldl9cEcrAnaWrd-10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;container=0;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;clk_rst_gen&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;div&gt;- root: CC_USR_RSTN &amp;amp; PERST#&lt;/div&gt;&lt;div&gt;- 2 reset syncs&lt;/div&gt;&lt;div&gt;- clk_aon, no PLL&lt;/div&gt;&lt;/div&gt;" vertex="1">
-          <mxGeometry height="92.47" width="229.880174291939" x="842.826" y="-135.47000000000003" as="geometry" />
+        <mxCell id="W-DqrCldl9cEcrAnaWrd-10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;container=0;align=left;spacingLeft=12;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;clk_rst_gen&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;div&gt;- root: CC_USR_RSTN &amp;amp; PERST#&lt;/div&gt;&lt;div&gt;- 2 reset syncs&lt;/div&gt;&lt;div&gt;- clk_aon, no PLL&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="92.47" width="330" x="742.826" y="-135.47000000000003" as="geometry" />
         </mxCell>
         <mxCell id="W-DqrCldl9cEcrAnaWrd-88" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;points=[[0,0,1,0,0],[0,0.25,1,0,0],[0,0.441718,0,0,0],[0,0.75,1,0,0],[0,1,1,0,0],[0.25,0,1,0,0],[0.25,1,1,0,0],[0.5,0,1,0,0],[0.5,1,1,0,0],[0.75,0,1,0,0],[0.75,1,1,0,0],[1,0,1,0,0],[1,0.25,1,0,0],[1,0.5,1,0,0],[1,0.75,1,0,0],[1,1,1,0,0]];container=0;" value="&lt;font style=&quot;font-size: 13px;&quot;&gt;&lt;b&gt;CC_BUFG&lt;/b&gt;&lt;br&gt;&lt;b&gt;CC_USR_RSTN&lt;/b&gt;&lt;/font&gt;" vertex="1">
-          <mxGeometry height="41.5" width="101.8222440087146" x="965.993" y="-88.5" as="geometry" />
+          <mxGeometry height="41.5" width="101.8222440087146" x="961" y="-110" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

@@ -1,9 +1,48 @@
+// SPDX-FileCopyrightText: 2026 Chili.CHIPS
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
+//==========================================================================
+// openCologne-PCIE * NLnet-sponsored open-source implementation
+//--------------------------------------------------------------------------
+//                   Copyright (C) 2026 Chili.CHIPS
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//
+// 1. Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+// contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+// IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+// PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+//              https://opensource.org/license/bsd-3-clause
+//==========================================================================
+
 `timescale 1ns/100fs
 
-module tb_dll_phy;
+module tb_dll_phy
+  import pipe_pkg::*;
+;
 
-   localparam DATA_BYTES = 8;
-   localparam DATA_WIDTH = DATA_BYTES * 8;
 
    localparam real CLKPERIOD_REF   = 10.0;
    localparam real CLKPERIOD_REG   =  8.0;
@@ -87,11 +126,11 @@ module tb_dll_phy;
    logic            [4:0] ltssm       [0:1];
    logic                  serdes_rdy  [0:1];
    logic                  rx_valid    [0:1];
-   logic [DATA_BYTES-1:0] disp_err    [0:1];
-   logic [DATA_BYTES-1:0] dec_err     [0:1];
+   pipe_flags_t disp_err    [0:1];
+   pipe_flags_t dec_err     [0:1];
    logic                  tx_buf_err  [0:1];
 
-   logic  [DATA_WIDTH-1:0] tx_data     [0:1];
+   pipe_data_t  tx_data     [0:1];
    logic                   tx_valid    [0:1];
    logic                   tx_first    [0:1];
    logic                   tx_last     [0:1];
@@ -103,7 +142,7 @@ module tb_dll_phy;
    logic             [1:0] tx_pkt      [0:1];
    logic                   tx_dllp     [0:1];
 
-   logic [DATA_WIDTH-1:0] rx_data     [0:1];
+   pipe_data_t  rx_data     [0:1];
    logic                  rx_tvalid   [0:1];
    logic                  rx_first    [0:1];
    logic                  rx_last     [0:1];
@@ -113,18 +152,18 @@ module tb_dll_phy;
    logic            [1:0] rx_pkt      [0:1];
    logic                  rx_dllp     [0:1];
 
-   pcie_stack #(.DATA_BYTES(DATA_BYTES)) ep (
+   pcie_stack ep (
       .clk_ref           ( clk_ref        ),
       .clk_aon           ( clk_aon        ),
       .clk_cfg           ( clk_cfg        ),
       .reset_n           ( reset_n        ),
-      .o_PCLK            ( pclk[EP]       ),
-      .o_LinkUp          ( link_up[EP]    ),
+      .o_pclk            ( pclk[EP]       ),
+      .o_link_up          ( link_up[EP]    ),
       .o_ltssm_state     ( ltssm[EP]      ),
       .o_serdes_ready    ( serdes_rdy[EP] ),
-      .o_RxValid         ( rx_valid[EP]   ),
-      .o_RxDataDispErr   ( disp_err[EP]   ),
-      .o_RxDataDecErr    ( dec_err[EP]    ),
+      .o_rx_valid         ( rx_valid[EP]   ),
+      .o_rx_disp_err   ( disp_err[EP]   ),
+      .o_rx_dec_err    ( dec_err[EP]    ),
       .o_tx_buf_err      ( tx_buf_err[EP] ),
       .tl_tx_data        ( tx_data[EP]    ),
       .tl_tx_tlp_valid   ( tx_valid[EP]   ),
@@ -152,18 +191,18 @@ module tb_dll_phy;
       .TX_SERIO_N        ( ep_tx_n        )
    );
 
-   pcie_stack #(.DATA_BYTES(DATA_BYTES)) rc (
+   pcie_stack rc (
       .clk_ref           ( clk_ref        ),
       .clk_aon           ( clk_aon        ),
       .clk_cfg           ( clk_cfg        ),
       .reset_n           ( reset_n        ),
-      .o_PCLK            ( pclk[RC]       ),
-      .o_LinkUp          ( link_up[RC]    ),
+      .o_pclk            ( pclk[RC]       ),
+      .o_link_up          ( link_up[RC]    ),
       .o_ltssm_state     ( ltssm[RC]      ),
       .o_serdes_ready    ( serdes_rdy[RC] ),
-      .o_RxValid         ( rx_valid[RC]   ),
-      .o_RxDataDispErr   ( disp_err[RC]   ),
-      .o_RxDataDecErr    ( dec_err[RC]    ),
+      .o_rx_valid         ( rx_valid[RC]   ),
+      .o_rx_disp_err   ( disp_err[RC]   ),
+      .o_rx_dec_err    ( dec_err[RC]    ),
       .o_tx_buf_err      ( tx_buf_err[RC] ),
       .tl_tx_data        ( tx_data[RC]    ),
       .tl_tx_tlp_valid   ( tx_valid[RC]   ),
@@ -210,20 +249,20 @@ module tb_dll_phy;
    logic [7:0] rc_lane;
    assign rc_lane = (rc_training || rc_link_phase) ? PAD : RC_LANE_NUM;
 
-   always @(rc_link) force rc.mac.expected_Link = rc_link;
-   always @(rc_lane) force rc.mac.expected_Lane = rc_lane;
+   always @(rc_link) force rc.mac.link_num = rc_link;
+   always @(rc_lane) force rc.mac.lane_num = rc_lane;
 
    always @(ltssm[RC])
       if (ltssm[RC] == CONFIG_LINKWIDTH_ACCEPT || ltssm[RC] == CONFIG_LANENUM_ACCEPT)
-         force rc.mac.TS2_pattern_en = 1'b1;
+         force rc.mac.ts2_pattern_en = 1'b1;
       else
-         release rc.mac.TS2_pattern_en;
+         release rc.mac.ts2_pattern_en;
 
    always @(ltssm[RC])
       if (ltssm[RC] == CONFIG_LANENUM_ACCEPT)
-         force rc.mac.TS1_pattern_en = 1'b1;
+         force rc.mac.ts1_pattern_en = 1'b1;
       else
-         release rc.mac.TS1_pattern_en;
+         release rc.mac.ts1_pattern_en;
 
 `ifndef SCRAMBLE
    initial begin
@@ -290,8 +329,8 @@ module tb_dll_phy;
          logic [7:0]            tlp [0:255];
          integer                cnt;
          logic                  framed;
-         logic [DATA_WIDTH-1:0] d;
-         logic [DATA_BYTES-1:0] k;
+         pipe_data_t  d;
+         pipe_flags_t k;
          logic [31:0]           crc;
          integer                b, i;
          initial begin
@@ -331,7 +370,7 @@ module tb_dll_phy;
    endgenerate
 
    integer errors;
-   logic [DATA_WIDTH-1:0] tlp_words [0:15];
+   pipe_data_t  tlp_words [0:15];
 
    task tick(input integer s);
       begin
@@ -393,7 +432,7 @@ module tb_dll_phy;
 
    task check_tlp_rx(input integer s, input integer n, input logic half, input integer limit);
       integer t, i;
-      logic [DATA_WIDTH-1:0] m;
+      pipe_data_t  m;
       begin
          t = 0;
          while (!rx_tvalid[s] && t < limit) begin
@@ -485,8 +524,8 @@ module tb_dll_phy;
    // (SDP, then 8'h80) the RC receives. A K symbol becomes a data byte, a data
    // byte gets bit 0 flipped: to the DLL, a symbol that decoded wrong.
    localparam [7:0] SDP = 8'h5C;
-   logic [DATA_WIDTH-1:0] inj_d;
-   logic [DATA_BYTES-1:0] inj_k;
+   pipe_data_t  inj_d;
+   pipe_flags_t inj_k;
 
    task inject_rc(input logic dllp, input integer off);
       integer pos, b, n;
@@ -519,11 +558,9 @@ module tb_dll_phy;
             $display("[%10.1f ns] ERROR: no %s for the RC's receiver to corrupt", $realtime, dllp ? "UpdateFC-P" : "TLP");
          end
          else begin
-            force rc.dll.phy_rx_data   = inj_d;
-            force rc.dll.phy_rx_data_k = inj_k;
+            force rc.dll.g_vc[0].u_vc.rx_sym = {inj_d, inj_k};  // pipe_sym_t {data, kcode}
             @(posedge pclk[RC]); #1;
-            release rc.dll.phy_rx_data;
-            release rc.dll.phy_rx_data_k;
+            release rc.dll.g_vc[0].u_vc.rx_sym;
          end
       end
    endtask
@@ -722,6 +759,15 @@ module tb_dll_phy;
       tlp_words[2] = 64'hC0C1C2C3C4C5C6C7;
       tlp_once(EP, 3, 1'b0);
 
+      // The EP sends its reserved bits set (its LCRC covers them): the RC's
+      // LCRC must cover them too, so the TLP is taken once, no Nak (3.5.2.1)
+      $display("=== Step 6b: TLP with the reserved bits after STP set, EP -> RC, taken once ===");
+      force ep.dll.g_vc[0].u_vc.u_vc_tx.u_retry_buffer.stp_prefix.rsvd = 4'hA;
+      tlp_words[0] = 64'h0000000F_0100A5A5;
+      tlp_words[1] = 64'h76543210_FEDCBA98;
+      tlp_once(EP, 2, 1'b0);
+      release ep.dll.g_vc[0].u_vc.u_vc_tx.u_retry_buffer.stp_prefix.rsvd;
+
       $display("=== Step 7: odd-DW TLP, its last TLP byte corrupted at the RC's receiver, expect NAK and replay ===");
       tlp_words[0] = 64'h5555AAAA5555AAAA;
       tlp_words[1] = 64'h1234567890ABCDEF;
@@ -769,3 +815,10 @@ module tb_dll_phy;
 `endif
 
 endmodule
+
+// -----------------------------------------------------------------------------
+// Project:     openCologne-PCIE
+// Description: NLnet-sponsored open-source implementation
+// Version:     1.0
+// Date:        Oct 13, 2026
+// -----------------------------------------------------------------------------

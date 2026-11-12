@@ -11,15 +11,15 @@
 
 // pcieVHost's macros (timescale, display flags, register map, `fatal) first,
 // so every model below sees them, whatever the simulator
-$VIP_DIR/hdl/headers/allheaders.v
+$VIP_DIR/hdl/headers/allheaders.svh
 
 // Co-simulation models
 models/cosim/mem_model.sv
-$VIP_DIR/hdl/f_VProc.v
-$VIP_DIR/hdl/clkmux.v
-$VIP_DIR/hdl/Serialiser.v
-$VIP_DIR/hdl/pcieVHost.v
-$VIP_DIR/hdl/pcieVHostPipex1.v
+$VIP_DIR/hdl/f_VProc.sv
+$VIP_DIR/hdl/clkmux.sv
+$VIP_DIR/hdl/Serialiser.sv
+$VIP_DIR/hdl/pcieVHost.sv
+$VIP_DIR/hdl/pcieVHostPipex1.sv
 models/PIPEx1__pcieVHost.sv
 models/RCPIPEx1__pcieVHost.sv
 

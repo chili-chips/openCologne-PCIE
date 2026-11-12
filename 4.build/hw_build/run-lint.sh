@@ -7,12 +7,13 @@
 # a set of opensource tools, run in this order:
 #
 #   tags       every /*LINT:OK*/ sits on an output port (no tool needed)
-#   verilator  Verilator --lint-only -Wall: unused/undriven signals, widths,
+#   verilator  Verilator --lint-only -Wall (top, then trn_compat on its own):
+#              unused/undriven signals, widths,
 #              implicit nets, multiple drivers, blocking vs non-blocking, case
 #   yosys      Yosys check on the read_slang netlist: combinational loops,
 #              conflicting drivers, used-but-undriven wires, latches
 #   slang      read_slang -Wextra: strict IEEE parse, second opinion
-#   verible    Verible style rules (run-lint.verible) on our own RTL: our case
+#   verible    Verible style rules (run-lint.verible) on all RTL (not the BFM, csr.sv, eduBOS5): our case
 #              rule -- signals and ports lower case, constants UPPER case --
 #              and Verible's defaults
 #
@@ -32,14 +33,10 @@
 # The GateMate primitives (CC_SERDES, CC_BUFG, ...) come from the Yosys
 # library (yosys-config --datdir), as blackboxes.
 #
-# The Cologne Chip submodule code (2.pipe/pipe_src) keeps its own style and
-# is not changed here: its style findings are waived (run-lint-waivers.txt)
-# and slang's are not shown, while the ones that can be bugs (latches,
-# undriven wires) stay; they belong upstream. Its waivers are temporary: closer to the
-# first release, that code is brought up to our standard and through this
-# flow. The SerDes BFM (ccfpga_serdes.BFM.sv, ccfpga_serdes_pkg.sv) is a
-# behavioural model, not RTL, and is left out the same way; the synthesis
-# wrapper ccfpga_serdes.SYNTH.sv is RTL and is linted like ours.
+# All RTL is linted, the PIPE, MAC and DLL code too. The SerDes BFM
+# (ccfpga_serdes.BFM.sv, ccfpga_serdes_pkg.sv) is a behavioural model, not
+# RTL, and is left out; the synthesis wrapper ccfpga_serdes.SYNTH.sv is RTL
+# and is linted like ours.
 #
 # Sources are copied into a work directory (LINT_WORK, default mktemp -d) and
 # every tool gets relative paths. Logs stay there: <phase>.log is the tool
@@ -86,14 +83,14 @@ mkdir -p "$W"
 
 # ---- work copy ----------------------------------------------------------------
 (cd "$REPO" && cp -r --parents 2.rtl/*.sv 2.rtl/1.phy/phy_top.sv 2.rtl/1.phy/2.serdes-model \
-   2.rtl/2.pipe/pipe_if.sv 2.rtl/2.pipe/pipe_src/src 2.rtl/4.dll/dll_if.sv 2.rtl/5.tlp 2.rtl/6.soc \
+   2.rtl/2.pipe/*.sv 2.rtl/3.mac/*.sv 2.rtl/4.dll/*.sv 2.rtl/5.tlp 2.rtl/6.trn_bridge 2.rtl/7.soc \
    "$W/")
 mkdir -p "$W/csr"
 cp "$REPO"/4.build/csr_build/generated-files/{csr_pkg,csr}.sv "$W/csr/"
 cp "$REPO/4.build/sw_build/firmware.hex" "$W/"
 cd "$W"
 SV=$(design_rtl 2.rtl csr $SIM | tr '\n' ' ')
-OWN=$(own_rtl 2.rtl)
+OWN="$(own_rtl 2.rtl) $(ls 2.rtl/2.pipe/*.sv 2.rtl/3.mac/*.sv 2.rtl/4.dll/*.sv | grep -v -E '_(if|pkg)\.sv')"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 declare -A RESULT
@@ -200,7 +197,6 @@ run_verilator() {
   cat > waive.vlt <<'VLT'
 `verilator_config
 lint_off -file "*bb.v"
-lint_off -file "*/pipe_src/*"
 lint_off -file "*/2.serdes-model/ccfpga_serdes.BFM.sv"
 lint_off -file "*/2.serdes-model/ccfpga_serdes_pkg.sv"
 // the synthesis wrapper's serial and termination outputs: CC_SERDES has no such
@@ -215,8 +211,15 @@ VLT
   "$VERILATOR" --lint-only -Wall -Wno-fatal --timing --timescale 1ns/1ps --top-module $TOP $VL_DEFS \
     waive.vlt bb.v $SV > verilator.log 2>&1
   local rc=$?
-  found verilator < <(grep -E '^%(Warning|Error)' verilator.log)
-  exit_check verilator $rc
+  # trn_compat is not under top (it is for user logic written for TRN; the TL
+  # bench uses it): lint it as its own top and keep its own findings, the
+  # packages and interfaces are linted in the design above
+  "$VERILATOR" --lint-only -Wall -Wno-fatal --timing --timescale 1ns/1ps --top-module trn_compat \
+    $VL_DEFS waive.vlt bb.v $SV 2.rtl/5.tlp/trn_compat.sv > verilator-compat.log 2>&1
+  local rc2=$?
+  found verilator < <(grep -E '^%(Warning|Error)' verilator.log
+                      grep -E '^%Error|^%Warning-[A-Z0-9_]+: 2\.rtl/5\.tlp/trn_compat\.sv:' verilator-compat.log)
+  exit_check verilator $((rc | rc2))
 }
 
 run_yosys() {
@@ -246,7 +249,7 @@ run_slang() {
   found slang < <(sed -E 's#^(\.\./)+[^ ]*/(2\.rtl|csr)/#\2/#;
                           s/^([^ :]+:[0-9]+): Warning:/\1:0: warning:/;
                           s/^([^ :]+:[0-9]+): Error:/\1:0: error:/' slang.log |
-                  grep -E 'warning:|error:' | grep -v -E '^(bb\.v|2\.rtl/2\.pipe/pipe_src/|2\.rtl/1\.phy/2\.serdes-model/ccfpga_serdes(\.BFM|_pkg)\.sv)')
+                  grep -E 'warning:|error:' | grep -v -E '^(bb\.v|2\.rtl/1\.phy/2\.serdes-model/ccfpga_serdes(\.BFM|_pkg)\.sv)')
   exit_check slang $rc
 }
 

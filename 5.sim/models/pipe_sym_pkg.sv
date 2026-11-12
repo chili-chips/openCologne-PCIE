@@ -5,7 +5,7 @@
 //--------------------------------------------------------------------------
 // Description:
 //   pipe_sym_pkg: the symbol values our pcieVHost models put on a PIPE, in
-//   place of including upstream's pciexpress_header.v for them.
+//   place of including upstream's pciexpress_header.svh for them.
 //
 //   NOSIG_SYM is electrical idle on a PIPE, per symbol: the K flag and 0xFF,
 //   which has no 8b/10b code (Base 2.1 4.2.1), so PCIe never sends it. Our

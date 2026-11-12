@@ -174,7 +174,7 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
 - The tester's random mix is seeded (`make SEED=N`, `make regress`).
 - The EP model passes all of them, at the PIPE and on the serial line, over 100 seeds. Our EP passes with `A7RC=1` and fails the tester, above.
 
-The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22): our DLL's InitFC advertised P 32/1008 and NP 32/1, while the TL has 8/32 and 8/8, so its first UpdateFC-NP (9 after 32) looked to the host like a jump of 233 header credits. Fixed on our fork of gatemate-pipe (`send_DLLP.v` builds the InitFC DLLPs from `INIT_*`); `pcie_core.sv` gives the TL and DLL the same credits.
+The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22): our DLL's InitFC advertised P 32/1008 and NP 32/1, while the TL has 8/32 and 8/8, so its first UpdateFC-NP (9 after 32) looked to the host like a jump of 233 header credits. Fixed on our fork of gatemate-pipe (`send_dllp.sv` builds the InitFC DLLPs from `INIT_*`); `pcie_core.sv` gives the TL and DLL the same credits.
 
 ### Make options
 
@@ -248,6 +248,7 @@ make EP=rtl IFACE=serial A7RC=1 run                   # our EP with the real PHY
 | `a_skp` | in L0, no SKP Ordered Set on the PIPE for 1538 + 128 + 28 Symbol Times (4.2.7.1) | [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
 | `a_skp_mux` | the MAC's SKP generator sends its SKP word in a cycle its output mux gives to data, an OS or IDLE: the SKP is lost | [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
 | `a_replay` | a TLP in the retry buffer is neither Acked nor replayed within the REPLAY_TIMER limit, 2 × 711 Symbol Times (3.5.2.1), in L0 | [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
+| `a_fc_init` | the DLL enters DL_Active, but the TL does not hold the InitFC credit limits of P, NP and Cpl (3.2.1) | none: fixed, the TL runs on `mac_rst_n` |
 
 ### WaveCrux decoders
 
@@ -272,7 +273,7 @@ Each pcieVHost reports every TLP and DLLP it sends and receives on ports of its 
 - Each side has its decoder page, `tb.u_rc` and `tb.dut.bfm_pcie`, with the same names by link direction (dn = RC -> EP, up = EP -> RC). A packet shows on both, a link latency apart.
 
 <p align="center">
-<img alt="Inside PIPEx1__pcieVHost, used by both sides: the pcieVHost C model writes each TLP and DLLP through VProc, in zero time, into four SV queues in pcieVHost.v, which play them out one per clock on TlpTx/TlpRx/DllpTx/DllpRx ports; our wrapper turns them into dll_rx beats for a TL under test and into the names WaveCrux decoders auto-bind, next to the PIPE link" width="100%" src="../0.doc/5.sim/pcievhost-taps.drawio.png">
+<img alt="Inside PIPEx1__pcieVHost, used by both sides: the pcieVHost C model writes each TLP and DLLP through VProc, in zero time, into four SV queues in pcieVHost.sv, which play them out one per clock on TlpTx/TlpRx/DllpTx/DllpRx ports; our wrapper turns them into dll_rx beats for a TL under test and into the names WaveCrux decoders auto-bind, next to the PIPE link" width="100%" src="../0.doc/5.sim/pcievhost-taps.drawio.png">
 </p>
 
 | Layer | Ports of `tb.u_rc`, `tb.dut.bfm_pcie` | For |
@@ -306,7 +307,7 @@ With `EP=rtl`, `DUMP=1` gives our EP a decoder page at every layer boundary:
 | PIPE, PHY ↔ MAC | `pipe_dn_*`, `pipe_up_*` | wcx-pcie: PCIe PIPE and PCIe Data Link Layer, 64-bit, `scrambling` auto | layers, free |
 | MAC ↔ DLL | `mac_dn_*`, `mac_up_*` | wcx-pcie: PCIe Data Link Layer, `scrambling` off | layers, free |
 | DLL ↔ TL, `dll_if` | `dll_*` | WaveCrux Pro: PCIe TLP, generic, Data Width 64 | layers, serial |
-| TL ↔ `trn_bridge`, `trn_if` | `trn_*` | the same | layers, serial |
+| TL ↔ `trn_bridge`, `trn_rx_if`, `trn_tx_if` | `trn_*` | the same | layers, serial |
 | `trn_bridge` ↔ SOC, AXI-Stream | `m_axis_rx_*`, `s_axis_tx_*` | WaveCrux Pro: PCIe TLP, Xilinx 7 Series AXIS preset | layers, serial |
 | | `tlp_view.tx_*`, `tlp_view.rx_*` | our [TLP decoder](https://github.com/Ferrite-Engineering/wavecrux-decoders/tree/main/decoders/pcie-tlp) (free), one DW per clock | free |
 | SOC CPU | `tb.dut.u_soc.cpu_view.rvfi_*` | WaveCrux: RISC-V instruction trace | all |
@@ -333,7 +334,7 @@ The pictures are WaveCrux Pro 1.1.0 with wcx-pcie 0.2.0. They predate the Artix-
 <img alt="WaveCrux, the whole EP=rtl run: link training, enumeration, PIO" src="../0.doc/5.sim/wavecrux-ep-overview.png" width=900 />
 
 - 0 to 72 µs, link training. Most of it is Polling.Active: the EP sends the 1024 TS1 the specification asks for (65.5 µs), while the host, with its abbreviated LTSSM, already waits in Polling.Configuration sending TS2 (`TS2 ×1047`). L0 at 72.2 µs (a), DL_Active at 73.4 µs.
-- 74 to 103 µs, enumeration (b): 22 configuration requests. `dll_if` is busy, `trn_if` and the AXI-Stream stay quiet: the TL answers them itself.
+- 74 to 103 µs, enumeration (b): 22 configuration requests. `dll_if` is busy, TRN and the AXI-Stream stay quiet: the TL answers them itself.
 - 103 µs, the first MWr32 and MRd32 to BAR0 (c) go on to the SOC. The SOC takes the MRd32 only at 345 µs (d): until then eduBOS5 clears its PIO memory (`pio_mem` in [`main.c`](../3.sw/EP/main.c), 256 words, 11 instructions each: the firmware is built without `-O`). The CPU leaves reset with the link; from then on its row is full.
 - 345 to 499 µs, PIO, one request at a time, 24 µs each, almost all of it in the firmware; `fw_pass` at 370.7 µs (e).
 
@@ -386,11 +387,11 @@ Zoomed in, from top to bottom: the CfgRd0 at the PIPE and after the MAC (74.08 t
 | 74.096 µs | PIPE RX | `TLP seq=0 CfgRd0 len=1` | STP on the link, scrambled |
 | 74.320 µs | MAC -> DLL | `TLP seq=0 CfgRd0 len=1` | MAC receive, 7 PCLK |
 | 74.704 µs | `dll_if` | `CfgRd0 Vendor ID/Device ID · 00:00.2 tag 0x00` | DLL receive with the LCRC check, 12 PCLK; `Ack seq=0` goes back at 74.74 µs |
-| 75.056 µs | `dll_if` | `CplD [SC] Vendor ID/Device ID = 0x00011234` | the TL, 11 PCLK; `UpdateFC-NP H=33` gives the credit back at 75.18 µs |
+| 75.056 µs | `dll_if` | `CplD [SC] Vendor ID/Device ID = 0x00011234` (CC00h:CC00h since 2026-11-03) | the TL, 11 PCLK; `UpdateFC-NP H=33` gives the credit back at 75.18 µs |
 | 75.280 µs | DLL -> MAC | `TLP seq=0 CplD len=1` | DLL transmit, 7 PCLK |
 | 75.408 µs | PIPE TX | `TLP seq=0 CplD len=1` | MAC transmit, 4 PCLK |
 
-1.31 µs, 41 PCLK, from STP in to STP out. The times in this table and the next are the PCLK edge that samples the STP, or the first beat at `dll_if`, `trn_if` and the AXI-Stream; the PCIe TLP decoders' rows start one PCLK, 32 ns, earlier, at the start of that clock (74.672 µs for the CfgRd0 at `dll_if`).
+1.31 µs, 41 PCLK, from STP in to STP out. The times in this table and the next are the PCLK edge that samples the STP, or the first beat at `dll_if`, TRN and the AXI-Stream; the PCIe TLP decoders' rows start one PCLK, 32 ns, earlier, at the start of that clock (74.672 µs for the CfgRd0 at `dll_if`).
 
 **A memory read, down to the firmware and back.** The last request, MRd32 of BAR0 + 0x010 (a: the host sends it, b: the SOC takes it, c: the SOC sends the CplD, d: the host has it):
 
@@ -404,24 +405,24 @@ Zoomed in on the PIPE and the MAC, `TLP seq=29 MRd32 len=1` coming in (472.98 to
 
 <img alt="WaveCrux, the MRd32 coming in and its CplD going out, zoomed in" src="../0.doc/5.sim/wavecrux-ep-mrd-zoom.png" width=900 />
 
-The Pro decoders' table, filtered on address 0x2A784010: the first MWr32 and MRd32 to it (tags 0x16, 0x17) and this MRd32 (tag 0x1D), at `dll_if` (`PCIe TLP #1`), `trn_if` (`#2`) and the AXI-Stream (`Xilinx 7 Series AXIS`). Each CplD names the request it answers; requests at the AXI-Stream have `bar_hit` BAR0; latency is request to CplD at that boundary. The `bar_hit`, `latency` and `tag` columns are further right in the same table; we put them next to the label:
+The Pro decoders' table, filtered on address 0x2A784010: the first MWr32 and MRd32 to it (tags 0x16, 0x17) and this MRd32 (tag 0x1D), at `dll_if` (`PCIe TLP #1`), TRN (`#2`) and the AXI-Stream (`Xilinx 7 Series AXIS`). Each CplD names the request it answers; requests at the AXI-Stream have `bar_hit` BAR0; latency is request to CplD at that boundary. The `bar_hit`, `latency` and `tag` columns are further right in the same table; we put them next to the label:
 
-<img alt="WaveCrux Pro PCIe TLP decoders, the requests to BAR0 + 0x010 and their completions at dll_if, trn_if and the AXI-Stream" src="../0.doc/5.sim/wavecrux-ep-mrd-table.png" width=900 />
+<img alt="WaveCrux Pro PCIe TLP decoders, the requests to BAR0 + 0x010 and their completions at dll_if, TRN and the AXI-Stream" src="../0.doc/5.sim/wavecrux-ep-mrd-table.png" width=900 />
 
 | Time | Where | Decoded | Step |
 |---|---|---|---|
 | 473.008 µs | PIPE RX | `TLP seq=29 MRd32 len=1` | STP on the link |
 | 473.232 µs | MAC -> DLL | `TLP seq=29 MRd32 len=1` | MAC receive, 7 PCLK |
 | 473.616 µs | `dll_if` | `MRd32 0x2A784010 · 00:00.2 tag 0x1D` | DLL receive, 12 PCLK |
-| 473.808 µs | `trn_if` | `MRd32 0x2A784010` | the TL: queue, ordering, BAR0 hit, 6 PCLK |
+| 473.808 µs | TRN | `MRd32 0x2A784010` | the TL: queue, ordering, BAR0 hit, 6 PCLK |
 | 474.384 µs | AXI-Stream | `MRd32 0x2A784010`, `bar_hit` BAR0 | the SOC takes it once the firmware has released the previous request |
 | 498.192 µs | AXI-Stream | `CplD [SC] 0x2A784010 = 0x0DF0FECA` | the firmware, 23.8 µs |
-| 498.224 µs | `trn_if` | `CplD [SC]` | `trn_bridge`, 1 PCLK |
+| 498.224 µs | TRN | `CplD [SC]` | `trn_bridge`, 1 PCLK |
 | 498.448 µs | `dll_if` | `CplD [SC] 0x2A784010` | the TL's TX buffer, which takes a TLP whole before it sends it, 7 PCLK |
 | 498.672 µs | DLL -> MAC | `TLP seq=25 CplD len=1` | DLL transmit, 7 PCLK |
 | 498.800 µs | PIPE TX | `TLP seq=25 CplD len=1` | MAC transmit, 4 PCLK |
 
-25.8 µs from STP in to STP out, 23.8 µs of it in the firmware: the latency of this MRd32 is 24.8 µs at `dll_if`, 24.4 µs at `trn_if` and 23.8 µs at the AXI-Stream. The payload reads `0x0DF0FECA`, byte 0 first: the host wrote 0xcafef00d little-endian. Every layer shows the same tag, 0x1D, and the Pro decoders pair the CplD with this MRd32 at each of them. The first MRd32 to this address (tag 0x17) waited 264 µs; the [TL section](../2.rtl/5.tlp/README.md#viewing-the-tl-in-wavecrux) shows where.
+25.8 µs from STP in to STP out, 23.8 µs of it in the firmware: the latency of this MRd32 is 24.8 µs at `dll_if`, 24.4 µs at TRN and 23.8 µs at the AXI-Stream. The payload reads `0x0DF0FECA`, byte 0 first: the host wrote 0xcafef00d little-endian. Every layer shows the same tag, 0x1D, and the Pro decoders pair the CplD with this MRd32 at each of them. The first MRd32 to this address (tag 0x17) waited 264 µs; the [TL section](../2.rtl/5.tlp/README.md#viewing-the-tl-in-wavecrux) shows where.
 
 **On the serial line** (`IFACE=serial`). The first CfgRd0 again, with Cologne Chip's PIPE logic and the SerDes BFM below the MAC: the serial-line decoders recover it from the 1-bit line. It is on the line at 80.47 µs and at the PIPE about 0.4 µs later (STP at 80.864 µs: bit lock, 8b/10b, word alignment, elastic buffer); its CplD leaves the PIPE at 82.176 µs and is on the line about 0.13 µs after:
 
@@ -500,7 +501,7 @@ openPCIE runs its co-simulation on AMD's XSIM, as the encrypted Artix-7 hard mac
 2. **Every referenced module must exist.** The pcieVHost wrappers instantiate `clkmux` and `Serialiser` (from pcieVHost's `verilog/lib`), never compiled by the XSIM file list. Verilator wants every referenced module, so the VIP build now collects them.
 3. **Electrical idle: `NOSIG`.** An electrically idle PCIE line carries no signal. Upstream models it as `Z` on a 4-state simulator, and under Verilator (2-state) as zeros plus a side-band, `ElecIdleOut` and `ElecIdleIn`. openPCIE's patch drops both: each idle symbol on the PIPE is `NOSIG`, the K flag and `0xFF` (no 8b/10b code), on Verilator and Icarus alike. Verilator can't be trusted with `Z` here: its `=== 'z` reads a driven 0 as `Z` ([#34](https://github.com/chili-chips-ba/openCologne-PCIE/issues/34)).
 4. **One LTSSM on both sides.** On openPCIE the model plays the EP, an upstream port, against a real `PCIE_2_1` downstream port; the patch makes it spec-correct: an upstream port keeps sending Link/Lane = PAD in its TS1 until the downstream port assigns the numbers. Upstream's model takes a shortcut that only works against a copy of itself, so the patched EP would deadlock in Configuration.Start against pcieVHost's own RC, on both simulators. With upstream's RC as our host, we used upstream's `ltssm.c`. The host is now openPCIE's Artix-7 RC model, which assigns Link and Lane numbers as the hard macro does, so both sides use openPCIE's `ltssm.c`, patch included.
-5. **Macros before models.** The pcieVHost models use macros (`WsTimeScale`, `RegDel`, the comma symbols, the register map) from its headers. Under Verilator the first file in the list happened to pull them in for all others; not under Icarus. [`tb.f`](tb.f) now names `allheaders.v` first, for both.
+5. **Macros before models.** The pcieVHost models use macros (`WsTimeScale`, `RegDel`, the comma symbols, the register map) from its headers. Under Verilator the first file in the list happened to pull them in for all others; not under Icarus. [`tb.f`](tb.f) now names `allheaders.svh` first, for both.
 6. **Portable delays.** Icarus rejected the test bench's `#(N * 1ps)` delays. The file's timescale is 1 ps, so plain numbers mean the same everywhere; the run limit is a 64-bit constant, as 10 ms in picoseconds overflows 32 bits.
 
 ### VIP versions and local changes
@@ -516,13 +517,14 @@ The upstream files are copied in [`vip`](vip/README.md), with these changes made
 
 | File | Change | Why |
 |---|---|---|
-| pcieVHost `verilog/pcieVHost/pcieVHost.v` | VProc `BE` and `Burst` ports, left open | we build VProc with `VPROC_BYTE_ENABLE` |
-| pcieVHost `verilog/headers/test_defs.v` | `` `fatal`` calls `tb.Fatal` | our test bench top is `tb` |
-| pcieVHost `src/displink.c`, `src/pcie_vhost_map.h`, `pcieVHost.v`, `pcieVHostPipex1.v` | transaction taps: TLP and DLLP ports ([`pcievhost-taps.patch`](models/pcievhost/pcievhost-taps.patch)) | waveform decoders need the TLP stream; the model keeps it in C |
-| pcieVHost `verilog/headers/pcie_vhost_map.v` | added: generated from `src/pcie_vhost_map.h` | upstream's make files generate it |
+| pcieVHost `verilog/pcieVHost/pcieVHost.sv` | VProc `BE` and `Burst` ports, left open | we build VProc with `VPROC_BYTE_ENABLE` |
+| pcieVHost `verilog/test/test_defs.svh` | `` `fatal`` calls `tb.Fatal` | our test bench top is `tb` |
+| pcieVHost `src/displink.c`, `src/pcie_vhost_map.h`, `pcieVHost.sv`, `pcieVHostPipex1.sv` | transaction taps: TLP and DLLP ports ([`pcievhost-taps.patch`](models/pcievhost/pcievhost-taps.patch)) | waveform decoders need the TLP stream; the model keeps it in C |
+| pcieVHost `verilog/headers/pcie_vhost_map.svh` | added: generated from `src/pcie_vhost_map.h` | upstream's make files generate it |
 | pcieVHost `src/ltssm.c` | not copied: the make file compiles openPCIE's, [`models/a7rc-model/ltssm.c`](models/a7rc-model), with its LTSSM patch and Artix-7 RC profile | the host is openPCIE's Artix-7 RC model (step 4 above) |
-| pcieVHost `src/*.c`, `verilog/lib/Serialiser.v`, `verilog/lib/clkmux.v`, `verilog/pcieVHost/pcieVHost.v`, `verilog/pcieVHost/pcieVHostPipex1.v`, `verilog/headers/pciexpress_header.v` | openPCIE's `pcievhost-speed.patch`, applied by `tools/build-vip.sh` before the build | Gen2 speed changes, the Artix-7 RC profile's flow control and Ack timing, lane polarity inversion, and one electrical-idle rule on every simulator (`NOSIG` on the PIPE, constant 0 on the serial line, no X or Z) |
-| [`models/cosim/mem_model.sv`](models/cosim/mem_model.sv) | wraps upstream `mem_model.v` (as `f_mem_model.v`) in Verilator `lint_off` pragmas | keeps third-party code out of our lint |
+| pcieVHost `src/*.c`, `verilog/lib/Serialiser.sv`, `verilog/lib/clkmux.sv`, `verilog/pcieVHost/pcieVHost.sv`, `verilog/pcieVHost/pcieVHostPipex1.sv`, `verilog/headers/pciexpress_header.svh` | openPCIE's `pcievhost-speed.patch`, applied by `tools/build-vip.sh` before the build | Gen2 speed changes, the Artix-7 RC profile's flow control and Ack timing, lane polarity inversion, and one electrical-idle rule on every simulator (`NOSIG` on the PIPE, constant 0 on the serial line, no X or Z) |
+| [`models/cosim/mem_model.sv`](models/cosim/mem_model.sv) | wraps upstream `mem_model.v` (as `f_mem_model.sv`) in Verilator `lint_off` pragmas | keeps third-party code out of our lint |
+| VProc, pcieVHost, mem_model HDL | SystemVerilog names: modules `.sv`, `` `include`` headers `.svh`, the `` `include`` lines to match; after the patches, which keep upstream's `.v` names (`tools/build-vip.sh` maps `pcievhost-speed.patch`'s) | one rule for the whole repo: no `.v` files |
 | rv32 `src/rv32csr_cpu.cpp` (in [`models/rv32/rv32-openpcie.patch`](models/rv32/rv32-openpcie.patch), from openPCIE) | the timer-compare check in `process_interrupts()` no longer charges cycles | it added 2 cycles to every instruction |
 | rv32 `src/rv32i_cpu.cpp` (same patch) | `sw`, `sh` add the store extra cycles | upstream adds the load ones |
 | [`models/rv32/usercode/rv32_timing_config.h`](models/rv32/usercode/rv32_timing_config.h) | PicoRV32, eduBOS5 2-/3-stage timing tables, measured on openPCIE's SOC RTL | see openPCIE's [Our Local VIP Improvements](https://github.com/chili-chips-ba/openPCIE/blob/main/5.sim/README.md#our-local-vip-improvements) |

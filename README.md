@@ -5,8 +5,8 @@
 [![eduBOS5:YES](https://badgen.net/badge/eduBOS5/YES/green)](https://github.com/chili-chips-ba/openPCIE/blob/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/README.md)
 [![pcievhost:YES](https://badgen.net/badge/pcievhost/YES/green)](5.sim/models/pcievhost/README.md)
 [![WaveCrux:YES](https://badgen.net/badge/WaveCrux/YES/green)](2.rtl/4.dll/README.md#viewing-the-dll-in-wavecrux)
-[![Lint:WIP](https://badgen.net/badge/Lint/WIP/orange)](2.rtl/README.md#rtl-coding-guidelines)
-[![Verible:WIP](https://badgen.net/badge/Verible/WIP/orange)](2.rtl/README.md#rtl-coding-guidelines)
+[![Lint](https://badgen.net/github/checks/chili-chips-ba/openCologne-PCIE/main/run-lint?label=Lint)](https://github.com/chili-chips-ba/openCologne-PCIE/actions/workflows/lint.yml)
+[![Verible](https://badgen.net/github/checks/chili-chips-ba/openCologne-PCIE/main/verible?label=Verible)](https://github.com/chili-chips-ba/openCologne-PCIE/actions/workflows/verible.yml)
 [![8b10b-Formal:Pass](https://badgen.net/badge/8b10b%20Formal/Pass/green)](https://github.com/chili-chips-ba/openCologne/tree/main/7.SerDes/1.sim-model/formal_8b10b)
 [![DLL+PHY-Sim:Pass](https://badgen.net/badge/DLL%2BPHY%20Sim/Pass/green)](2.rtl/4.dll/sim)
 [![TopSim:WIP](https://badgen.net/badge/TopSim/WIP/orange)](5.sim)
@@ -44,7 +44,7 @@ PCIE is complex, and most real-life users need little of it. We build a barebone
 | Area | Scope |
 |---|---|
 | Application | **PIO writes and reads** only. DMA and other applications can later be added on top of the core. |
-| Speed | **`Gen1`** committed. Gen2 (5 Gbps) best-effort, as a bonus. No automatic up/down speed training. |
+| Speed | **`Gen1`**. Gen2 (5 Gbps) is future work: the GateMate SerDes has trouble running at 5 Gbps ([1.pcb](1.pcb/README.md)), and Gen2 needs the rate change in Recovery.Speed, as every link trains at Gen1 first. |
 | Width | **`x1 (single-lane)`** only. Link width training is reduced to waking the link from its down state. |
 | Functions | **`One Physical Function (PF0)`**. No _Virtual Functions_ (VF), _Traffic Classes_ (TC) or _Virtual Channels_ (VC). |
 | Configuration Space | Bare minimum, mostly hard-coded. **BAR0** only, 32-bit, programmable from the Root Port. No 64-bit BARs. |
@@ -88,10 +88,10 @@ We then also test with a PC and a Raspberry Pi as the host. Details: [1.pcb/READ
 # PIPE is not a dream!
 
 <p align="center">
-  <img alt="PCIe physical layer sub-blocks" width="90%" src="2.rtl/1.phy/0.doc/images/PHY-Layers.drawio.png">
+  <img alt="PCIe physical layer sub-blocks" width="90%" src="2.rtl/1.phy/0.doc/PHY-Layers.drawio.png">
 </p>
 
-The GateMate SerDes has not been used for PCIE before, so expect PHY issues (signal integrity, jitter). Cologne Chip developers own the PHY and the **P**hysical **I**nterface for **P**CI **E**xpress (PIPE): **`2.rtl/1.phy`** and **`2.rtl/2.pipe`** (`pipe_if.sv`, `pipe_src`).
+The GateMate SerDes has not been used for PCIE before, so expect PHY issues (signal integrity, jitter). Cologne Chip developers own the PHY and the **P**hysical **I**nterface for **P**CI **E**xpress (PIPE): **`2.rtl/1.phy`** and **`2.rtl/2.pipe`**.
 
 > PIPE keeps the generic logic apart from FPGA-specific RTL. Not all our RTL is portable to other vendors, but a port only needs to revisit the thin layer behind PIPE.
 
@@ -101,9 +101,9 @@ The GateMate SerDes has not been used for PCIE before, so expect PHY issues (sig
 
 Two major elements:
 - **PCIE-capable SerDes:** Cologne Chip (CC) **proprietary** mixed-signal hard IP, wrapped in a thin soft adaptation layer (_phy_top_) with an industry-standard PIPE interface. An opensource SerDes BFM stands in for it in faster, public-domain simulations.
-- **PCIE protocol stack:** soft RTL: MAC/LTSSM by Cologne Chip; DLL, TL, app, test, validation, system, infrastructure and process by Chili.CHIPS (MAC and DLL sources in [gatemate-pipe](https://github.com/colognechip/gatemate-pipe)), topped by an eduBOS5-based RISC-V SOC as the application layer.
+- **PCIE protocol stack:** soft RTL: MAC/LTSSM by Cologne Chip; DLL, TL, app, test, validation, system, infrastructure and process by Chili.CHIPS (MAC from Cologne Chip's [gatemate-pipe](https://github.com/colognechip/gatemate-pipe)), topped by an eduBOS5-based RISC-V SOC as the application layer.
 
-> **Plug-and-play:** the TL's user interface, `trn_if`, is a drop-in replacement for the TRN interface of the AMD Artix-7 `PCIE_2_1` hard macro in EndPoint mode: same signals, widths and handshakes. User logic written for that HM, including openPCIE's `trn_bridge` to AXI-Stream, connects unchanged ([details](2.rtl/README.md#compatibility-goal-an-artix-7-endpoint-in-open-source)).
+> **TRN-compatible:** the TL's user interface, `trn_tx_if` / `trn_rx_if`, is derived from the TRN interface of the AMD Artix-7 `PCIE_2_1` hard macro in EndPoint mode, cut to the signals this core uses. `trn_compat` maps it back to TRN for user logic written for that HM, and lists what is not supported ([details](2.rtl/README.md#compatibility-goal-an-artix-7-endpoint-in-open-source)).
 
 <p align="center">
   <img alt="RTL blocks of the EndPoint: SOC, trn_bridge, soft TL+DLL+MAC, phy_top with the Cologne Chip soft wrapper and the GateMate SerDes, its BFM below" src="0.doc/2.rtl/block-diagram.drawio.png" width="100%">
@@ -150,7 +150,7 @@ Waveforms decode as transactions in the [WaveCrux PCIE decoders](https://github.
 | View | Where |
 |---|---|
 | PIPE and DLL, block level | [DLL in WaveCrux](2.rtl/4.dll/README.md#viewing-the-dll-in-wavecrux) |
-| Cologne Chip's MAC + DLL bench with pcieVHost (submodule) | [pictures](2.rtl/4.dll/README.md#simulation-with-pcievhost) |
+| Cologne Chip's MAC + DLL bench with pcieVHost (in gatemate-pipe) | [pictures](2.rtl/4.dll/README.md#simulation-with-pcievhost) |
 | Top level, every layer from PIPE to firmware | [EP in WaveCrux](5.sim/README.md#viewing-the-ep-in-wavecrux), [TL in WaveCrux](2.rtl/5.tlp/README.md#viewing-the-tl-in-wavecrux) |
 
 * A [_VProc_](https://github.com/wyvernSemi/vproc) virtual processor based [`soc_cpu.VPROC`](5.sim/models/README.md#soc_cpuvproc) component, in place of the RTL CPU, runs:
@@ -222,8 +222,8 @@ See [6.litex/README.md](6.litex/README.md)
 - ✅ Procure Test equipment, test fixtures, dev boards and accessories
 
 - ✅ Create docs and diagrams that are easy to follow and comprehend
->- ✅ RTL DLL and TL
 >- ✅ PIPE
+>- ✅ RTL DLL and TL
 >- ✅ SW
 >- ✅ TB, Sim, VIP
 
@@ -237,7 +237,7 @@ See [6.litex/README.md](6.litex/README.md)
 
 - 🟠 Develop opensource PHY with PIPE interface for GateMate SerDes
 >- ✅ x1, **Gen1**
->- ⬜ x1, Gen2 (best-effort, consider it a bonus if we make it)
+>- ⬜ x1, Gen2: future work, the SerDes has trouble running at 5 Gbps
 
 - 🟠 Develop opensource RTL for PCIE EP **DLL function**, with PIPE interface
 - 🟠 Develop opensource RTL for PCIE EP **TL function**
@@ -329,14 +329,15 @@ This project was funded through the NGI0 Commons Fund, a fund established by NLn
 A project the community does not know about is not finished work. We spread the word through posts, presentations and conferences.
 
 Our posts so far:
+- [2026-11-04, LinkedIn (JanusHDL)](https://lnkd.in/p/geXDYbsq)
 - [2026-10-20, LinkedIn (Ferrite)](https://lnkd.in/p/g-yGBEU8)
-- [2026-10-17](https://www.linkedin.com/posts/chili-chips_having-too-much-fun-cracking-ones-and-zeros-activity-7517129808020074496-Rmev?utm_source=share&utm_medium=member_desktop&rcm=ACoAAAJv-TcBSi_5ff0VNMrInrT-xg44YF3jnyU)
-- [2026-09-17](https://www.linkedin.com/feed/update/urn:li:activity:7505843991876370432?commentUrn=urn%3Ali%3Acomment%3A%28activity%3A7505843991876370432%2C7505869378253578240%29&replyUrn=urn%3Ali%3Acomment%3A%28activity%3A7505843991876370432%2C7505896426162274304%29&dashCommentUrn=urn%3Ali%3Afsd_comment%3A%287505869378253578240%2Curn%3Ali%3Aactivity%3A7505843991876370432%29&dashReplyUrn=urn%3Ali%3Afsd_comment%3A%287505896426162274304%2Curn%3Ali%3Aactivity%3A7505843991876370432%29)
-- [2026-06-23](https://www.linkedin.com/posts/andrew-e-wilson_its-fun-bringing-all-the-fpga-vendors-together-share-7475267075234607104-j50-)
-- [2026-06-12](https://www.linkedin.com/feed/update/urn:li:activity:7471157152074694656?commentUrn=urn%3Ali%3Acomment%3A%28activity%3A7471157152074694656%2C7471308573994557441%29&dashCommentUrn=urn%3Ali%3Afsd_comment%3A%287471308573994557441%2Curn%3Ali%3Aactivity%3A7471157152074694656%29)
-- [2025-11-20](https://www.linkedin.com/feed/update/urn:li:activity:7394569666557366272?commentUrn=urn%3Ali%3Acomment%3A%28activity%3A7394569666557366272%2C7397466385519448064%29&dashCommentUrn=urn%3Ali%3Afsd_comment%3A%287397466385519448064%2Curn%3Ali%3Aactivity%3A7394569666557366272%29)
-- [2025-10-02](https://www.linkedin.com/feed/update/urn:li:activity:7379769413421559808)
-- [2025-08-25](https://www.linkedin.com/feed/update/urn:li:ugcPost:7362742908170473473?commentUrn=urn%3Ali%3Acomment%3A%28ugcPost%3A7362742908170473473%2C7363111076936232962%29&dashCommentUrn=urn%3Ali%3Afsd_comment%3A%287363111076936232962%2Curn%3Ali%3AugcPost%3A7362742908170473473%29)
+- [2026-10-17, LinkedIn (WaveCrux)](https://www.linkedin.com/posts/chili-chips_having-too-much-fun-cracking-ones-and-zeros-activity-7517129808020074496-Rmev?utm_source=share&utm_medium=member_desktop&rcm=ACoAAAJv-TcBSi_5ff0VNMrInrT-xg44YF3jnyU)
+- [2026-09-17, LinkedIn (Tiny Tapeout)](https://www.linkedin.com/feed/update/urn:li:activity:7505843991876370432?commentUrn=urn%3Ali%3Acomment%3A%28activity%3A7505843991876370432%2C7505869378253578240%29&replyUrn=urn%3Ali%3Acomment%3A%28activity%3A7505843991876370432%2C7505896426162274304%29&dashCommentUrn=urn%3Ali%3Afsd_comment%3A%287505869378253578240%2Curn%3Ali%3Aactivity%3A7505843991876370432%29&dashReplyUrn=urn%3Ali%3Afsd_comment%3A%287505896426162274304%2Curn%3Ali%3Aactivity%3A7505843991876370432%29)
+- [2026-06-23, LinkedIn (FPGA vendors)](https://www.linkedin.com/posts/andrew-e-wilson_its-fun-bringing-all-the-fpga-vendors-together-share-7475267075234607104-j50-)
+- [2026-06-12, LinkedIn (FDF26)](https://www.linkedin.com/feed/update/urn:li:activity:7471157152074694656?commentUrn=urn%3Ali%3Acomment%3A%28activity%3A7471157152074694656%2C7471308573994557441%29&dashCommentUrn=urn%3Ali%3Afsd_comment%3A%287471308573994557441%2Curn%3Ali%3Aactivity%3A7471157152074694656%29)
+- [2025-11-20, LinkedIn (Namaste FPGA)](https://www.linkedin.com/feed/update/urn:li:activity:7394569666557366272?commentUrn=urn%3Ali%3Acomment%3A%28activity%3A7394569666557366272%2C7397466385519448064%29&dashCommentUrn=urn%3Ali%3Afsd_comment%3A%287397466385519448064%2Curn%3Ali%3Aactivity%3A7394569666557366272%29)
+- [2025-10-02, LinkedIn (announcement)](https://www.linkedin.com/feed/update/urn:li:activity:7379769413421559808)
+- [2025-08-25, LinkedIn (pcievhost)](https://www.linkedin.com/feed/update/urn:li:ugcPost:7362742908170473473?commentUrn=urn%3Ali%3Acomment%3A%28ugcPost%3A7362742908170473473%2C7363111076936232962%29&dashCommentUrn=urn%3Ali%3Afsd_comment%3A%287363111076936232962%2Curn%3Ali%3AugcPost%3A7362742908170473473%29)
 
 Planned fairs and conferences:
 
@@ -361,7 +362,9 @@ Need help? Ask ===> [![issues](https://badgen.net/github/open-issues/chili-chips
 
 ### Future outlook
 
-Beyond DMA and ports to other FPGA families + ASICs, we are considering:
+Next, in this order: burst PIO, then DMA Requester capability. Gen2 comes later, once the SerDes runs at 5 Gbps ([Future Development](2.rtl/README.md#future-development)).
+
+Beyond that and ports to other FPGA families + ASICs, we are considering:
 
 - hardware acceleration for AI, video, and general DSP compute workloads
 - bolting our PCIE EP to [ztachip](https://github.com/ztachip/ztachip), to accelerate PC host Python

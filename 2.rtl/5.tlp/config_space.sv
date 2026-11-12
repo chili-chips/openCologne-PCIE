@@ -1,21 +1,59 @@
+// SPDX-FileCopyrightText: 2026 Chili.CHIPS
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
+//==========================================================================
+// openCologne-PCIE * NLnet-sponsored open-source implementation
+//--------------------------------------------------------------------------
+//                   Copyright (C) 2026 Chili.CHIPS
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//
+// 1. Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+// contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+// IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+// PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+//              https://opensource.org/license/bsd-3-clause
+//==========================================================================
+
 module config_space
-  import pcie_pkg::*;
   import tl_pkg::*;
 #(
-    parameter logic [15:0] VENDOR_ID        = 16'h1234,
-    parameter logic [15:0] DEVICE_ID        = 16'h0001,
-    parameter logic [ 7:0] REVISION_ID      = 8'h00,
-    parameter logic [23:0] CLASS_CODE       = 24'hFF0000,
-    parameter logic [15:0] SUBSYS_VENDOR_ID = 16'h1234,
-    parameter logic [15:0] SUBSYS_ID        = 16'h0001,
-    parameter int          BAR0_SIZE_BITS   = 12,
-    parameter logic [ 1:0] ASPM_SUPPORT     = 2'b01,
-    parameter logic [ 2:0] L0S_EXIT_LATENCY = 3'b111,
-    parameter logic [ 2:0] L1_EXIT_LATENCY  = 3'b111,
+    parameter logic  [15:0] VENDOR_ID        = PCIE_VENDOR_ID,
+    parameter logic  [15:0] DEVICE_ID        = PCIE_DEVICE_ID,
+    parameter logic  [ 7:0] REVISION_ID      = 8'h00,
+    parameter logic  [23:0] CLASS_CODE       = 24'hFF0000,
+    parameter logic  [15:0] SUBSYS_VENDOR_ID = PCIE_SUBSYS_VENDOR_ID,
+    parameter logic  [15:0] SUBSYS_ID        = PCIE_SUBSYS_ID,
+    parameter int           BAR0_SIZE_BITS   = 12,
+    parameter aspm_e        ASPM_SUPPORT     = ASPM_L0S,
+    parameter logic  [ 2:0] L0S_EXIT_LATENCY = 3'd7,
+    parameter logic  [ 2:0] L1_EXIT_LATENCY  = 3'd7,
     // 64 ns, below our L0s exit latency: hosts that check it keep ASPM L0s off (no L0s in the MAC)
-    parameter logic [ 2:0] L0S_ACCEPT_LAT   = 3'b000,
-    parameter logic [ 2:0] L1_ACCEPT_LAT    = 3'b111,
-    parameter logic        SLOT_CLOCK       = 1'b1
+    parameter logic  [ 2:0] L0S_ACCEPT_LAT   = 3'd0,
+    parameter logic  [ 2:0] L1_ACCEPT_LAT    = 3'd7,
+    parameter logic         SLOT_CLOCK       = 1'b1
 ) (
     input  logic               clk,
     input  logic               rst_n,
@@ -31,27 +69,8 @@ module config_space
 
   localparam logic [ 7:0] CAP_PM      = 8'h40;
   localparam logic [ 7:0] CAP_PCIE    = 8'h50;
-  localparam logic [ 7:0] CAP_ID_PM   = 8'h01;
-  localparam logic [ 7:0] CAP_ID_PCIE = 8'h10;
   localparam logic [15:0] PM_CAPS     = 16'h0003;
   localparam logic [15:0] PCIE_CAPS   = 16'h0002;
-
-  localparam logic [ 9:0] R_ID        = 10'h000;
-  localparam logic [ 9:0] R_CMD       = 10'h001;
-  localparam logic [ 9:0] R_CLASS     = 10'h002;
-  localparam logic [ 9:0] R_MISC      = 10'h003;
-  localparam logic [ 9:0] R_BAR0      = 10'h004;
-  localparam logic [ 9:0] R_SUBSYS    = 10'h00B;
-  localparam logic [ 9:0] R_CAP_PTR   = 10'h00D;
-  localparam logic [ 9:0] R_INT       = 10'h00F;
-  localparam logic [ 9:0] R_PM_CAP    = 10'h010;
-  localparam logic [ 9:0] R_PM_CSR    = 10'h011;
-  localparam logic [ 9:0] R_PCIE_CAP  = 10'h014;
-  localparam logic [ 9:0] R_DEV_CAP   = 10'h015;
-  localparam logic [ 9:0] R_DEV_CTL   = 10'h016;
-  localparam logic [ 9:0] R_LNK_CAP   = 10'h017;
-  localparam logic [ 9:0] R_LNK_CTL   = 10'h018;
-  localparam logic [ 9:0] R_LNK_CTL2  = 10'h020;
 
   localparam logic [31:0] CMD_WMASK   = 32'h0000_0147;
   localparam logic [31:0] CMD_W1C     = 32'hC000_0000;
@@ -63,42 +82,40 @@ module config_space
   localparam logic [31:0] LNK_WMASK   = 32'h0000_00CB;
   localparam logic [31:0] LNK2_WMASK  = 32'h0000_1FBF;
 
-  localparam logic [ 1:0] D0          = 2'b00;
-  localparam logic [ 1:0] D3HOT       = 2'b11;
 
-  cfg_cmd_dw_t          cmd;
-  logic          [31:0] misc;
-  logic          [31:0] bar0;
-  logic          [31:0] int_reg;
-  cfg_pm_dw_t           pm;
-  cfg_dev_dw_t          dev;
-  cfg_lnk_dw_t          lnk;
-  logic          [31:0] lnk2;
-  logic          [ 7:0] bus_number;
-  logic          [ 4:0] device_number;
-  logic          [ 7:0] sspl_value;
-  logic          [ 1:0] sspl_scale;
+  cfg_cmd_dw_t         cmd;
+  logic         [31:0] misc;
+  logic         [31:0] bar0;
+  logic         [31:0] int_reg;
+  cfg_pm_dw_t          pm;
+  cfg_dev_dw_t         dev;
+  cfg_lnk_dw_t         lnk;
+  cfg_lnk2_dw_t        lnk2;
+  logic         [ 7:0] bus_number;
+  logic         [ 4:0] device_number;
+  logic         [ 7:0] sspl_value;
+  logic         [ 1:0] sspl_scale;
 
-  pcie_dev_cap_t        dev_cap;
-  pcie_lnk_cap_t        lnk_cap;
-  pcie_lnk_sta_t        lnk_sta;
+  dev_cap_t            dev_cap;
+  lnk_cap_t            lnk_cap;
+  lnk_sta_t            lnk_sta;
 
-  logic                 wr_cmd;
-  logic                 wr_misc;
-  logic                 wr_bar0;
-  logic                 wr_int;
-  logic                 wr_pm;
-  logic                 wr_dev;
-  logic                 wr_lnk;
-  logic                 wr_lnk2;
-  cfg_pm_dw_t           pm_next;
+  logic                wr_cmd;
+  logic                wr_misc;
+  logic                wr_bar0;
+  logic                wr_int;
+  logic                wr_pm;
+  logic                wr_dev;
+  logic                wr_lnk;
+  logic                wr_lnk2;
+  cfg_pm_dw_t          pm_next;
 
-  logic                 send_nonfatal;
-  logic                 send_fatal;
+  logic                send_nonfatal;
+  logic                send_fatal;
 
   assign cfg.bus_number        = bus_number;
   assign cfg.device_number     = device_number;
-  assign cfg.memory_enable     = cmd.command.mem_space && (pm.csr.power_state == D0);
+  assign cfg.memory_enable     = cmd.command.mem_space & (pm.csr.power_state == PM_D0);
   assign cfg.bus_master_enable = cmd.command.bus_master;
   assign cfg.bar0_base         = bar0;
   assign cfg.max_payload_size  = dev.control.max_payload;
@@ -117,15 +134,15 @@ module config_space
     lnk_cap.l1_exit_lat  = L1_EXIT_LATENCY;
     lnk_cap.l0s_exit_lat = L0S_EXIT_LATENCY;
     lnk_cap.aspm_support = ASPM_SUPPORT;
-    lnk_cap.max_width    = 6'd1;
-    lnk_cap.max_speed    = 4'd1;
+    lnk_cap.max_width    = WIDTH_X1;
+    lnk_cap.max_speed    = SPEED_2G5;
   end
 
   always_comb begin
     lnk_sta            = '0;
     lnk_sta.slot_clock = SLOT_CLOCK;
-    lnk_sta.width      = 6'd1;
-    lnk_sta.speed      = 4'd1;
+    lnk_sta.width      = WIDTH_X1;
+    lnk_sta.speed      = SPEED_2G5;
   end
 
   always_comb begin
@@ -150,20 +167,21 @@ module config_space
     endcase
   end
 
-  assign wr_cmd = acc.write && (acc.regnum == R_CMD);
-  assign wr_misc = acc.write && (acc.regnum == R_MISC);
-  assign wr_bar0 = acc.write && (acc.regnum == R_BAR0);
-  assign wr_int = acc.write && (acc.regnum == R_INT);
-  assign wr_pm = acc.write && (acc.regnum == R_PM_CSR);
-  assign wr_dev = acc.write && (acc.regnum == R_DEV_CTL);
-  assign wr_lnk = acc.write && (acc.regnum == R_LNK_CTL);
-  assign wr_lnk2 = acc.write && (acc.regnum == R_LNK_CTL2);
+  assign wr_cmd = acc.write & (acc.regnum == R_CMD);
+  assign wr_misc = acc.write & (acc.regnum == R_MISC);
+  assign wr_bar0 = acc.write & (acc.regnum == R_BAR0);
+  assign wr_int = acc.write & (acc.regnum == R_INT);
+  assign wr_pm = acc.write & (acc.regnum == R_PM_CSR);
+  assign wr_dev = acc.write & (acc.regnum == R_DEV_CTL);
+  assign wr_lnk = acc.write & (acc.regnum == R_LNK_CTL);
+  assign wr_lnk2 = acc.write & (acc.regnum == R_LNK_CTL2);
   assign pm_next = cfg_write_merge(pm, acc.wdata, acc.be, PM_WMASK);
 
-  assign send_nonfatal = err.ur && (dev.control.ur_report_en || cmd.command.serr_en) &&
-      (dev.control.nonfatal_report_en || cmd.command.serr_en);
-  assign send_fatal = (err.malformed || err.overflow) &&
-      (dev.control.fatal_report_en || cmd.command.serr_en);
+  assign send_nonfatal = err.ur
+                       & (dev.control.ur_report_en | cmd.command.serr_en)
+                       & (dev.control.nonfatal_report_en | cmd.command.serr_en);
+  assign send_fatal = (err.malformed | err.overflow)
+                    & (dev.control.fatal_report_en | cmd.command.serr_en);
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -172,8 +190,8 @@ module config_space
     end
     else begin
       if (wr_cmd) begin
-        cmd <= cfg_write_merge(cmd, acc.wdata, acc.be,
-                               CMD_WMASK) & ~cfg_w1c(acc.wdata, acc.be, CMD_W1C);
+        cmd <= cfg_write_merge(cmd, acc.wdata, acc.be, CMD_WMASK)
+            & ~cfg_w1c(acc.wdata, acc.be, CMD_W1C);
       end
       if (err.poisoned) begin
         cmd.status.detected_parity_err <= 1'b1;
@@ -187,14 +205,14 @@ module config_space
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       dev                        <= '0;
-      dev.control.max_read_req   <= 3'b010;
+      dev.control.max_read_req   <= SZ_512B;
       dev.control.no_snoop_en    <= 1'b1;
       dev.control.relaxed_ord_en <= 1'b1;
     end
     else begin
       if (wr_dev) begin
-        dev <= cfg_write_merge(dev, acc.wdata, acc.be,
-                               DEV_WMASK) & ~cfg_w1c(acc.wdata, acc.be, DEV_W1C);
+        dev <= cfg_write_merge(dev, acc.wdata, acc.be, DEV_WMASK)
+            & ~cfg_w1c(acc.wdata, acc.be, DEV_W1C);
       end
       if (err.ur) begin
         dev.status.nonfatal_detected <= 1'b1;
@@ -208,15 +226,16 @@ module config_space
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      misc                 <= '0;
-      bar0                 <= '0;
-      int_reg              <= '0;
-      pm                   <= '0;
-      pm.csr.no_soft_reset <= 1'b1;
-      pm.csr.power_state   <= D0;
-      lnk                  <= '0;
-      lnk.status           <= lnk_sta;
-      lnk2                 <= 32'h0000_0001;
+      misc                      <= '0;
+      bar0                      <= '0;
+      int_reg                   <= '0;
+      pm                        <= '0;
+      pm.csr.no_soft_reset      <= 1'b1;
+      pm.csr.power_state        <= PM_D0;
+      lnk                       <= '0;
+      lnk.status                <= lnk_sta;
+      lnk2                      <= '0;
+      lnk2.control.target_speed <= SPEED_2G5;
     end
     else begin
       if (wr_misc) begin
@@ -228,7 +247,7 @@ module config_space
       if (wr_int) begin
         int_reg <= cfg_write_merge(int_reg, acc.wdata, acc.be, BYTE0_WMASK);
       end
-      if (wr_pm && (pm_next.csr.power_state == D0 || pm_next.csr.power_state == D3HOT)) begin
+      if (wr_pm && (pm_next.csr.power_state == PM_D0 || pm_next.csr.power_state == PM_D3HOT)) begin
         pm <= pm_next;
       end
       if (wr_lnk) begin
@@ -274,3 +293,10 @@ module config_space
   end
 
 endmodule
+
+// -----------------------------------------------------------------------------
+// Project:     openCologne-PCIE
+// Description: NLnet-sponsored open-source implementation
+// Version:     1.0
+// Date:        Oct 21, 2026
+// -----------------------------------------------------------------------------

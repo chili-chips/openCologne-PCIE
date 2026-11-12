@@ -8,16 +8,16 @@ The **Transaction Layer (TL)** sits between the SOC above and the **Data Link La
 
 An Endpoint, function 0, single virtual channel (VC0), one 32-bit memory BAR, per PCI Express Base Specification 2.1.
 
-- **User interface:** that of the AMD `PCIE_2_1` hard block in EP mode ([UG477](../../0.doc/2.rtl/ug477_7Series_IntBlock_PCIe.pdf)): TLPs on the 64-bit TRN bus (`trn_if`) and the `cfg` sideband. `trn_if` is plug-and-play: a drop-in replacement for the `PCIE_2_1` TRN interface, so user logic written for the HM connects unchanged.
-- **Above it:** `trn_bridge`, the same as on [openPCIE](https://github.com/chili-chips-ba/openPCIE), turns the TRN bus into the SOC's two 64-bit AXI-Stream streams, as the AXI wrapper of `PCIE_2_1` does.
+- **User interface:** derived from that of the AMD `PCIE_2_1` hard block in EP mode ([UG477](../../0.doc/2.rtl/ug477_7Series_IntBlock_PCIe.pdf)): TLPs in 64-bit beats on `trn_tx_if` / `trn_rx_if`, the TRN bus cut to what this core uses, and the `cfg` sideband. [`trn_compat`](trn_compat.sv) maps them back to TRN for user logic written for the HM ([mapping](#trn-mapping)).
+- **Above it:** [`trn_bridge`](../6.trn_bridge), the same as on [openPCIE](https://github.com/chili-chips-ba/openPCIE), turns the TRN bus into the SOC's two 64-bit AXI-Stream streams, as the AXI wrapper of `PCIE_2_1` does.
 
-<img alt="Position of the Transaction Layer in the PCIe stack" src="./images/TL_Position.png" width=300 height=414 />
+<img alt="Position of the Transaction Layer in the PCIe stack" src="./0.doc/TL_Position.png" width=300 />
 
 ## Architecture
 
-<img alt="Transaction Layer block diagram" src="./images/TL_Block_Diagram.png" width=900 />
+<img alt="Transaction Layer block diagram" src="./0.doc/TL_Block_Diagram.png" width=900 />
 
-- **pcie_tl**: the top. It connects the blocks below to `dll_if`, `trn_if` and `cfg_if`, swaps the byte order at the DLL boundary and the DW order at the TRN boundary, keeps the TLPs of the SOC in the TX buffer, and takes DL_Up from the DLL state.
+- **tl_top**: the top. It connects the blocks below to `dll_if`, `trn_tx_if`, `trn_rx_if` and `cfg_if`, swaps the byte order at the DLL boundary and the DW order at the TRN boundary, keeps the TLPs of the SOC in the TX buffer, and takes DL_Up from the DLL state.
 - **tlp_rx_handler**: takes TLPs from the DLL, decodes the header, checks it and writes the TLP into the posted/completion queue or the non-posted queue. A TLP is committed only after its last word has been received and all checks passed; otherwise it is discarded.
 - **tlp_queue**: TLP buffer in block RAM. Two words of the head TLP are held in registers, so the header can be decoded before the TLP is taken out of the queue. There are three: the posted/completion queue, the non-posted queue, and the TX buffer for the TLPs of the SOC.
 - **tlp_order**: remembers, for every non-posted TLP, how many posted TLPs were received before it, and releases the head of the non-posted queue once all of them are done.
@@ -26,68 +26,90 @@ An Endpoint, function 0, single virtual channel (VC0), one 32-bit memory BAR, pe
 - **cpl_gen**: builds Cpl and CplD for configuration requests and Unsupported Requests, and the PME_TO_Ack, ERR_NONFATAL and ERR_FATAL messages.
 - **tlp_tx_arbiter**: chooses between `cpl_gen` and the SOC, checks the transmit credits, and streams one TLP at a time to the DLL.
 - **fc_credit**: credit limits of the link partner (from InitFC1, InitFC2 and UpdateFC), credits consumed by the TL, credits allocated to the link partner, and UpdateFC requests to the DLL.
-- **tl_pkg**: the types of the TL, the header decoder (`tlp_kind`, `tlp_class`, `tlp_words`, ...) and the configuration registers as structs. The TLP header fields themselves are the structs of [`pcie_pkg`](pcie_pkg.sv).
+- **tl_pkg**: the types of the TL, the header decoder (`tlp_kind`, `tlp_class`, `tlp_words`, ...) and the configuration registers as structs. It also holds the TLP header and AXI-Stream sideband structs and the TRN widths, which openPCIE keeps in `pcie_pkg`.
 
-Next to the TL, in this folder because it is its user side:
-- **trn_bridge** (`trn_tx`, `trn_rx`, `trn_tx_throttle`) and **trn_if**: copied unchanged from openPCIE, where they sit on `PCIE_2_1`. `pcie_core` puts `trn_bridge` between the TL and the SOC, as in the [RTL block diagram](../../0.doc/2.rtl/block-diagram.drawio): AXI-Stream to and from TRN, and the TX throttle of the SOC.
+Next to the TL:
+- **trn_tx_if, trn_rx_if, trn_compat**: the TL's user side, in this folder. Split from openPCIE's TRN, where it sits on `PCIE_2_1`; `trn_compat` maps them back to TRN.
+- **trn_bridge** (`trn_tx`, `trn_rx`, `trn_tx_throttle`): in [6.trn_bridge](../6.trn_bridge). `pcie_core` puts `trn_bridge` between the TL and the SOC, as in the [RTL block diagram](../../0.doc/2.rtl/block-diagram.drawio): AXI-Stream to and from TRN, and the TX throttle of the SOC.
 
 ## The Interface
 
 | Port        | Type             | Description                                   |
 |:----------- |:---------------- |:--------------------------------------------- |
 | `clk`       | `input logic`    | PCLK                                          |
-| `rst_n`     | `input logic`    | `core_rst_n`, asynchronous, active low        |
+| `rst_n`     | `input logic`    | `mac_rst_n`, asynchronous, active low         |
 | `dll`       | `dll_if.tl`      | the Data Link Layer                           |
-| `trn`       | `trn_if.core`    | TLPs to and from `trn_bridge`, the TRN bus    |
+| `trn_tx`    | `trn_tx_if.dst`  | TLPs from `trn_bridge`                        |
+| `trn_rx`    | `trn_rx_if.src`  | TLPs to `trn_bridge`                          |
 | `cfg`       | `cfg_if.core`    | status sideband to the SOC                    |
 
 ### Byte order
 | Bus | Order |
 |---|---|
 | `dll_if` | byte 0 of a TLP in `[7:0]` of the first word, as the DLL sends it |
-| AXI-Stream (UG477, `pcie_pkg`) | header DW0 in `[31:0]`, DW1 in `[63:32]`; byte 0 of every DW, payload included, in `[31:24]` |
+| AXI-Stream (UG477, `tl_pkg`) | header DW0 in `[31:0]`, DW1 in `[63:32]`; byte 0 of every DW, payload included, in `[31:24]` |
 | TRN | DW0 in `[63:32]`: the two DWs swapped; `trn_bridge` swaps them back |
 
-`pcie_tl` swaps the bytes of every DW at the DLL boundary (`trn_byte_swap`) and the two DWs at the TRN boundary, so the whole TL works in AXI-Stream order and reads the header through the `pcie_pkg` structs.
+`tl_top` swaps the bytes of every DW at the DLL boundary (`wire_byte_swap`) and the two DWs at the TRN boundary (`trn_dw_swap`, in `trn_pkg`), so the whole TL works in AXI-Stream order and reads the header through the `tl_pkg` structs.
 
 <p align="center">
-  <img alt="3-DW request header, byte 0 of every DW in [31:24]: H0 Fmt, Type, TC, TD, EP, Attr, Length; H1 Requester ID, Tag, Last and 1st DW byte enables; H2 Address[31:2]" src="images/tlp_header_request.drawio.png" width="48%">
-  <img alt="3-DW completion header: H0 as for a request; H1 Completer ID, Status, BCM, Byte Count; H2 Requester ID, Tag, Lower Address" src="images/tlp_header_completion.drawio.png" width="48%">
+  <img alt="3-DW request header, byte 0 of every DW in [31:24]: H0 Fmt, Type, TC, TD, EP, Attr, Length; H1 Requester ID, Tag, Last and 1st DW byte enables; H2 Address[31:2]" src="0.doc/tlp_header_request.drawio.png" width="48%">
+  <img alt="3-DW completion header: H0 as for a request; H1 Completer ID, Status, BCM, Byte Count; H2 Requester ID, Tag, Lower Address" src="0.doc/tlp_header_completion.drawio.png" width="48%">
 </p>
 
 ### Data Link Layer (dll_if)
-- **DL_Up** is `dl_state` in DL_Init FC_INIT2 or DL_Active, registered. While DL_Up is low the TL is held in reset: DL_Down resets the TL, as required for an upstream port.
+- **DL_Up** is `dl_state` in DL_Init FC_INIT2 or DL_Active, registered. While DL_Up is low the TL is held in reset: DL_Down resets the TL, as required for an upstream port. The TX credit limits are the exception: `fc_credit` takes them from InitFC1 and InitFC2 in DL_Init, and clears them in DL_Inactive. In FC_INIT2 the TL already takes TLPs (DL_Up, 3.2.1); a credit it releases there goes out as an UpdateFC at once, between the InitFC2s. A partner still in FC_INIT1 ignores it, and the next UpdateFC carries the cumulative count.
 - **TLPs**: the TL starts a TLP only while `tx_tlp_ready` is high, sends it in consecutive words, then waits for `tx_tlp_ready` to drop before the next one, matching the one-TLP DLL retry buffer. The last word of a TLP with an odd number of DWs is marked with `tx_tlp_last_half`, the DLL's `tl_tx_tlp_last_half` ([#21](https://github.com/chili-chips-ba/openCologne-PCIE/issues/21)): the DLL then sends only its lower 4 bytes.
 - **DLLPs**: the TL requests UpdateFC DLLPs (`tx_packet_type` is always UpdateFC) and takes the credits of the InitFC1, InitFC2 and UpdateFC DLLPs the DLL receives.
 
-InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)): the DLL used to send InitFC1 and InitFC2 with fixed credits (P 32/1008, NP 32/1, Cpl infinite). It now builds them from the `INIT_*` parameters, which `pcie_core` sets to the TL's. The fix is on our fork ([2.pipe](../2.pipe/README.md#submodule)), offered upstream as [gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17).
+InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)): the DLL used to send InitFC1 and InitFC2 with fixed credits (P 32/1008, NP 32/1, Cpl infinite). It now builds them from the `INIT_*` parameters, which `pcie_core` sets to the TL's. The fix is on our fork ([2.pipe](../2.pipe/README.md#sources)), offered upstream as [gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17).
 
-### SOC side (trn_if and cfg_if)
+### SOC side (trn_tx_if, trn_rx_if and cfg_if)
 
-<p align="center"><img alt="TLPs on trn_if: MWr32, MRd32 and CplD in 64-bit beats, header DW0 in [63:32], rsof on the first beat, reof and rrem on the last" src="images/trn_if_format.drawio.png" width="70%"></p>
+<p align="center"><img alt="TLPs on TRN: MWr32, MRd32 and CplD in 64-bit beats, header DW0 in [63:32], eof on the last beat" src="0.doc/trn_format.drawio.png" width="70%"></p>
 
-- **TRN RX** carries memory reads and writes that hit BAR0, and all completions.
-  - A word moves when `rsrc_rdy` and `rdst_rdy` are both high. `rrem` is 1, and 0 on a last word holding one DW. `rbar_hit[0]` marks BAR0 (0 for completions), `rerrfwd` a poisoned TLP, `recrc_err` is 0.
-  - `trn_bridge` turns them into `m_axis_rx`: `tkeep` `8'hFF`, or `8'h0F` on a last beat holding one DW; `tuser.bar_hit`, `tuser.err_fwd`, `tuser.ecrc_err`.
-  - `rsrc_dsc` ends a TLP that DL_Down cuts short: high for one clock, `rsof` low, as on `PCIE_2_1` when the link goes down (UG477, Appendix G); `trn_bridge` pads the TLP to its length. In `pcie_core`, `core_rst_n` follows the link and resets `trn_bridge` and the SOC on DL_Down anyway.
-- **TRN TX** takes the SOC's TLPs, from `s_axis_tx` through `trn_bridge`, into the TX buffer; a TLP leaves whole, when the arbiter sends it.
-  - The buffer holds `TX_SLOTS` TLPs of the largest supported payload (128 bytes, 18 words; 3 TLPs with the default `TX_ADDR_W`). `tbuf_av` is the number of free slots: a TLP takes one from its first word until its last word has gone to the DLL.
-  - As on `PCIE_2_1`, `trn_bridge` does not wait for `tdst_rdy` inside a TLP: it throttles `s_axis_tx` between TLPs while `tbuf_av` is 1 or less, so a TLP it lets in always fits, if the SOC keeps to Max_Payload_Size.
-  - `link_up` is high in DL_Active, and so is `tdst_rdy`, except between TLPs while all `TX_SLOTS` are taken. As on `PCIE_2_1` (UG477, Destination Throttling of the Transmit Datapath), a TLP the TL has begun to take is taken whole, so a source waiting for `tdst_rdy` instead of watching `tbuf_av` cannot overfill the buffer either.
-  - Credit type and length come from the header, so `trem` and the TX qualifiers (`tsrc_dsc`, `terrfwd`, `tstr`, `tecrc_gen`, from `s_axis_tx.tuser`) are unused.
+- **TRN RX** (`trn_rx_if`) carries memory reads and writes that hit BAR0, and all completions.
+  - A beat moves when `vld` and `rdy` are both high; `eof` marks the last. There is no `sof`: the first beat after `eof`, or after reset, starts a TLP. The TL holds a TLP at its first beat until `rdy`, and DL_Down resets the TL's RX side, `trn_bridge` and the SOC on the same edge, so a TLP always arrives whole.
+  - `trn_bridge` turns them into `m_axis_rx`: `tdata`, `tvalid`, `tlast`. The SOC reads no more, so `tkeep` is `8'hFF` and `tuser` 0.
+- **TRN TX** (`trn_tx_if`) takes the SOC's TLPs, from `s_axis_tx` through `trn_bridge`, into the TX buffer; a TLP leaves whole, when the arbiter sends it.
+  - The buffer is a FIFO of 2^`TRN_TX_ADDR_W` - 1 = 511 beats (`trn_pkg`): one 40K block RAM, 512 x 80 bit, which a 65-bit beat needs at any depth. `free_words` is its free space; a beat's place frees when the TL reads it out for the DLL.
+  - As on `PCIE_2_1`, `trn_bridge` does not wait for `rdy` inside a TLP: it throttles `s_axis_tx` between TLPs while `free_words` is below a largest TLP plus 4 (18 beats: a 4-DW header and a 128-byte payload), so a TLP it lets in always fits, if the SOC keeps to Max_Payload_Size.
+  - `rdy` is high in DL_Active, except between TLPs while a largest TLP would not fit. As on `PCIE_2_1` (UG477, Destination Throttling of the Transmit Datapath), a TLP the TL has begun to take is taken whole, so a source waiting for `rdy` instead of watching `free_words` cannot overfill the buffer either.
+  - Credit type and length come from the header: no `rem`, and no TX qualifier.
   - SOC memory and I/O requests wait in the buffer until Bus Master Enable is set.
-- The SOC must answer every memory read with a completion, Completer ID `{cfg.bus_number, cfg.device_number, 3'b000}`. Completions are advertised with infinite credits, so always taken from the link; a SOC that issues requests must keep accepting their completions.
-- **cfg**: `bus_number` and `device_number` are captured from Type 0 configuration writes, `function_number` is 0, `tx_buf_avail` is `tbuf_av`, `msg_err_fatal` is 0 (an Endpoint does not receive ERR_FATAL).
+- The SOC must answer every memory read with a completion, Completer ID `cfg.id` (`pcie_id_t`: bus, device, function 0). Completions are advertised with infinite credits, so always taken from the link; a SOC that issues requests must keep accepting their completions.
+- **cfg**: `id` (`pcie_id_t`): bus and device are captured from Type 0 configuration writes, the function is 0; `tx_buf_avail` is the number of largest TLPs that fit in `free_words` (`trn_tlps_fit`, as UG477's `tbuf_av`), `msg_err_fatal` is 0 (an Endpoint does not receive ERR_FATAL).
+
+#### TRN mapping
+
+[`trn_compat`](trn_compat.sv) connects user logic written for the 64-bit TRN of `PCIE_2_1` to the TL. Our RTL does not use it; the TL test bench goes through it.
+
+| UG477 TRN | Ours | In `trn_compat` |
+|---|---|---|
+| `trn_td`, `trn_tsof`, `trn_teof` | `trn_tx.dat`, `.sof`, `.eof` | as they are |
+| `trn_tsrc_rdy`, `trn_tdst_rdy` | `trn_tx.vld`, `.rdy` | as they are |
+| `trn_tbuf_av` | `trn_tx.free_words` | the largest TLPs that fit (`trn_tlps_fit`) |
+| `trn_trem` | – | not read: the TL takes the length from the header |
+| `trn_tsrc_dsc`, `trn_terrfwd`, `trn_tstr`, `trn_tecrc_gen` | – | not supported, not read |
+| `trn_rd`, `trn_reof` | `trn_rx.dat`, `.eof` | as they are |
+| `trn_rsrc_rdy`, `trn_rdst_rdy` | `trn_rx.vld`, `.rdy` | as they are |
+| `trn_rsof` | – | rebuilt: an in-packet register (UG477 Appendix G) |
+| `trn_rrem`, `trn_rbar_hit` | – | rebuilt from the header: the length; BAR0 for a request, 0 for a completion |
+| `trn_rerrfwd`, `trn_recrc_err`, `trn_rsrc_dsc` | – | 0: a poisoned completion reaches the user unflagged, no ECRC, no TLP cut short |
+| `trn_lnk_up` | – | `dll_up` of `pcie_core` |
+| `trn_terr_drop`, `trn_tcfg_*`, `trn_rnp_*`, `trn_rfcp_ret`, `trn_fc_*`, `trn_tdllp_*` | – | not supported, no port |
+
+Requester and DMA features are not supported either: no tags, Completion Timeout or Unexpected Completion check.
 
 ### Parameters
 | Parameter          | Default        | Description                                          |
 |:------------------ |:-------------- |:---------------------------------------------------- |
-| `VENDOR_ID`        | `16'h1234`     | Vendor ID                                            |
-| `DEVICE_ID`        | `16'h0001`     | Device ID                                            |
+| `VENDOR_ID`        | `PCIE_VENDOR_ID` | Vendor ID: CC00h, from `tl_pkg` (a placeholder) |
+| `DEVICE_ID`        | `PCIE_DEVICE_ID` | Device ID: CC00h, from `tl_pkg` (a placeholder) |
 | `REVISION_ID`      | `8'h00`        | Revision ID                                          |
 | `CLASS_CODE`       | `24'hFF0000`   | Class Code                                           |
-| `SUBSYS_VENDOR_ID` | `16'h1234`     | Subsystem Vendor ID                                  |
-| `SUBSYS_ID`        | `16'h0001`     | Subsystem ID                                         |
+| `SUBSYS_VENDOR_ID` | `PCIE_SUBSYS_VENDOR_ID` | Subsystem Vendor ID: 0000h, from `tl_pkg` |
+| `SUBSYS_ID`        | `PCIE_SUBSYS_ID` | Subsystem ID: CABAh, from `tl_pkg` |
 | `BAR0_SIZE_BITS`   | `12`           | BAR0 size is `2^BAR0_SIZE_BITS` bytes                |
 | `INIT_PH`          | `8'd8`         | Posted header credits advertised                     |
 | `INIT_PD`          | `12'd32`       | Posted data credits advertised                       |
@@ -95,7 +117,6 @@ InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/
 | `INIT_NPD`         | `12'd8`        | Non-posted data credits advertised                   |
 | `P_ADDR_W`         | `7`            | Posted/completion queue depth, `2^n` words           |
 | `NP_ADDR_W`        | `6`            | Non-posted queue depth, `2^n` words                  |
-| `TX_ADDR_W`        | `6`            | TX buffer depth, `2^n` words; `TX_SLOTS` is `(2^n - 1) / 18` |
 | `ASPM_SUPPORT`     | `2'b01`        | Link Capabilities ASPM Support (L0s); the MAC has no L0s |
 | `L0S_EXIT_LATENCY` | `3'b111`       | Link Capabilities L0s Exit Latency                   |
 | `L1_EXIT_LATENCY`  | `3'b111`       | Link Capabilities L1 Exit Latency                    |
@@ -103,11 +124,11 @@ InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/
 | `L1_ACCEPT_LAT`    | `3'b111`       | Device Capabilities Endpoint L1 Acceptable Latency   |
 | `SLOT_CLOCK`       | `1'b1`         | Link Status Slot Clock Configuration                 |
 
-`pcie_core` instantiates `pcie_tl` with these defaults.
+`pcie_core` instantiates `tl_top` with these defaults.
 
 ## Receive path
 
-<img alt="Transaction Layer receive flow" src="./images/RX_flow.png" width=900 />
+<img alt="Transaction Layer receive flow" src="./0.doc/RX_flow.png" width=900 />
 
 ### Checks
 Every received TLP is checked before it is committed to a queue; a failed check discards it.
@@ -142,13 +163,13 @@ Posted requests and completions go to one queue, non-posted requests to the othe
 | Set_Slot_Power_Limit                        | Value and scale copied to Device Capabilities               |
 | Unlock, PM_Active_State_Nak, Vendor_Defined Type 1, Ignored Messages | Discarded                          |
 | Any other message                           | Discarded, Unsupported Request                              |
-| Cpl / CplD                                  | To the SOC, `err_fwd` if poisoned                           |
+| Cpl / CplD                                  | To the SOC; a poisoned one unflagged                        |
 
 BAR0 hits require Memory Space Enable and the function in D0. For an Unsupported Request completion to a memory read, Byte Count and Lower Address are calculated from Length, the byte enables and the address, as for a successful completion (Tables 2-31 and 2-32 of the specification). For an Unsupported Request completion to an AtomicOp, Byte Count is the operand size. For all other completions Byte Count is 4 and Lower Address is 0.
 
 ## Transmit path
 
-<img alt="Transaction Layer transmit flow" src="./images/TX_flow.png" width=900 />
+<img alt="Transaction Layer transmit flow" src="./0.doc/TX_flow.png" width=900 />
 
 The arbiter alternates between `cpl_gen` and the SOC, whose TLPs come from the TX buffer. A TLP is sent only if every credit type it needs passes the gating test of section 2.6.1.1:
 
@@ -162,7 +183,7 @@ Credit types that were advertised as 0 in InitFC are infinite and always pass. A
 
 ## Configuration space
 
-<p align="center"><img alt="Type 0 configuration space, 00h to FFFh: implemented registers in green (IDs, Command, Status, Class Code, Header Type, Cache Line Size, BAR0, Subsystem IDs, Capabilities Pointer, Interrupt Line, PM capability with PMCSR D0/D3hot, PCI Express capability); not implemented, reading 0, in grey (BIST, Latency Timer, BAR1-5, CardBus CIS, Expansion ROM, Max_Lat, Min_Gnt, Interrupt Pin, PM Data, Slot and Root registers, Device Capabilities/Control/Status 2 and Link Capabilities 2, MSI and other capabilities, extended space)" src="./images/Config_Space.drawio.png" width="75%"></p>
+<p align="center"><img alt="Type 0 configuration space, 00h to FFFh: implemented registers in green (IDs, Command, Status, Class Code, Header Type, Cache Line Size, BAR0, Subsystem IDs, Capabilities Pointer, Interrupt Line, PM capability with PMCSR D0/D3hot, PCI Express capability); not implemented, reading 0, in grey (BIST, Latency Timer, BAR1-5, CardBus CIS, Expansion ROM, Max_Lat, Min_Gnt, Interrupt Pin, PM Data, Slot and Root registers, Device Capabilities/Control/Status 2, Link Capabilities 2 and Link Status 2, MSI and other capabilities, extended space)" src="./0.doc/Config_Space.drawio.png" width="75%"></p>
 
 | Register                 | Notes                                                                                   |
 |:------------------------ |:--------------------------------------------------------------------------------------- |
@@ -202,7 +223,7 @@ ERR_FATAL is sent when Fatal Error Reporting Enable or SERR# Enable is set. ERR_
 | PM_Enter_L1 is never sent: D3hot does not take the link to L1 | 5.3.2.1 | |
 
 ## Simulation
-[`sim/tb_pcie_tl.sv`](sim/tb_pcie_tl.sv) tests `pcie_tl` with `trn_bridge` above it, as in `pcie_core`, through their interfaces. The test bench plays:
+[`sim/tb_tl_top.sv`](sim/tb_tl_top.sv) tests `tl_top` with `trn_bridge` above it, as in `pcie_core`, through their interfaces. The test bench plays:
 
 - **the DLL** on `dll_if`: injects TLPs and DLLPs in DLL byte order, steps `dl_state` through DL_Init, takes the TL's TLPs with the `tx_tlp_ready` behaviour of the DLL retry buffer;
 - **the Root Complex** that issues the requests;
@@ -238,14 +259,14 @@ Build products and the waveform go to `$SERDES_BUILD_DIR/tl` (default `~/.cache/
 | 13   | A posted request passes a non-posted request that is waiting for the SOC                |
 | 14   | Receiver Overflow                                                                        |
 | 15   | TLP with digest                                                                           |
-| 16   | Completions forwarded to the SOC, `err_fwd` for a poisoned CplD                           |
+| 16   | Completions forwarded to the SOC, a poisoned CplD too (`trn_rerrfwd` 0, not supported)    |
 | 17   | D3hot disables Memory Space                                                                |
-| 18   | SOC requests wait in the TX buffer until Bus Master Enable; of five, two enter, `tbuf_av` drops to 1 and `trn_bridge` holds the SOC back; all five go out in order |
+| 18   | SOC requests wait in the TX buffer until Bus Master Enable; of 30 largest MWrs (18 beats), 28 enter, `free_words` drops to 9 and `trn_bridge` holds the SOC back; all 30 go out in order |
 | 19   | 80 random memory writes and reads with random back-pressure from the SOC, credits respected as the DLL would |
 | 20   | DL_Down resets the TL, transmit stops at the completion credit limit and resumes after UpdateFC |
-| 21   | DL_Down in the middle of a TLP on TRN RX: `rsrc_dsc`, `trn_bridge` pads the cut TLP to its length, and the next TLP reaches the SOC whole |
+| 21   | DL_Down in the middle of a TLP on TRN RX: `trn_bridge` is reset with the link, as in `pcie_core`; the cut TLP is gone, and the next TLP reaches the SOC whole |
 
-Also checked on every `m_axis_rx` beat: `tkeep` against the header length, `ecrc_err` is 0. On every clock: no TRN TX word from `trn_bridge` finds the TX buffer full, `tbuf_av` never exceeds `TX_SLOTS`, `tdst_rdy` never drops inside a TLP.
+`trn_bridge` reaches the TL through `trn_compat`. Also checked, on TRN RX: `trn_rsof` on every first beat, and on every last beat `trn_rrem` against the header length and `trn_recrc_err` 0. On every clock: no TRN TX beat from `trn_bridge` finds `rdy` low or the TX buffer full, `trn_tbuf_av` matches `free_words`, `rdy` never drops inside a TLP.
 
 ## Viewing the TL in WaveCrux
 
@@ -254,30 +275,30 @@ The top-level run, `make EP=rtl DUMP=1 run` in [5.sim](../../5.sim/README.md#vie
 | Where | Signals | Decoder |
 |---|---|---|
 | `dll_if` | `tb.dut.u_core.wavecrux.dll_*`, each DW in the byte order the TL reads | PCIe TLP |
-| `trn_if` | `trn_*` | PCIe TLP |
+| `trn_rx_if`, `trn_tx_if` | `trn_*` | PCIe TLP |
 | AXI-Stream of `trn_bridge` | `m_axis_rx_*`, `s_axis_tx_*`: the interface of AMD's 7 Series PCIe core (PG054), which `trn_bridge` builds on the TRN ports of `PCIE_2_1` | Xilinx 7 Series preset |
 
 The pictures are from the run with the DLL issues worked around locally, as described there; the far-left column, the layer of every row, is ours, added to the screenshots.
 
 **Enumeration at `dll_if`.** The decoder learns the Type 0 header from the reads, names every register, and gives each completion the request it answers:
 
-<img alt="WaveCrux Pro PCIe TLP decoder at dll_if: the configuration requests of the enumeration and their completions" src="./images/wavecrux-tl-table.png" width=900 />
+<img alt="WaveCrux Pro PCIe TLP decoder at dll_if: the configuration requests of the enumeration and their completions" src="./0.doc/wavecrux-tl-table.png" width=900 />
 
-The host reads the IDs (`0x00011234`: Device ID 0001, Vendor ID 1234), the class code (`0xFF000000`) and the header type, then sizes the BARs: it writes 0xFFFFFFFF and reads back `BAR0 = 0xFFFFF000`, 4 KB of 32-bit memory (`BAR0_SIZE_BITS`), and 0 for BAR1 to BAR5 (the picture ends at BAR4). None of this reaches `trn_if`: `config_space` answers, `cpl_gen` builds the completions, 11 PCLK after the request.
+The host reads the IDs (`0x00011234` in this run: Device ID 0001, Vendor ID 1234; CC00h:CC00h since 2026-11-03), the class code (`0xFF000000`) and the header type, then sizes the BARs: it writes 0xFFFFFFFF and reads back `BAR0 = 0xFFFFF000`, 4 KB of 32-bit memory (`BAR0_SIZE_BITS`), and 0 for BAR1 to BAR5 (the picture ends at BAR4). None of this reaches TRN: `config_space` answers, `cpl_gen` builds the completions, 11 PCLK after the request.
 
-**Memory requests go on to the SOC.** The first MWr32 and MRd32 to BAR0 pass from `dll_if` to `trn_if` in 6 PCLK (`tlp_rx_handler`, the queues, `tlp_order`, `tlp_rx_dispatch`), and the MWr32 on to the AXI-Stream with `bar_hit` BAR0 (the MRd32 gets there only at 345 µs, below). The decoder flags the MRd32 red at `dll_if` and `trn_if`: a completion timeout, as its CplD comes 264 µs later and the decoder's default limit is 50 µs:
+**Memory requests go on to the SOC.** The first MWr32 and MRd32 to BAR0 pass from `dll_if` to TRN in 6 PCLK (`tlp_rx_handler`, the queues, `tlp_order`, `tlp_rx_dispatch`), and the MWr32 on to the AXI-Stream with `bar_hit` BAR0 (the MRd32 gets there only at 345 µs, below). The decoder flags the MRd32 red at `dll_if` and TRN: a completion timeout, as its CplD comes 264 µs later and the decoder's default limit is 50 µs:
 
-<img alt="WaveCrux, the first MWr32 and MRd32 to BAR0, from the link to the AXI-Stream of the SOC" src="./images/wavecrux-tl-mem.png" width=900 />
+<img alt="WaveCrux, the first MWr32 and MRd32 to BAR0, from the link to the AXI-Stream of the SOC" src="./0.doc/wavecrux-tl-mem.png" width=900 />
 
 **Where the MRd32 waits.** `trn_bridge` takes both of its beats from the TL at once (TRN RX `dst_rdy` drops only after them), so it leaves the TL's queue, and its credit goes back to the host, right away (a). It waits in `trn_bridge` with `m_axis_rx_tvalid` high until the SOC raises `tready` at 345.46 µs (b): the firmware is still clearing its PIO memory and has not yet released the MWr32 before it. The CplD leaves the SOC 23.8 µs later (c):
 
-<img alt="WaveCrux, the MRd32 waiting in trn_bridge for the SOC" src="./images/wavecrux-tl-wait.png" width=900 />
+<img alt="WaveCrux, the MRd32 waiting in trn_bridge for the SOC" src="./0.doc/wavecrux-tl-wait.png" width=900 />
 
-The Pro decoders' table, filtered on these requests' address, BAR0 + 0x010, names each TLP: the MWr32 (tag 0x16), this MRd32 (0x17) and the last read of the address (0x1D), at `dll_if` (`PCIe TLP #1`), `trn_if` (`#2`) and the AXI-Stream. The latency of this MRd32 is 264.4 µs at `trn_if`, that of the last read 24.4 µs; at the AXI-Stream it is 23.8 µs for both, which is the firmware alone (built without `-O`). The `bar_hit`, `latency` and `tag` columns are further right in the same table; we put them next to the label:
+The Pro decoders' table, filtered on these requests' address, BAR0 + 0x010, names each TLP: the MWr32 (tag 0x16), this MRd32 (0x17) and the last read of the address (0x1D), at `dll_if` (`PCIe TLP #1`), TRN (`#2`) and the AXI-Stream. The latency of this MRd32 is 264.4 µs at TRN, that of the last read 24.4 µs; at the AXI-Stream it is 23.8 µs for both, which is the firmware alone (built without `-O`). The `bar_hit`, `latency` and `tag` columns are further right in the same table; we put them next to the label:
 
-<img alt="WaveCrux Pro PCIe TLP decoders, the requests to BAR0 + 0x010 and their completions at dll_if, trn_if and the AXI-Stream" src="../../0.doc/5.sim/wavecrux-ep-mrd-table.png" width=900 />
+<img alt="WaveCrux Pro PCIe TLP decoders, the requests to BAR0 + 0x010 and their completions at dll_if, TRN and the AXI-Stream" src="../../0.doc/5.sim/wavecrux-ep-mrd-table.png" width=900 />
 
-Its Start column gives the share of the TL and `trn_bridge`: 6 PCLK from `dll_if` to `trn_if` and 1 PCLK on to the AXI-Stream on the way in (the MWr32), and on the way out 1 PCLK in `trn_bridge` and 7 in the TL's TX buffer, which takes a TLP whole before it sends it (the CplD of tag 0x1D). A host whose completion timeout is short (the default range of the Base Specification starts at 50 µs) could give up on the first read.
+Its Start column gives the share of the TL and `trn_bridge`: 6 PCLK from `dll_if` to TRN and 1 PCLK on to the AXI-Stream on the way in (the MWr32), and on the way out 1 PCLK in `trn_bridge` and 7 in the TL's TX buffer, which takes a TLP whole before it sends it (the CplD of tag 0x1D). A host whose completion timeout is short (the default range of the Base Specification starts at 50 µs) could give up on the first read.
 
 ## References
 - [PCI Express Base Specification Revision 2.1](../../0.doc/PCIE-base-spec.Rev2-1.pdf)

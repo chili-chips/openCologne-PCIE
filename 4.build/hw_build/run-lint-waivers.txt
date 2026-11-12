@@ -21,9 +21,21 @@
 # NC_ signals are no-connects by name: driven by an unused output, never read
 verilator ^%Warning-UNUSEDSIGNAL: .*'NC_[A-Za-z0-9_]+'
 
+# The SOC CPU address (soc_addr_t): its nc_ fields are not decoded
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/7\.soc/riscv_pcie_soc\.sv:[0-9]+:[0-9]+: Bits of signal are not used: 'addr'\[31:29,27:13,1:0\]$
+
+# dll_if: an RX TLP beat carries no half word (rx_tlp.half is 0): the TL
+# does not read it
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/4\.dll/dll_if\.sv:[0-9]+:[0-9]+: Bits of signal are not used: 'rx_tlp'\[64\]$
+
 # KEEPME: the SOC's rvfi (the CPU's retired instructions) is read only by
 # WaveCrux's RISC-V views (tb_soc, 5.sim) and formal checks, never by the RTL
-verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/6\.soc/rvfi_if\.sv:[0-9]+:[0-9]+: Signal is not used: 'rvfi_[a-z0-9_]+'$
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/7\.soc/rvfi_if\.sv:[0-9]+:[0-9]+: Signal is not used: 'rvfi_[a-z0-9_]+'$
+
+# PhyStatus is a PIPE signal the PIPE drives, but Cologne Chip's MAC does not
+# read it (no wait for the PHY after a power-state change or receiver detect),
+# issue #54
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/2\.pipe/pipe_if\.sv:[0-9]+:[0-9]+: Signal is not used: 'phy_status'$
 
 # The SerDes BFM is a behavioural model, not RTL: its # delays are computed
 verilator ^%Warning-ZERODLY: 2\.rtl/1\.phy/2\.serdes-model/
@@ -32,29 +44,31 @@ verilator ^%Warning-ZERODLY: 2\.rtl/1\.phy/2\.serdes-model/
 verilator ^%Warning-UNUSEDSIGNAL: csr/csr\.sv:[0-9]+:[0-9]+: Signal is not used: '(decoded_err|is_valid_addr|is_valid_rw)'
 verilator ^%Warning-MULTIDRIVEN: csr/csr\.sv:[0-9]+:[0-9]+: Variable written to in always_(comb|ff) also written by other process .*: '(field_combo|field_storage)'$
 
-# Descriptor names: a signal or function argument of a pcie_pkg header or
+# Descriptor names: a signal or function argument of a tl_pkg header or
 # sideband type (*_dw0 ... *_dw3, *_hdr_*, *_tuser) reads only the fields it
 # needs
-verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/5\.tlp/[a-z_]+\.sv:[0-9]+:[0-9]+: Bits of (signal|function variable) are not used: '[a-z0-9_]*(_dw[0-9]+|_hdr_[a-z0-9_]+|_tuser)'
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/(5\.tlp|6\.trn_bridge)/[a-z_]+\.sv:[0-9]+:[0-9]+: Bits of (signal|function variable) are not used: '[a-z0-9_]*(_dw[0-9]+|_hdr_[a-z0-9_]+|_tuser)'
 
 # AXI-Stream fields kept to the standard (as on openPCIE): the SOC does not
-# read the RX tkeep and tuser (pcie_rx_tuser_t); on TX only tkeep[7] (upper
-# DW valid) maps to TRN rem
-verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/5\.tlp/axis_if\.sv:[0-9]+:[0-9]+: (Signal is not used: 'tkeep'|Bits of signal are not used: 'tkeep'\[6:0\]|Signal is not used: 'tuser')$
+# read the RX tkeep and tuser (rx_tuser_t), trn_rx drives them constant; on
+# TX the TL takes the length from the header and supports no qualifier
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/6\.trn_bridge/axis_if\.sv:[0-9]+:[0-9]+: (Signal is not used: 'tkeep'|Bits of signal are not used: 'tkeep'\[6:0\]|Signal is not used: 'tuser')$
 
-# TRN TX: the TL takes the TLP length from the header, not from trem, and
-# supports none of the TX qualifiers of PCIE_2_1 (UG477 table 2-9:
-# discontinue, error forward, streaming, ECRC generation)
-verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/5\.tlp/trn_if\.sv:[0-9]+:[0-9]+: Signal is not used: '(trem|tsrc_dsc|terrfwd|tstr|tecrc_gen)'$
+# trn_compat keeps the UG477 TX inputs this core does not support, so user
+# logic written for TRN connects unchanged
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/5\.tlp/trn_compat\.sv:[0-9]+:[0-9]+: Signal is not used: 'trn_(trem|tsrc_dsc|terrfwd|tstr|tecrc_gen)'$
 
 # The TX buffer is read one word at a time: the look-ahead word of tlp_queue
 # (rd.next) is for tlp_rx_dispatch
-verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/5\.tlp/pcie_tl\.sv:[0-9]+:[0-9]+: Bits of signal are not used: 'app_q_rd'\[63:0\]$
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/5\.tlp/tl_top\.sv:[0-9]+:[0-9]+: Bits of signal are not used: 'app_q_rd'\[63:0\]$
 
-# Cologne Chip submodule code (2.pipe/pipe_src) keeps its own style and is not
-# changed here: its style findings are waived. Findings that can be bugs
-# (LATCH, undriven wires) are not: they go upstream to gatemate-pipe.
-# These waivers are temporary. Closer to the first release, the Cologne Chip
-# code is brought up to our coding standard and runs through this QA flow,
-# and the waivers go.
-verilator ^%Warning-(GENUNNAMED|WIDTHEXPAND|WIDTHTRUNC|UNUSEDSIGNAL|UNUSEDPARAM|CASEINCOMPLETE|IMPLICIT): 2\.rtl/2\.pipe/pipe_src/
+# Wire-format structs read field by field: the framing symbols (STP, SDP,
+# END) were already matched by packet_handler; a TS's N_FTS and data rate are
+# not read (Gen1 only, no L0s)
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/4\.dll/packet_handler\.sv:[0-9]+:[0-9]+: Bits of signal are not used: 'prefix'\[7:0\]$
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/4\.dll/virtual_channel_rx\.sv:[0-9]+:[0-9]+: Bits of signal are not used: 'dllp_data'\[63:56,7:0\]$
+verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/3\.mac/ccfpga_OS_process\.sv:[0-9]+:[0-9]+: Bits of signal are not used: 'i_data'\[39:24\]$
+
+# every unique case has a default, also a full one (our rule): unique checks
+# that the items never overlap, the default that no value goes unhandled
+slang ^2\.rtl/.*\.sv:[0-9]+:[0-9]+: warning: .casez?. marked .unique. has .default. label

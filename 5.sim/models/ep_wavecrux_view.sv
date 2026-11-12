@@ -28,10 +28,10 @@
 //                  peer_* TL -> DLL, with peer_keep from tx_tlp_last_half.
 //                  One instance shows both directions and pairs each
 //                  Completion with its request. Each DW byte-swapped to
-//                  byte 0 in [31:24], as the TL reads it (trn_byte_swap)
-//     TL <->       trn_*: trn_if, the same decoder: tlp_* TRN RX, peer_* TRN
-//     trn_bridge   TX; DW0 moved to [31:0], ready from the TRN handshake,
-//     (trn_if)     keep from rrem / trem
+//                  byte 0 in [31:24], as the TL reads it (wire_byte_swap)
+//     TL <->       trn_*: the same decoder: tlp_* TRN RX (trn_rx_if), peer_*
+//     trn_bridge   TRN TX (trn_tx_if); DW0 moved to [31:0], ready from the
+//                  handshake, RX sop and keep from the header (TRN has none)
 //     trn_bridge   m_axis_rx_*, s_axis_tx_*, user_clk_out, user_reset_out:
 //     <-> SOC      as they are, the names of the Pro decoder's Xilinx 7
 //     (AXI-Stream) Series preset (PG054); m_axis_rx_tuser padded to its 22
@@ -46,13 +46,15 @@
 //==========================================================================
 
 module ep_wavecrux_view
-  import pcie_pkg::*;
+  import tl_pkg::*;
+  import dll_pkg::*;
 (
     input logic rst_n,  // core_rst_n
 
            pipe_if.mac    pipe,
            dll_if.tl      dll,
-           trn_if.core    trn,
+           trn_tx_if.mon  trn_tx,
+           trn_rx_if.mon  trn_rx,
            axis_if.slave  s_axis_tx,
            axis_if.master m_axis_rx,
 
@@ -200,13 +202,13 @@ module ep_wavecrux_view
 
   always_comb begin
     pipe_dn_pclk       = pipe.pclk;
-    pipe_dn_data       = pipe.rx_data;
-    pipe_dn_datak      = pipe.rx_datak;
+    pipe_dn_data       = pipe.rx.data;
+    pipe_dn_datak      = pipe.rx.kcode;
     pipe_dn_rxvalid    = pipe.rx_valid;
     pipe_dn_rxstatus   = pipe.rx_status;
     pipe_up_pclk       = pipe.pclk;
-    pipe_up_data       = pipe.tx_data;
-    pipe_up_datak      = pipe.tx_datak;
+    pipe_up_data       = pipe.tx.data;
+    pipe_up_datak      = pipe.tx.kcode;
     pipe_up_txelecidle = pipe.tx_elec_idle;
   end
 
@@ -248,20 +250,20 @@ module ep_wavecrux_view
   always_comb begin
     dll_clk        = pipe.pclk;
     dll_rst_n      = rst_n;
-    dll_tlp_data   = trn_byte_swap(dll.rx_data);
-    dll_tlp_sop    = dll.rx_tlp_first;
-    dll_tlp_eop    = dll.rx_tlp_last;
-    dll_tlp_valid  = dll.rx_tlp_valid;
-    dll_peer_data  = trn_byte_swap(dll.tx_data);
-    dll_peer_sop   = dll.tx_tlp_first;
-    dll_peer_eop   = dll.tx_tlp_last;
-    dll_peer_valid = dll.tx_tlp_valid;
-    dll_peer_keep  = dll.tx_tlp_last && dll.tx_tlp_last_half ? 8'h0F : 8'hFF;
+    dll_tlp_data   = wire_byte_swap(dll.rx_tlp.data);
+    dll_tlp_sop    = dll.rx_tlp.first;
+    dll_tlp_eop    = dll.rx_tlp.last;
+    dll_tlp_valid  = dll.rx_tlp.valid;
+    dll_peer_data  = wire_byte_swap(dll.tx_tlp.data);
+    dll_peer_sop   = dll.tx_tlp.first;
+    dll_peer_eop   = dll.tx_tlp.last;
+    dll_peer_valid = dll.tx_tlp.valid;
+    dll_peer_keep  = dll.tx_tlp.last && dll.tx_tlp.half ? 8'h0F : 8'hFF;
   end
 
   //------------------------------------------------------------------------
-  // TL <-> trn_bridge (trn_if): the same decoder. tlp is TRN RX, peer TRN
-  // TX; a beat moves when src_rdy and dst_rdy are both high
+  // TL <-> trn_bridge (trn_rx_if, trn_tx_if): the same decoder. tlp is TRN RX, peer TRN
+  // TX; a beat moves when vld and rdy are both high
   //------------------------------------------------------------------------
   logic        trn_clk;
   logic        trn_rst_n;
@@ -278,21 +280,56 @@ module ep_wavecrux_view
   logic        trn_peer_ready;
   logic [ 7:0] trn_peer_keep;
 
+  // TRN has no rsof and no rem: the first beat after eof starts a TLP, and
+  // its header gives the DWs of its last beat
+  bit   trn_rx_mid;
+  bit   trn_tx_mid;
+  dw0_t trn_rx_hdr0;
+  dw0_t trn_tx_hdr0;
+  dw0_t trn_rx_dw0;
+  dw0_t trn_tx_dw0;
+
+  always_ff @(posedge pipe.pclk or negedge rst_n) begin
+    if (!rst_n) begin
+      trn_rx_mid  <= 1'b0;
+      trn_tx_mid  <= 1'b0;
+      trn_rx_hdr0 <= '0;
+      trn_tx_hdr0 <= '0;
+    end
+    else begin
+      if (trn_rx.vld && trn_rx.rdy) begin
+        trn_rx_mid <= !trn_rx.eof;
+        if (!trn_rx_mid) begin
+          trn_rx_hdr0 <= trn_rx_dw0;
+        end
+      end
+      if (trn_tx.vld && trn_tx.rdy) begin
+        trn_tx_mid <= !trn_tx.eof;
+        if (!trn_tx_mid) begin
+          trn_tx_hdr0 <= trn_tx_dw0;
+        end
+      end
+    end
+  end
+
+  assign trn_rx_dw0 = trn_rx_mid ? trn_rx_hdr0 : dw0_t'(trn_rx.dat[63:32]);
+  assign trn_tx_dw0 = trn_tx_mid ? trn_tx_hdr0 : dw0_t'(trn_tx.dat[63:32]);
+
   always_comb begin
     trn_clk        = pipe.pclk;
     trn_rst_n      = rst_n;
-    trn_tlp_data   = {trn.rd[31:0], trn.rd[63:32]};
-    trn_tlp_sop    = trn.rsof;
-    trn_tlp_eop    = trn.reof;
-    trn_tlp_valid  = trn.rsrc_rdy;
-    trn_tlp_ready  = trn.rdst_rdy;
-    trn_tlp_keep   = trn.rrem ? 8'hFF : 8'h0F;
-    trn_peer_data  = {trn.td[31:0], trn.td[63:32]};
-    trn_peer_sop   = trn.tsof;
-    trn_peer_eop   = trn.teof;
-    trn_peer_valid = trn.tsrc_rdy;
-    trn_peer_ready = trn.tdst_rdy;
-    trn_peer_keep  = trn.trem ? 8'hFF : 8'h0F;
+    trn_tlp_data   = {trn_rx.dat[31:0], trn_rx.dat[63:32]};
+    trn_tlp_sop    = !trn_rx_mid;
+    trn_tlp_eop    = trn_rx.eof;
+    trn_tlp_valid  = trn_rx.vld;
+    trn_tlp_ready  = trn_rx.rdy;
+    trn_tlp_keep   = trn_rx.eof && tlp_last_half(trn_rx_dw0) ? 8'h0F : 8'hFF;
+    trn_peer_data  = {trn_tx.dat[31:0], trn_tx.dat[63:32]};
+    trn_peer_sop   = trn_tx.sof;
+    trn_peer_eop   = trn_tx.eof;
+    trn_peer_valid = trn_tx.vld;
+    trn_peer_ready = trn_tx.rdy;
+    trn_peer_keep  = trn_tx.eof && tlp_last_half(trn_tx_dw0) ? 8'h0F : 8'hFF;
   end
 
   //------------------------------------------------------------------------
@@ -371,14 +408,15 @@ bind pcie_core ep_wavecrux_view wavecrux (
     .rst_n       (core_rst_n),
     .pipe        (pipe),
     .dll         (dll),
-    .trn         (trn),
+    .trn_tx      (trn_tx),
+    .trn_rx      (trn_rx),
     .s_axis_tx   (s_axis_tx),
     .m_axis_rx   (m_axis_rx),
-    .mac_tx_data (dll_tx_data),
-    .mac_tx_datak(dll_tx_datak),
-    .mac_rx_data (mac_rx_data),
-    .mac_rx_datak(mac_rx_datak),
-    .ltssm       (ltssm_state),
+    .mac_tx_data (mac.tx.data),
+    .mac_tx_datak(mac.tx.kcode),
+    .mac_rx_data (mac.rx.data),
+    .mac_rx_datak(mac.rx.kcode),
+    .ltssm       (mac.ltssm_state),
     .link        (dll_up)
 );
 

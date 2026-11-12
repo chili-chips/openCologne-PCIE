@@ -54,7 +54,7 @@ static bool IsDispEnabled(const pPcieModelState_t const state, const int rx, int
 }
 
 // -------------------------------------------------------------------------
-// TapTl() / TapDll()  (openCologne-PCIE)
+// TapTl() / TapDll()  (openPCIE)
 //
 // Write each TLP (one DW per write, byte 0 in bits 31:24, without framing,
 // sequence number and LCRC) and each DLLP (its 4 bytes, without CRC) to the

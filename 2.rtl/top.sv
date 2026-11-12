@@ -85,13 +85,13 @@ module top (
   );
 
   pcie_top u_pcie_top (
-      .clk_brd    (clk_brd),
-      .perst_n    (perst_n),
-      .pipe_mac   (pipe_mac),
-      .phy_rdy    (phy_rdy),
-      .rst_pipe_n (rst_pipe_n),
-      .dll_up     (link_up),
-      .fw_pass    (fw_pass)
+      .clk_brd   (clk_brd),
+      .perst_n   (perst_n),
+      .pipe_mac  (pipe_mac),
+      .phy_rdy   (phy_rdy),
+      .rst_pipe_n(rst_pipe_n),
+      .dll_up    (link_up),
+      .fw_pass   (fw_pass)
   );
 
 endmodule
