@@ -61,13 +61,13 @@ Receiver:
 | `RX_AFE_OFFSET` | 8 | Front-end offset, when not adapted |
 | `RX_EI_BIAS` / `RX_EI_BW_SEL` | 4 / 4 | Electrical-idle detector bias and bandwidth |
 
-PCIe asks for Tx de-emphasis (spec 4.3.3); this test runs without it. For comparison, see the [ULX5M-M2 Ver1 settings](https://github.com/chili-chips-ba/openCologne-PCIE/tree/main/1.pcb#ver1) used for SerDes PRBS speed tests.
+PCIe asks for Tx de-emphasis (spec 4.3.3); this test runs without it. For comparison, see the [ULX5M-M2 Ver1 settings](https://github.com/chili-chips/openCologne-PCIE/tree/main/1.pcb#ver1) used for SerDes PRBS speed tests.
 
 ---
 ### References:
 - [CC SerDes LB](https://github.com/pu-cc/gm_serdes_lb) -- Includes **serdestool.py** tool for register map helpers
-- [Intergalaktik 2-chip SerDes test](https://github.com/chili-chips-ba/openCologne-PCIE/tree/main/1.pcb#ver1), [more](https://github.com/chili-chips-ba/openCologne/issues/76#issue-6170309059)
-- [openCologne ICLINK SerDes](https://github.com/chili-chips-ba/openCologne/tree/main/7.SerDes)
+- [Intergalaktik 2-chip SerDes test](https://github.com/chili-chips/openCologne-PCIE/tree/main/1.pcb#ver1), [more](https://github.com/chili-chips-ba/openCologne/issues/76#issue-6170309059)
+- [openCologne ICLINK SerDes](https://github.com/chili-chips/openCologne/tree/main/7.SerDes)
   
 --------------------
 #### End of Document

@@ -52,7 +52,7 @@ Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's 
 --------------------
 ## Lane polarity: the P and N swaps
 
-A lane is a differential pair, P and N. Keeping P on P from pin to pin often means crossing the pair on the board: two vias and their stubs on a 2.5 or 5 Gb/s line. On the openPCIE backplane we did not take the chance and routed every P to P, at the cost of crossings like 1 to 5 below ([openPCIE 1.pcb](https://github.com/chili-chips-ba/openPCIE/tree/main/1.pcb#the-p-and-n-swaps)).
+A lane is a differential pair, P and N. Keeping P on P from pin to pin often means crossing the pair on the board: two vias and their stubs on a 2.5 or 5 Gb/s line. On the openPCIE backplane we did not take the chance and routed every P to P, at the cost of crossings like 1 to 5 below ([openPCIE 1.pcb](https://github.com/chili-chips/openPCIE/tree/main/1.pcb#the-p-and-n-swaps)).
 
 <div align="center">
   <img alt="P and N crossings on a PCB" width="50%" src="0.doc/PCIE-P-and-N-swaps.png">
@@ -68,7 +68,7 @@ So a GateMate board can route each pair the short way: no crossing vias, no stub
 --------------------
 ## Open-source SerDes simulation model
 
-`2.serdes-model/` holds a copy of the open-source **SerDes BFM**, a behavioural model of the GateMate SerDes at the level of Cologne Chip's sim model `ccfpga_serdes`, not the `CC_SERDES` primitive. Its sibling `ccfpga_serdes.SYNTH.sv` puts `CC_SERDES` behind the same ports for the chip: `phy_top` has one SerDes instance, the file list picks the file. So the PIPE, MAC and DLL simulate with open tools. Master copy, documentation, tests and 8b/10b proofs: [openCologne `7.SerDes/1.sim-model`](https://github.com/chili-chips-ba/openCologne/blob/main/7.SerDes/1.sim-model/README.md).
+`2.serdes-model/` holds a copy of the open-source **SerDes BFM**, a behavioural model of the GateMate SerDes at the level of Cologne Chip's sim model `ccfpga_serdes`, not the `CC_SERDES` primitive. Its sibling `ccfpga_serdes.SYNTH.sv` puts `CC_SERDES` behind the same ports for the chip: `phy_top` has one SerDes instance, the file list picks the file. So the PIPE, MAC and DLL simulate with open tools. Master copy, documentation, tests and 8b/10b proofs: [openCologne `7.SerDes/1.sim-model`](https://github.com/chili-chips/openCologne/blob/main/7.SerDes/1.sim-model/README.md).
 
 | flow | result |
 |---|---|

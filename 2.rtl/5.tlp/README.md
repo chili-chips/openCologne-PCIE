@@ -9,7 +9,7 @@ The **Transaction Layer (TL)** sits between the SOC above and the **Data Link La
 An Endpoint, function 0, single virtual channel (VC0), one 32-bit memory BAR, per PCI Express Base Specification 2.1.
 
 - **User interface:** derived from that of the AMD `PCIE_2_1` hard block in EP mode ([UG477](../../0.doc/2.rtl/ug477_7Series_IntBlock_PCIe.pdf)): TLPs in 64-bit beats on `trn_tx_if` / `trn_rx_if`, the TRN bus cut to what this core uses, and the `cfg` sideband. [`trn_compat`](trn_compat.sv) maps them back to TRN for user logic written for the HM ([mapping](#trn-mapping)).
-- **Above it:** [`trn_bridge`](../6.trn_bridge), the same as on [openPCIE](https://github.com/chili-chips-ba/openPCIE), turns the TRN bus into the SOC's two 64-bit AXI-Stream streams, as the AXI wrapper of `PCIE_2_1` does.
+- **Above it:** [`trn_bridge`](../6.trn_bridge), the same as on [openPCIE](https://github.com/chili-chips/openPCIE), turns the TRN bus into the SOC's two 64-bit AXI-Stream streams, as the AXI wrapper of `PCIE_2_1` does.
 
 <img alt="Position of the Transaction Layer in the PCIe stack" src="./0.doc/TL_Position.png" width=300 />
 

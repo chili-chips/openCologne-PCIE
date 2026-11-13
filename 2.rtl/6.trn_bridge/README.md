@@ -1,6 +1,6 @@
 # TRN Bridge
 
-`trn_bridge` turns the TL's TLP interfaces (`trn_tx_if`, `trn_rx_if`, derived from TRN) into the SOC's two 64-bit AXI-Stream streams (`axis_if`), as the AXI wrapper of AMD's `PCIE_2_1` does. From [openPCIE](https://github.com/chili-chips-ba/openPCIE), where it sits on `PCIE_2_1`, cut to what this core uses:
+`trn_bridge` turns the TL's TLP interfaces (`trn_tx_if`, `trn_rx_if`, derived from TRN) into the SOC's two 64-bit AXI-Stream streams (`axis_if`), as the AXI wrapper of AMD's `PCIE_2_1` does. From [openPCIE](https://github.com/chili-chips/openPCIE), where it sits on `PCIE_2_1`, cut to what this core uses:
 - the clock port is `clk`, our PCLK (`clk62m5` there);
 - `m_axis_rx` carries `tdata`, `tvalid` and `tlast`. `tkeep` is all ones, also on a last beat holding one DW, and `tuser` is 0: the SOC reads neither, it takes the length from the header. A departure from AXI-Stream and UG477;
 - on `trn_tx_if` / `trn_rx_if` instead of TRN: no `rsof`, `rem`, BAR hit, error forward or `link_up`, and the throttle works on `free_words` (beats) instead of `tbuf_av` (TLPs);

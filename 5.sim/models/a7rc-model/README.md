@@ -1,6 +1,6 @@
 # Artix-7 RC model: the host
 
-A copy of openPCIE's [Artix-7 RC model](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#the-rc-model), the host of our simulations: driver (tester) and spec checker. The masters are in openPCIE; do not edit here.
+A copy of openPCIE's [Artix-7 RC model](https://github.com/chili-chips/openPCIE/tree/main/5.sim#the-rc-model), the host of our simulations: driver (tester) and spec checker. The masters are in openPCIE; do not edit here.
 
 | File | Master in openPCIE `5.sim` | What |
 |---|---|---|

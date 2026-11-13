@@ -1,20 +1,21 @@
 [![NLnet:Funded](https://badgen.net/badge/NLnet/Funded/08C)](https://nlnet.nl/project/OpenCologne-PCIe/)
-[![Stars](https://badgen.net/github/stars/chili-chips-ba/openCologne-PCIE?label=Stars)](https://github.com/chili-chips-ba/openCologne-PCIE/stargazers)
+[![Stars](https://badgen.net/github/stars/chili-chips/openCologne-PCIE?label=Stars)](https://github.com/chili-chips/openCologne-PCIE/stargazers)
+[![GitLab:Mirror](https://badgen.net/badge/GitLab/Mirror/08C)](https://gitlab.com/chili-chips/openCologne-PCIE)
 [![License:BSD-3/CC-BY-SA](https://badgen.net/badge/License/BSD-3%2FCC-BY-SA/blue)](LICENSES)
 [![REUSE:Compliant](https://badgen.net/badge/REUSE/Compliant/green)](REUSE.toml)
-[![eduBOS5:YES](https://badgen.net/badge/eduBOS5/YES/green)](https://github.com/chili-chips-ba/openPCIE/blob/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/README.md)
+[![eduBOS5:YES](https://badgen.net/badge/eduBOS5/YES/green)](https://github.com/chili-chips/openPCIE/blob/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/README.md)
 [![pcievhost:YES](https://badgen.net/badge/pcievhost/YES/green)](5.sim/models/pcievhost/README.md)
 [![WaveCrux:Pass](https://badgen.net/badge/WaveCrux/Pass/green)](2.rtl/4.dll/README.md#viewing-the-dll-in-wavecrux)
 [![JanusHDL:WIP](https://badgen.net/badge/JanusHDL/WIP/orange)](https://que.no/janushdl/)
-[![Lint](https://badgen.net/github/checks/chili-chips-ba/openCologne-PCIE/main/run-lint?label=Lint)](https://github.com/chili-chips-ba/openCologne-PCIE/actions/workflows/lint.yml)
-[![Verible](https://badgen.net/github/checks/chili-chips-ba/openCologne-PCIE/main/verible?label=Verible)](https://github.com/chili-chips-ba/openCologne-PCIE/actions/workflows/verible.yml)
-[![8b10b-Formal:Pass](https://badgen.net/badge/8b10b%20Formal/Pass/green)](https://github.com/chili-chips-ba/openCologne/tree/main/7.SerDes/1.sim-model/formal_8b10b)
+[![Lint](https://badgen.net/github/checks/chili-chips/openCologne-PCIE/main/run-lint?label=Lint)](https://github.com/chili-chips/openCologne-PCIE/actions/workflows/lint.yml)
+[![Verible](https://badgen.net/github/checks/chili-chips/openCologne-PCIE/main/verible?label=Verible)](https://github.com/chili-chips/openCologne-PCIE/actions/workflows/verible.yml)
+[![8b10b-Formal:Pass](https://badgen.net/badge/8b10b%20Formal/Pass/green)](https://github.com/chili-chips/openCologne/tree/main/7.SerDes/1.sim-model/formal_8b10b)
 [![DLL+PHY-Sim:Pass](https://badgen.net/badge/DLL%2BPHY%20Sim/Pass/green)](2.rtl/4.dll/sim)
 [![TopSim:WIP](https://badgen.net/badge/TopSim/WIP/orange)](5.sim)
 [![PCIE:TODO](https://badgen.net/badge/PCIE/TODO/red)](#project-status)
 [![LiteX:TODO](https://badgen.net/badge/LiteX/TODO/red)](6.litex/README.md)
 
-**openCologne-PCIE** is a **soft PCIE EndPoint core** for the Cologne Chip GateMate FPGA, built with the fully opensource [nextPNR](https://github.com/YosysHQ/prjpeppercorn) tool suite. It continues [openCologne](https://github.com/chili-chips-ba/openCologne) and complements the [openPCIE](https://github.com/chili-chips-ba/openpcie) RootComplex.
+**openCologne-PCIE** is a **soft PCIE EndPoint core** for the Cologne Chip GateMate FPGA, built with the fully opensource [nextPNR](https://github.com/YosysHQ/prjpeppercorn) tool suite. It continues [openCologne](https://github.com/chili-chips/openCologne) and complements the [openPCIE](https://github.com/chili-chips/openpcie) RootComplex.
 
 <div align="center">
   <img alt="openCologne-PCIE logo" width="30%" src="0.doc/artwork/openCologne-PCIE.hex.png">
@@ -22,7 +23,7 @@
 
 - **Layered and portable:** only the PHY is in the hard-macro (HM) domain, so the stack can move to other FPGA families and [OpenROAD](https://github.com/The-OpenROAD-Project) ASICs. It is the only soft PCIE protocol stack in opensource at the moment.
 - **Verified:** comes with its own **Verification IP (VIP)**.
-- **Hardware:** two **PCIE cards for GateMate**. They host all three GateMate variants (A1, A2, A4) and plug into 3rd-party carriers, including our opensource [PCIE Backplane](https://github.com/chili-chips-ba/openPCIE/tree/main/1.pcb/openpci2-backplane).
+- **Hardware:** two **PCIE cards for GateMate**. They host all three GateMate variants (A1, A2, A4) and plug into 3rd-party carriers, including our opensource [PCIE Backplane](https://github.com/chili-chips/openPCIE/tree/main/1.pcb/openpci2-backplane).
 - **LiteX:** integration planned through [LitePCIE](https://github.com/enjoy-digital/litepcie), toward an end-to-end, community-maintained _openCompute_ PCIE ecosystem.
 
 | Go to | For |
@@ -75,7 +76,7 @@ The GateMate EP card is the [ULX5M-M2](1.pcb/README.md) by [Intergalaktik](https
   <a href="https://www.canva.com/design/DAHXSTcjxEc/odZj_VbgU20EEeZ1zuJlJA/watch?utm_content=DAHXSTcjxEc&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h8306e0024f" target="_blank" rel="noopener"><img width="70%" alt="openPCIE backplane intro video (click to watch)" src="0.doc/artwork/openPCIE-backplane.png"></a>
 </div>
 
-The card plugs into the [openPCIE backplane](https://github.com/chili-chips-ba/openPCIE/tree/main/1.pcb) ([more info](https://www.chili-chips.xyz/openpcie-backplane-put-your-fpga-in-control)), where the [openPCIE](https://github.com/chili-chips-ba/openPCIE) Artix-7 is the RC. Two topologies:
+The card plugs into the [openPCIE backplane](https://github.com/chili-chips/openPCIE/tree/main/1.pcb) ([more info](https://www.chili-chips.xyz/openpcie-backplane-put-your-fpga-in-control)), where the [openPCIE](https://github.com/chili-chips/openPCIE) Artix-7 is the RC. Two topologies:
 
 1. **Direct:** our EP on the RC link.
 2. **Behind Switch:** through the backplane's PCIE switch.
@@ -289,7 +290,7 @@ This project was funded through the NGI0 Commons Fund, a fund established by NLn
 </div>
 
 <div align="center">
-  <a href="https://github.com/chili-chips-ba/openPCIE"><img width="15%" alt="openPCIE project logo" src="0.doc/artwork/pcie2rootc.hex.png"></a>
+  <a href="https://github.com/chili-chips/openPCIE"><img width="15%" alt="openPCIE project logo" src="0.doc/artwork/pcie2rootc.hex.png"></a>
   <a href="https://www.envox.eu"><img width="25%" alt="EEZ / Envox logo: openPCIE backplane" src="0.doc/artwork/EEZ-web-logo.png"></a>
 </div>
 
@@ -358,7 +359,7 @@ More venues welcome: please send your ideas!
 
 Want to help the opensource PCIE community grow? See [Contributions](CONTRIBUTING.md).
 
-Need help? Ask ===> [![issues](https://badgen.net/github/open-issues/chili-chips-ba/openCologne-PCIE?label=issues)](https://github.com/chili-chips-ba/openCologne-PCIE/issues).
+Need help? Ask ===> [![issues](https://badgen.net/github/open-issues/chili-chips/openCologne-PCIE?label=issues)](https://github.com/chili-chips/openCologne-PCIE/issues).
 
 --------------------
 

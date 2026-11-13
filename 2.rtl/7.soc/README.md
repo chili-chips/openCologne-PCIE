@@ -12,7 +12,7 @@
 
 ### CPU
 
-- **eduBOS5** (default): Chili.CHIPS' RV32I core, copied here in [`CPU.eduBOS5`](CPU.eduBOS5). The master is on [openPCIE](https://github.com/chili-chips-ba/openPCIE/tree/main/2.rtl/0.common.opensource/src/CPU.eduBOS5): before major work here, update the copy from it ([how](CPU.eduBOS5/README.md)). `` `define SOC_EDUBOS5_3STG `` selects its 3-stage pipeline.
+- **eduBOS5** (default): Chili.CHIPS' RV32I core, copied here in [`CPU.eduBOS5`](CPU.eduBOS5). The master is on [openPCIE](https://github.com/chili-chips/openPCIE/tree/main/2.rtl/0.common.opensource/src/CPU.eduBOS5): before major work here, update the copy from it ([how](CPU.eduBOS5/README.md)). `` `define SOC_EDUBOS5_3STG `` selects its 3-stage pipeline.
 - **VProc** (`` `define SOC_CPU_VPROC ``, co-simulation only): the same bus driven by native C/C++ or by the rv32 ISS, see [5.sim](../../5.sim).
 
 ### Address map
@@ -86,7 +86,7 @@ The SOC adds none: it is the user side, which the spec does not cover. The depar
 **The RVFI Commit Inspector** (View -> Toggle Stage Panel), the same core and view in openPCIE: each retired instruction with its effect, a register written or a store:
 
 <div align="center">
-  <img alt="WaveCrux RVFI Commit Inspector: eduBOS5 commits" src="https://github.com/chili-chips-ba/openPCIE/raw/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/wavecrux/wavecrux-rvfi-commits.png" width="900">
+  <img alt="WaveCrux RVFI Commit Inspector: eduBOS5 commits" src="https://github.com/chili-chips/openPCIE/raw/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/wavecrux/wavecrux-rvfi-commits.png" width="900">
 </div>
 
 --------------------

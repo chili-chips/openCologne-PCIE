@@ -76,8 +76,8 @@ How to run each, and today's status: [Simulation, layer by layer](../2.rtl/READM
 
 `RCPIPEx1__pcieVHost` is the pcieVHost model in our wrapper [`PIPEx1__pcieVHost`](models/PIPEx1__pcieVHost.sv), around upstream's `pcieVHostPipex1`, fixed to the RC role ([`models/RCPIPEx1__pcieVHost.sv`](models/RCPIPEx1__pcieVHost.sv)).
 
-- On [openPCIE](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim), the same model and PIPE wrapper were validated against the AMD `PCIE_2_1` hard macro, roles swapped (model EP, hard macro RC): link training, flow control, TLPs and completions, end to end. So the model and the hard macro speak the same PCIE.
-- An EP that passes against this model in simulation stands a better chance of working first time in hardware, when a physical Artix-7 running openPCIE as the RC drives our GateMate EP over the [openPCIE backplane](https://github.com/chili-chips-ba/openPCIE/tree/main/1.pcb).
+- On [openPCIE](https://github.com/chili-chips/openPCIE/tree/main/5.sim), the same model and PIPE wrapper were validated against the AMD `PCIE_2_1` hard macro, roles swapped (model EP, hard macro RC): link training, flow control, TLPs and completions, end to end. So the model and the hard macro speak the same PCIE.
+- An EP that passes against this model in simulation stands a better chance of working first time in hardware, when a physical Artix-7 running openPCIE as the RC drives our GateMate EP over the [openPCIE backplane](https://github.com/chili-chips/openPCIE/tree/main/1.pcb).
 
 ### An Artix-7 RC profile for the host
 
@@ -116,7 +116,7 @@ make EP=rtl DUMP=1 run       # also write tb_rtl.fst: every layer of the EP, for
 - **Session.** [`tb.DLL-PIPE.wavecrux`](tb.DLL-PIPE.wavecrux) opens the tracked [`tb.fst`](tb.fst) (Verilator run) with Ferrite's PIPE and DLL decoders on both directions. It binds signals by number: after a change to the dumped signals, run [`tools/wavecrux-rebind.py`](tools/wavecrux-rebind.py) on it.
 - **lz4.** Verilator 5.052 has its own FST writer, which needs the lz4 headers (`liblz4-dev`).
 
-**VIP.** VProc, the pcieVHost PCIE model and mem_model are copied from upstream into [`vip`](vip/README.md); our own wrappers are in `models/`. The first build compiles the VIP once into `~/.cache/opencologne-pcie/vip`, the Makefile's `$VIP_DIR` ([`tools/build-vip.sh`](tools/build-vip.sh)). VProc is built with openPCIE's `vproc-coroutine.patch`: the user code runs as a coroutine on the simulator's thread, not in a thread per node. That is about 22 times faster and deterministic, with no operating system scheduler in the handover (the prime suspect of the intermittent slow mode), so every run takes the same time: an `EP=model` run took 0.8 s instead of 17.7 s, same results (2026-10-31); with today's longer tester, about 1 s, and 100 seeds, 8 at a time, in about 19 s, all PASS ([details](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#our-local-vip-improvements)).
+**VIP.** VProc, the pcieVHost PCIE model and mem_model are copied from upstream into [`vip`](vip/README.md); our own wrappers are in `models/`. The first build compiles the VIP once into `~/.cache/opencologne-pcie/vip`, the Makefile's `$VIP_DIR` ([`tools/build-vip.sh`](tools/build-vip.sh)). VProc is built with openPCIE's `vproc-coroutine.patch`: the user code runs as a coroutine on the simulator's thread, not in a thread per node. That is about 22 times faster and deterministic, with no operating system scheduler in the handover (the prime suspect of the intermittent slow mode), so every run takes the same time: an `EP=model` run took 0.8 s instead of 17.7 s, same results (2026-10-31); with today's longer tester, about 1 s, and 100 seeds, 8 at a time, in about 19 s, all PASS ([details](https://github.com/chili-chips/openPCIE/tree/main/5.sim#our-local-vip-improvements)).
 
 **EP and host.**
 
@@ -134,7 +134,7 @@ make EP=rtl DUMP=1 run       # also write tb_rtl.fst: every layer of the EP, for
 
 ### The host: openPCIE's Artix-7 RC model
 
-The host is openPCIE's [Artix-7 RC model](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#the-rc-model): what the lab RC sends, from link training to the RC firmware's requests and their pacing. It runs at the PIPE or, with `IFACE=serial`, on the serial line, with 8b/10b and scrambling on. At the PIPE it scrambles too against our EP RTL (`A7RC_PIPE_SCRAMBLE`, as the lab RC); against the EP model it sets Disable Scrambling. [`usercode/a7rc_ep.h`](usercode/a7rc_ep.h) says what it expects of our EP RTL; the EP model matches the RC model's own EP.
+The host is openPCIE's [Artix-7 RC model](https://github.com/chili-chips/openPCIE/tree/main/5.sim#the-rc-model): what the lab RC sends, from link training to the RC firmware's requests and their pacing. It runs at the PIPE or, with `IFACE=serial`, on the serial line, with 8b/10b and scrambling on. At the PIPE it scrambles too against our EP RTL (`A7RC_PIPE_SCRAMBLE`, as the lab RC); against the EP model it sets Disable Scrambling. [`usercode/a7rc_ep.h`](usercode/a7rc_ep.h) says what it expects of our EP RTL; the EP model matches the RC model's own EP.
 
 **Masters.** The host is a copy in [`models/a7rc-model`](models/a7rc-model); the masters are in openPCIE. To update: copy, `cmp`, `bash run-sanity.sh`.
 
@@ -151,7 +151,7 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
 | Link training | to L0, shortened (`LTSSM_ABBREVIATED`: 16 TS1 in Polling.Active) | to L0 as the lab RC: full length, its TS counts and timeouts; Gen2 if the EP offers it |
 | FC init against our one InitFC1 and one InitFC2 set ([#25](https://github.com/chili-chips-ba/openCologne-PCIE/issues/25)) | hangs: after FC_INIT1 it waits for all three InitFC types again | completes on our first InitFC2 or UpdateFC, as the spec has it |
 | Requests | as fast as the model can send them; a TLP right after another is dropped ([#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26)) | the RC firmware's, with its think times, as on the lab RC; then, in the default tester mode, the tester's stages, below (`A7RC=1`: the lab RC's requests only) |
-| Spec checks | none | every TLP and DLLP, against PCIe Base 2.1 rules ([drive and check](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#drive-and-check)) |
+| Spec checks | none | every TLP and DLLP, against PCIe Base 2.1 rules ([drive and check](https://github.com/chili-chips/openPCIE/tree/main/5.sim#drive-and-check)) |
 | Result | stops in FC init, no TLP sent | `A7RC=1`: `RC MODEL RESULT: PASS`, `fw_pass` set, no violation. Tester (default): FAIL, below |
 
 **Tester and literal.**
@@ -170,7 +170,7 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
 
 **Spec checker.** Every TLP and DLLP on the link is checked against PCIe Base Specification 2.1 rules, each with an ID and section number; a table of checks and violations prints at the end, and any violation fails the run.
 
-- Today: 59 rules: Transaction Layer (`TL.`, 19), Data Link Layer (`DL.`, 12), flow control (`FC.`, 11), configuration space (`CFG.`, 11), Physical Layer (`PL.`, 6), listed in [drive and check](https://github.com/chili-chips-ba/openPCIE/tree/main/5.sim#drive-and-check).
+- Today: 59 rules: Transaction Layer (`TL.`, 19), Data Link Layer (`DL.`, 12), flow control (`FC.`, 11), configuration space (`CFG.`, 11), Physical Layer (`PL.`, 6), listed in [drive and check](https://github.com/chili-chips/openPCIE/tree/main/5.sim#drive-and-check).
 - The tester's random mix is seeded (`make SEED=N`, `make regress`).
 - The EP model passes all of them, at the PIPE and on the serial line, over 100 seeds. Our EP passes with `A7RC=1` and fails the tester, above.
 
@@ -527,7 +527,7 @@ The upstream files are copied in [`vip`](vip/README.md), with these changes made
 | VProc, pcieVHost, mem_model HDL | SystemVerilog names: modules `.sv`, `` `include`` headers `.svh`, the `` `include`` lines to match; after the patches, which keep upstream's `.v` names (`tools/build-vip.sh` maps `pcievhost-speed.patch`'s) | one rule for the whole repo: no `.v` files |
 | rv32 `src/rv32csr_cpu.cpp` (in [`models/rv32/rv32-openpcie.patch`](models/rv32/rv32-openpcie.patch), from openPCIE) | the timer-compare check in `process_interrupts()` no longer charges cycles | it added 2 cycles to every instruction |
 | rv32 `src/rv32i_cpu.cpp` (same patch) | `sw`, `sh` add the store extra cycles | upstream adds the load ones |
-| [`models/rv32/usercode/rv32_timing_config.h`](models/rv32/usercode/rv32_timing_config.h) | PicoRV32, eduBOS5 2-/3-stage timing tables, measured on openPCIE's SOC RTL | see openPCIE's [Our Local VIP Improvements](https://github.com/chili-chips-ba/openPCIE/blob/main/5.sim/README.md#our-local-vip-improvements) |
+| [`models/rv32/usercode/rv32_timing_config.h`](models/rv32/usercode/rv32_timing_config.h) | PicoRV32, eduBOS5 2-/3-stage timing tables, measured on openPCIE's SOC RTL | see openPCIE's [Our Local VIP Improvements](https://github.com/chili-chips/openPCIE/blob/main/5.sim/README.md#our-local-vip-improvements) |
 | [`models/rv32/usercode/VUserMain0.cpp`](models/rv32/usercode/VUserMain0.cpp) | no fetch/load wait states; bus credit; waits for reset release, restarts on reset | the same |
 
 The rv32 integration code in `models/rv32/usercode` is openPCIE's, without its `COUNTERS` (Zicntr) option.
@@ -645,7 +645,7 @@ On a 64-bit PIPE, eight symbols travel per PIPE clock, so `pclk` runs at `pciecl
 
 ## HAL
 
-One HAL, [`csr_regs.h`](../4.build/csr_build/csr_regs.h), serves the firmware on eduBOS5 and compiled for the host in co-simulation. Only its back end changes: the lines under `#ifdef VPROC` turn each access into a _VProc_ bus cycle. The design is openPCIE's ([HAL](https://github.com/chili-chips-ba/openPCIE/blob/main/5.sim/README.md#hal)).
+One HAL, [`csr_regs.h`](../4.build/csr_build/csr_regs.h), serves the firmware on eduBOS5 and compiled for the host in co-simulation. Only its back end changes: the lines under `#ifdef VPROC` turn each access into a _VProc_ bus cycle. The design is openPCIE's ([HAL](https://github.com/chili-chips/openPCIE/blob/main/5.sim/README.md#hal)).
 
 - **Generation:** `make -f MakefileCSR` in `4.build` generates the CSR RTL and the C header `csr.h` from the single register map `csr_build/csr.rdl`.
 - **Accessors** take register offsets and the CSR base address from `csr.h`: `CSR_REG32()` for a whole register, `CSR_GET()`, `CSR_SET()` and `CSR_RMW()` for one field.
