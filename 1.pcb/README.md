@@ -4,11 +4,11 @@ This is work area for the PCB-related thoughts and explanations, including the s
 
 ---
 ## M2 card
-<p align="center">
+<div align="center">
    <a href="https://canva.link/vyykwt6k7odhs3t" target="_blank" rel="noopener">
      <img width="70%" alt="ULX5M-M2 promo video (click to watch with sound)" src="../0.doc/1.pcb/Intergalaktik-ULX5M.png">
   </a>
-</p>
+</div>
 
 ---
 #### Ver1
@@ -18,16 +18,16 @@ This is work area for the PCB-related thoughts and explanations, including the s
 
 ❌ We did not manage to get higher than 2.5Gbps connections between v005 GS and M2 Ver1
  
-<p align="center">
+<div align="center">
   <img alt="ULX5M M.2 V1.0 card, top side" width="36%" src="../0.doc/1.pcb/ulx5m-m2.1--Top.jpg">
   <img alt="ULX5M M.2 V1.0 card, bottom side" width="45%" src="../0.doc/1.pcb/ulx5m-m2.2--Bottom.jpg">
-</p>
+</div>
   
-<p align="center">
+<div align="center">
   <img alt="ULX5M M.2 V1.0 Messy Test Setup" width="45%" src="../0.doc/1.pcb/M2-Ver1--Messy-Test-Setup.jpg">
   <img alt="ULX5M M.2 V1.0 SerDes Settings" width="45%" src="../0.doc/1.pcb/test-results/serdes-test-results---2026-10-18.settings2.png">
   <img alt="ULX5M M.2 V1.0 Test Results with extra filters" width="45%" src="../0.doc/1.pcb/test-results/serdes-test-results---2026-10-26--with-extra-filters.png">
-</p>
+</div>
 
 For comparison, see our [2.5Gbps SerDes settings](https://github.com/chili-chips-ba/openCologne-PCIE/blob/main/2.rtl/1.phy/1.serdes-test.STANDALONE/README.md#serdes-loopback-tests) for a standalone PRBS loopback test on CologneChip EVK.
 
@@ -35,10 +35,10 @@ For comparison, see our [2.5Gbps SerDes settings](https://github.com/chili-chips
 #### Ver2 (WIP 🟠)
 For better Signal Integrity (SI) FPGA is moved next to edge connector, see [Issue#4](https://github.com/chili-chips-ba/openCologne-PCIE/issues/4#issuecomment-4604732435). Power filtering that came out of our experimentation with Ver1 was also added. With all that, we are hoping for 5Gbps on Take2🤞.
 
-<p align="center">
+<div align="center">
   <img alt="ULX5M M.2 V1.0 card, top side" width="60%" src="../0.doc/1.pcb/ulx5m-m2-v2--1.top.jpg">
   <img alt="ULX5M M.2 V1.0 card, bottom side" width="60%" src="../0.doc/1.pcb/ulx5m-m2-v2--2.bottom.jpg">
-</p>
+</div>
 
 
 For additional detail, check the source repo:
@@ -52,16 +52,16 @@ While not the direct outcome of our project, the CologneChip PCIE card is also a
 
 Just for illustration, and to get the ball rolling, here is an earlier attempt at PCIE Edge/Slot EndPoint card. 
 
-<p align="center">
+<div align="center">
   <img alt="Earlier ULX4M PCIe slot edge card prototype" width="45%" src="../0.doc/1.pcb/ULX4M-PCIe-IO.beta_v2.png">
-</p>
+</div>
 
 ---
 #### Ver1 (WIP 🟠)
 
-<p align="center">
+<div align="center">
   <img alt="Earlier ULX4M PCIe slot edge card prototype" width="45%" src="../0.doc/1.pcb/PCIe_1X.png">
-</p>
+</div>
 
 For additional detail, check the source repo:
 - https://github.com/intergalaktik/ulx5-PCIe-1x
@@ -71,23 +71,23 @@ For additional detail, check the source repo:
 ### Form factors and hosts
 
 The PCB part of the project shall deliver two cards: GateMate in **(i) PCIE "Slot"** and **(ii) M.2** form-factors
-<p align="center">
+<div align="center">
   <img alt="PCIe slot connector" width="20%" src="../0.doc/1.pcb/PCIE-Slot-Connector.JPG">
   <img alt="NiteFury M.2 PCIe FPGA card" width="35%" src="../0.doc/1.pcb/NiteFury-PCIE-M2.JPG">
-</p>
+</div>
 
 While the "Slot" variant is not critical, and could have been supplanted by one of the ready-made M.2-to-Slot adapters, 
 
-<p align="center">
+<div align="center">
   <img alt="PCIe slot to M.2 adapter" width="40%" src="../0.doc/1.pcb/PCIE-Slot-to-M2-adapter.JPG">
-</p>
+</div>
 
 it is more practical not to have an interposer. "Slot" is still the dominant PCIE form-factor for desktops and servers. The M.2 is typically found in the laptops. The first plan was the [CM4 ULX4M](https://github.com/intergalaktik/ULX4M) with off-the-shelf I/O boards:
 
-<p align="center">
+<div align="center">
   <img alt="Raspberry Pi CM4 IO board with PCIe slot" width="40%" src="../0.doc/1.pcb/CM4-IO-with-PCIE-Slot.jpg">
   <img alt="Raspberry Pi CM4 IO board with PCIe M.2" width="40%" src="../0.doc/1.pcb/CM4-IO-with-PCIE-M2.jpg">
-</p>
+</div>
 
 With the M.2 RevA card done, the dev platform is now the ULX5M-M2 on our openPCIE backplane, which features:
 - Slots on one side
@@ -95,9 +95,9 @@ With the M.2 RevA card done, the dev platform is now the ULX5M-M2 on our openPCI
 - RootComplex also as a plug-in card (as opposed to the more typical soldered-down), for interoperability testing with [RaspberryPi](https://www.raspberrypi.com) and Xilinx Artix-7 .
 - on-board (soldered-down) PCIE Switch for interoperability testing of the most typical EP deployment scenario, which is when RootPort is not directly connected to EndPoints, but goes through a Switch.
 
-<p align="center">
+<div align="center">
   <img alt="PCIe interoperability with Raspberry Pi 5" width="40%" src="../0.doc/1.pcb/PCIE-interop-with-RPI5.png">
-</p>
+</div>
 
 ---
 #### References:

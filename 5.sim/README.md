@@ -35,9 +35,9 @@ The top-level test bench drives the DUT's PCIE link with the [pcieVHost](https:/
 - **[VProc](https://github.com/wyvernSemi/vproc)** runs a natively compiled program "inside" an HDL component, in lock-step with the simulation. pcieVHost is such a program; its PCIE lanes appear as ports.
 - **Roles:** designed as a root complex, the role it plays here. Its endpoint features, enabled by a parameter, are limited: a target for testing the root complex side.
 
-<p align=center>
+<div align=center>
 <img alt="openCologne-PCIE test bench: the host RCPIPEx1__pcieVHost at VProc node 2 on top, driving the DUT at its 64-bit PIPE interface below it: MAC, DLL and TL RTL, the CSR registers and the SOC CPU socket (soc_cpu.VPROC at node 0, or eduBOS5)" width=1000 src="../0.doc/5.sim/tb-structure.drawio.png">
-</p>
+</div>
 
 `CPU=rtl | vproc | iss` picks the SOC CPU ([below](#the-cpu-node-three-ways-to-run-the-socs-software)). Two switches set the rest:
 
@@ -272,9 +272,9 @@ Each pcieVHost reports every TLP and DLLP it sends and receives on ports of its 
 - Both sides use it: the host `RCPIPEx1__pcieVHost` (`EndPoint=0`) and the EP model `EPPIPEx1__pcieVHost_DUT` (`EndPoint=1`).
 - Each side has its decoder page, `tb.u_rc` and `tb.dut.bfm_pcie`, with the same names by link direction (dn = RC -> EP, up = EP -> RC). A packet shows on both, a link latency apart.
 
-<p align="center">
+<div align="center">
 <img alt="Inside PIPEx1__pcieVHost, used by both sides: the pcieVHost C model writes each TLP and DLLP through VProc, in zero time, into four SV queues in pcieVHost.sv, which play them out one per clock on TlpTx/TlpRx/DllpTx/DllpRx ports; our wrapper turns them into dll_rx beats for a TL under test and into the names WaveCrux decoders auto-bind, next to the PIPE link" width="100%" src="../0.doc/5.sim/pcievhost-taps.drawio.png">
-</p>
+</div>
 
 | Layer | Ports of `tb.u_rc`, `tb.dut.bfm_pcie` | For |
 |---|---|---|
@@ -559,9 +559,9 @@ uint32_t ReadRamWord   (const uint64_t addr, const int little_endian, const uint
 
 No default arguments (C). `node` selects a memory space, not a VProc node; we use one, 0. Every `mem_model` instance in the HDL sees the same memory as this API, so programs and logic exchange data through it.
 
-<p align="center">
+<div align="center">
 <img alt="soc_cpu VProc software stack" src="../0.doc/5.sim/soc-cpu-vproc-stack.png" width=800>
-</p>
+</div>
 
 ### The CPU node: three ways to run the SOC's software
 
@@ -637,9 +637,9 @@ Code on the rv32 ISS uses the RISC-V `gdb`: with `-g` in `vusermain.cfg`, the IS
 
 The EP has a single x1 PIPE port, 64 bits wide, as Cologne Chip's PIPE. `pcieVHostPipex1`, the PIPE wrapper of the pcieVHost model, drives it at Gen1 (Gen2 only when the EP offers it; ours is Gen1):
 
-<p align=center>
+<div align=center>
 <img alt="pcieVHost module ports" width=750 src="../0.doc/5.sim/pcievhost_module.png">
-</p>
+</div>
 
 On a 64-bit PIPE, eight symbols travel per PIPE clock, so `pclk` runs at `pcieclk`/8: 31.25 MHz against the 250 MHz symbol clock of Gen1. Configuring and driving the model: [`models/pcievhost/README.md`](models/pcievhost/README.md).
 

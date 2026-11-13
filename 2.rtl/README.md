@@ -1,14 +1,14 @@
 # RTL Architecture
 
-<p align="center">
+<div align="center">
   <img alt="PCIe EndPoint top-level stack" width="35%" src="../0.doc/2.rtl/pcie-ep-top-stack.png">
-</p>
+</div>
 
 ### Partitioning: Recipe for slicing this monster into manageable pieces
 
-<p align="center">
+<div align="center">
   <img alt="RTL blocks of the EndPoint: SOC, trn_bridge, soft TL+DLL+MAC, phy_top with the Cologne Chip soft wrapper and the GateMate SerDes, its BFM below" src="../0.doc/2.rtl/block-diagram.drawio.png" width="100%">
-</p>
+</div>
 
 ### Clock and Reset
 
@@ -19,9 +19,9 @@ Each reset is asserted asynchronously and released on its own clock, in a chain 
 - `mac_rst_n` (MAC, DLL, TL): once the SerDes TX is out of reset. The TL resets its parts on DL_Down itself, and keeps the InitFC credit limits it takes in DL_Init
 - `core_rst_n` (`trn_bridge`, SOC): while the data link is up (`dll_up`); made in [`pcie_core.sv`](pcie_core.sv)
 
-<p align="center">
+<div align="center">
   <img alt="Clocks and resets: the board clock is clk_aon for the reset chain root, rst_pipe_n; the SerDes PLL clock is PCLK; phy_rdy (CC_SERDES TX_RESET_DONE_O) releases mac_rst_n for MAC, DLL and TL, dll_up drives core_rst_n in pcie_core for trn_bridge and SOC" src="../0.doc/2.rtl/clk-rst.drawio.png" width="100%">
-</p>
+</div>
 
 Gen1 only; the diagram shows its frequencies. Gen2 is future work: the GateMate SerDes has trouble running at 5 Gbps, and every link trains at 2.5 GT/s first (PCIe 2.1 §4.2.4.7), so Gen2 takes a rate change in Recovery.Speed ([Future Development](#future-development)). At Gen2 the clocks would be:
 
@@ -234,7 +234,7 @@ The user side of the TL: 64-bit TLP beats on `trn_tx_if` / `trn_rx_if`, derived 
 
 In hardware: the TL's `config_space` RTL answers the host's CfgRd0/CfgWr0; the eduBOS5 firmware never sees them, so enumeration works before it starts. This follows AMD's `PCIE_2_1` hard macro in EP mode, whose configuration space is in silicon too and whose user logic gets only Memory and I/O requests and completions on TRN ([UG477](../0.doc/2.rtl/ug477_7Series_IntBlock_PCIe.pdf)); keeping that split keeps `trn_compat` usable by its user logic. Each register is one 32-bit word with a write mask, and an RW1C mask where needed. What is done where: [8) HW / SW Partitioning](#8-hw--sw-partitioning).
 
-<p align="center"><img alt="Type 0 configuration space, 00h to FFFh: implemented registers in green, not implemented ones (reading 0) in grey" src="5.tlp/0.doc/Config_Space.drawio.png" width="75%"></p>
+<div align="center"><img alt="Type 0 configuration space, 00h to FFFh: implemented registers in green, not implemented ones (reading 0) in grey" src="5.tlp/0.doc/Config_Space.drawio.png" width="75%"></div>
 
 | Capability | Implemented | Notes |
 |---|---|---|
@@ -251,8 +251,8 @@ To the rest of the logic, through `cfg_if`: Bus and Device Number, Memory Space 
 
 The same TLPs on both sides of `trn_bridge` ([byte order](5.tlp/README.md#byte-order)):
 
-<p align="center"><img alt="TLPs on TRN: MWr32, MRd32 and CplD in 64-bit beats, header DW0 in [63:32], eof on the last beat" src="5.tlp/0.doc/trn_format.drawio.png" width="70%"></p>
-<p align="center"><img alt="The same TLPs on axis_if: header DW0 in [31:0], tlast and tkeep on the last beat" src="6.trn_bridge/0.doc/axis_if_format.drawio.png" width="70%"></p>
+<div align="center"><img alt="TLPs on TRN: MWr32, MRd32 and CplD in 64-bit beats, header DW0 in [63:32], eof on the last beat" src="5.tlp/0.doc/trn_format.drawio.png" width="70%"></div>
+<div align="center"><img alt="The same TLPs on axis_if: header DW0 in [31:0], tlast and tkeep on the last beat" src="6.trn_bridge/0.doc/axis_if_format.drawio.png" width="70%"></div>
 
 ## 7) CSR, HAL and SW Interface
 The CSR block (`soc_csr`, at 0x3000_0000 on the CPU bus) is where the firmware meets the PCIE side: the `tx` registers (0x00) for the TLP to send, the `rx` window (0x10) for the received one, and `status` (0x24).
@@ -262,7 +262,7 @@ The CSR block (`soc_csr`, at 0x3000_0000 on the CPU bus) is where the firmware m
 - **Rx:** the SOC captures the first two beats of a TLP into the `rx` window and sets `rx.valid` at its last beat. While `rx.valid` is set, `tready` is low and the next TLP waits in the TL's queues (posted/completion 128 × 64 bit, non-posted 64 × 64 bit, 8 header credits each), its credits held, so nothing is lost. The firmware reads the window, answers, and writes 1 to `rx.valid` to open it again.
 - **Tx:** the firmware waits for the Tx FSM to be idle and the TL's Tx queue (64 × 64 bit, 3 TLPs) to have a free slot (`status.phy`), writes `tx.header0..2`, then `tx.data`. That last write starts the FSM, which sends the TLP in two beats.
 
-<p align="center"><img src="../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></p>
+<div align="center"><img src="../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></div>
 
 > **Food for thought:** PIO bursts without the CPU, see [Future Development](#future-development).
 

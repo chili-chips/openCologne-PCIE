@@ -52,10 +52,10 @@ Next to the TL:
 
 `tl_top` swaps the bytes of every DW at the DLL boundary (`wire_byte_swap`) and the two DWs at the TRN boundary (`trn_dw_swap`, in `trn_pkg`), so the whole TL works in AXI-Stream order and reads the header through the `tl_pkg` structs.
 
-<p align="center">
+<div align="center">
   <img alt="3-DW request header, byte 0 of every DW in [31:24]: H0 Fmt, Type, TC, TD, EP, Attr, Length; H1 Requester ID, Tag, Last and 1st DW byte enables; H2 Address[31:2]" src="0.doc/tlp_header_request.drawio.png" width="48%">
   <img alt="3-DW completion header: H0 as for a request; H1 Completer ID, Status, BCM, Byte Count; H2 Requester ID, Tag, Lower Address" src="0.doc/tlp_header_completion.drawio.png" width="48%">
-</p>
+</div>
 
 ### Data Link Layer (dll_if)
 - **DL_Up** is `dl_state` in DL_Init FC_INIT2 or DL_Active, registered. While DL_Up is low the TL is held in reset: DL_Down resets the TL, as required for an upstream port. The TX credit limits are the exception: `fc_credit` takes them from InitFC1 and InitFC2 in DL_Init, and clears them in DL_Inactive. In FC_INIT2 the TL already takes TLPs (DL_Up, 3.2.1); a credit it releases there goes out as an UpdateFC at once, between the InitFC2s. A partner still in FC_INIT1 ignores it, and the next UpdateFC carries the cumulative count.
@@ -66,7 +66,7 @@ InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/
 
 ### SOC side (trn_tx_if, trn_rx_if and cfg_if)
 
-<p align="center"><img alt="TLPs on TRN: MWr32, MRd32 and CplD in 64-bit beats, header DW0 in [63:32], eof on the last beat" src="0.doc/trn_format.drawio.png" width="70%"></p>
+<div align="center"><img alt="TLPs on TRN: MWr32, MRd32 and CplD in 64-bit beats, header DW0 in [63:32], eof on the last beat" src="0.doc/trn_format.drawio.png" width="70%"></div>
 
 - **TRN RX** (`trn_rx_if`) carries memory reads and writes that hit BAR0, and all completions.
   - A beat moves when `vld` and `rdy` are both high; `eof` marks the last. There is no `sof`: the first beat after `eof`, or after reset, starts a TLP. The TL holds a TLP at its first beat until `rdy`, and DL_Down resets the TL's RX side, `trn_bridge` and the SOC on the same edge, so a TLP always arrives whole.
@@ -183,7 +183,7 @@ Credit types that were advertised as 0 in InitFC are infinite and always pass. A
 
 ## Configuration space
 
-<p align="center"><img alt="Type 0 configuration space, 00h to FFFh: implemented registers in green (IDs, Command, Status, Class Code, Header Type, Cache Line Size, BAR0, Subsystem IDs, Capabilities Pointer, Interrupt Line, PM capability with PMCSR D0/D3hot, PCI Express capability); not implemented, reading 0, in grey (BIST, Latency Timer, BAR1-5, CardBus CIS, Expansion ROM, Max_Lat, Min_Gnt, Interrupt Pin, PM Data, Slot and Root registers, Device Capabilities/Control/Status 2, Link Capabilities 2 and Link Status 2, MSI and other capabilities, extended space)" src="./0.doc/Config_Space.drawio.png" width="75%"></p>
+<div align="center"><img alt="Type 0 configuration space, 00h to FFFh: implemented registers in green (IDs, Command, Status, Class Code, Header Type, Cache Line Size, BAR0, Subsystem IDs, Capabilities Pointer, Interrupt Line, PM capability with PMCSR D0/D3hot, PCI Express capability); not implemented, reading 0, in grey (BIST, Latency Timer, BAR1-5, CardBus CIS, Expansion ROM, Max_Lat, Min_Gnt, Interrupt Pin, PM Data, Slot and Root registers, Device Capabilities/Control/Status 2, Link Capabilities 2 and Link Status 2, MSI and other capabilities, extended space)" src="./0.doc/Config_Space.drawio.png" width="75%"></div>
 
 | Register                 | Notes                                                                                   |
 |:------------------------ |:--------------------------------------------------------------------------------------- |

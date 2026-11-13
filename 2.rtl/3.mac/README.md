@@ -9,9 +9,9 @@ The **Media Access Control (MAC)** is the logical sub-block of the PCIe **Physic
 - **Link:** owns bring-up and maintenance through the **Link Training and Status State Machine (LTSSM)**.
 - **Soft RTL** in the FPGA fabric. **8b/10b** encode/decode, the **elastic buffer** and **word alignment** are done by the GateMate SerDes, behind [PIPE](../2.pipe/README.md).
 
-<p align="center">
+<div align="center">
   <img alt="Position of the MAC layer in the PCIe stack" width="50%" src="../1.phy/0.doc/PHY-Layers-GateMate.drawio.png">
-</p>
+</div>
 
 ## Architecture
 A transmit datapath, a receive datapath, and the control plane binding them.
@@ -51,15 +51,15 @@ The heart of the MAC control plane. Top-level states for endpoint bring-up:
 | L0              | Fully active operational state; TLPs and DLLPs flow. |
 | Recovery        | Retrain the link from L0: RcvrLock, RcvrCfg, Idle. |
 
-<p align="center">
+<div align="center">
   <img alt="Our LTSSM: Detect, Polling, Configuration, L0, Recovery, with the PIPE power state of each" width="60%" src="./0.doc/MAC_LTSSM.drawio.png">
-</p>
+</div>
 
 **Against the full LTSSM** (Base 2.1, 4.2.5), with the PIPE power state of each state:
 
-<p align="center">
+<div align="center">
   <img alt="The full PCIe LTSSM with the PIPE power states" width="50%" src="./0.doc/MAC_LTSSM_full.png">
-</p>
+</div>
 
 | | Full LTSSM | Ours |
 |---|---|---|

@@ -47,7 +47,7 @@ Things worth knowing:
 
 **The handshake:** one TLP at a time each way; the firmware polls `rx.valid` and `status.phy`.
 
-<p align="center"><img src="../../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></p>
+<div align="center"><img src="../../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></div>
 
 **The headers** in `rx.header0..2` and `tx.header0..2`, one DW per register: H0 in `header0`, byte 0 of every DW in bits [31:24], payload included. The firmware decodes requests and builds completions:
 
@@ -79,15 +79,15 @@ The SOC adds none: it is the user side, which the spec does not cover. The depar
 
 **The disassembly**, from the EP co-simulation ([5.sim](../../5.sim/README.md)): the firmware clearing `pio_mem`, one turn of the loop. RVFI on top, the RISC-V decoder's table below:
 
-<p align="center">
+<div align="center">
   <img alt="WaveCrux: eduBOS5 RVFI signals and the RISC-V decoder's disassembly of the pio_mem loop" src="../../0.doc/5.sim/wavecrux-ep-cpu-loop.png" width="900">
-</p>
+</div>
 
 **The RVFI Commit Inspector** (View -> Toggle Stage Panel), the same core and view in openPCIE: each retired instruction with its effect, a register written or a store:
 
-<p align="center">
+<div align="center">
   <img alt="WaveCrux RVFI Commit Inspector: eduBOS5 commits" src="https://github.com/chili-chips-ba/openPCIE/raw/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/wavecrux/wavecrux-rvfi-commits.png" width="900">
-</p>
+</div>
 
 --------------------
 #### End of Document

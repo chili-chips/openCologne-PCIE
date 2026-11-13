@@ -18,15 +18,15 @@ More information can be found in the documentation located in <code>doc/VProc.pd
 
 ### VProc HDL component
 The diagram below shows the VProc component that's instantiated in the HDL.
-<p align="center">
+<div align="center">
 <img src="https://github.com/wyvernSemi/vproc/assets/21970031/71f770ac-5c5f-401c-bab2-4e3f376dba65" width=800>
-</p>
+</div>
 <hr>
 
 ### VProc stack with Python
 The diagram below shows the stack for node 0 from the HDL environment (Verilog in this diagram) through to the user code&mdash;in this case, python. For the C/C++ environment, the stack tops out at <tt>VUserMain0()</tt> as the user code entry point, with any additional user hiearchy on top of this.
-<p align="center">
+<div align="center">
 <img src="https://github.com/wyvernSemi/vproc/assets/21970031/523db26f-e23b-4f26-9019-6fe985c9cb62" width=700>
-</p>
+</div>
 
 Copyright &copy; 2024 Simon Southwell. All rights reserved.

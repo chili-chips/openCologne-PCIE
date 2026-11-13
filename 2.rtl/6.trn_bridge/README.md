@@ -19,8 +19,8 @@
 
 The same TLPs on both sides of `trn_bridge`:
 
-<p align="center"><img alt="TLPs on TRN: MWr32, MRd32 and CplD in 64-bit beats, header DW0 in [63:32], eof on the last beat" src="../5.tlp/0.doc/trn_format.drawio.png" width="70%"></p>
-<p align="center"><img alt="The same TLPs on axis_if: header DW0 in [31:0], tlast and tkeep on the last beat" src="./0.doc/axis_if_format.drawio.png" width="70%"></p>
+<div align="center"><img alt="TLPs on TRN: MWr32, MRd32 and CplD in 64-bit beats, header DW0 in [63:32], eof on the last beat" src="../5.tlp/0.doc/trn_format.drawio.png" width="70%"></div>
+<div align="center"><img alt="The same TLPs on axis_if: header DW0 in [31:0], tlast and tkeep on the last beat" src="./0.doc/axis_if_format.drawio.png" width="70%"></div>
 
 Tested with the TL: [`5.tlp/sim/run-tl.sh`](../5.tlp/sim/run-tl.sh) ([Simulation](../5.tlp/README.md#simulation)).
 

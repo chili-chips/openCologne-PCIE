@@ -36,14 +36,14 @@ The _pcievhost_ model generates PCIe Physical, Data Link and Transaction Layer t
 
 The diagram below shows the structure of the model which ultimately generates a stream of 8b10b encoded symbols, and processes the returned symbols.
 
-<p align="center">
+<div align="center">
 <img src="https://github.com/user-attachments/assets/32a4c6d9-e71f-4ece-89e4-3c49cc1c7c76" width=740>
-</p>
+</div>
 
 _pcievhost_ is bundled with verilog pcie link traffic display modules and an example test harness. The model has been tested with Questa (Verilog and VHDL), Vivado xsim, Verilator, NVC and GHDL at the present time, though easily adpated for other simulators. The _pcievhost_ model can also be configured to act as an _**endpoint**_ via a parameter and with simple running user code&mdash;the model itself automatically generating responses to transactions. The diagram below shows the example test bench structure.
 
-<p align="center">
+<div align="center">
 <img src="https://github.com/user-attachments/assets/7701ffa3-f556-4006-a16e-46ec2942c87a" width=800>
-</p>
+</div>
 
 More information can be found in the documentation <code>doc/pcieVHost.pdf</code>

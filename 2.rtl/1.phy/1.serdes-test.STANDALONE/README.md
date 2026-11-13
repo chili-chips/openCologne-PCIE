@@ -2,10 +2,10 @@
 
 Mujo Sejdic and @KemalLikic workspace. [`PRBS-Loopback-Test-for-GateMate-EVK`](PRBS-Loopback-Test-for-GateMate-EVK) is a PRBS-7 loopback test of the GateMate SerDes on the evaluation board; [`build.sh`](build.sh) builds its bitstream.
 
-<p align="center">
+<div align="center">
   <img alt="CologneChip EVK with SMA RF connectors, for SerDes PRBS loopback" width="60%" src="EVK-PRBS-Loopback-via-SMA-RF-cable.png">
   <img alt="CologneChip EVK with SMA RF connectors, for SerDes PRBS loopback" width="60%" src="EVK-PRBS-Loopback-via-SMA-RF-cable2.jpg">
-</p>
+</div>
     
 **Status:** tested on EVK board, using 10cm SMA RF loopback cable. It runs fine.
 

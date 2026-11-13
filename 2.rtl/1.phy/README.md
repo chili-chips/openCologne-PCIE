@@ -19,13 +19,13 @@ Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's 
 - [Mithro on SerDes](https://docs.google.com/presentation/d/e/2PACX-1vSgIGVCZtNt8RdifZXOLOJDDCj7g05zxr9WS2NjmQtM_E0GfZKCBYhASCto4eURL-86uNwJaXfo1qMC/pub?start=false&loop=false&delayms=3000#slide=id.g151286a907e_0_230)
 - [Yumewatari (whitequark) PHY segments with rudimentary LTSSM](https://github.com/whitequark/Yumewatari/tree/master/yumewatari/gateware)
 
-<p align="center">
+<div align="center">
   <img alt="PCIe physical layer sub-blocks" width="90%" src="0.doc/PHY-Layers.drawio.png">
-</p>
+</div>
 
-<p align="center">
+<div align="center">
   <img alt="PCIe physical layer mapped onto GateMate" width="60%" src="0.doc/PHY-Layers-GateMate.drawio.png">
-</p>
+</div>
 
 ## phy_top
 
@@ -34,9 +34,9 @@ Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's 
 - **`ccfpga_pipe_top`** runs the SerDes resets and comma alignment, receiver detection, the power states (P1 in Detect, P0 otherwise), PhyStatus and RxStatus ([2.pipe](../2.pipe/README.md)).
 - **`phy_rdy`** is the SerDes `TX_RESET_DONE_O`.
 
-<p align="center">
+<div align="center">
   <img alt="GateMate SerDes block diagram" width="60%" src="0.doc/SerDes-BlockDiagram.png">
-</p>
+</div>
 
 ### Where it departs from PCIe 2.1
 
@@ -54,9 +54,9 @@ Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's 
 
 A lane is a differential pair, P and N. Keeping P on P from pin to pin often means crossing the pair on the board: two vias and their stubs on a 2.5 or 5 Gb/s line. On the openPCIE backplane we did not take the chance and routed every P to P, at the cost of crossings like 1 to 5 below ([openPCIE 1.pcb](https://github.com/chili-chips-ba/openPCIE/tree/main/1.pcb#the-p-and-n-swaps)).
 
-<p align="center">
+<div align="center">
   <img alt="P and N crossings on a PCB" width="50%" src="0.doc/PCIE-P-and-N-swaps.png">
-</p>
+</div>
 
 The GateMate SerDes makes these crossings unnecessary:
 

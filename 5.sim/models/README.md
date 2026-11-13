@@ -23,7 +23,7 @@ In addition, sub-directories contain the following models
 
 The `soc_cpu.VPROC` module is pin compatible with the other `soc_cpu` components with RTL softcore implementations of 32-bit RISC-V processors, such as eduBOS5. In place of the softcore is a [_VProc_](https://github.com/wyvernSemi/vproc) virtual processor which can run natively compiled code and drive its memory mapped bus in the logic simulation (see [here](../README.md#vproc-software)). The module, `soc_cpu_vproc`, has only a clock (`clk`), an active-low reset (`resetn`) and the SOC's CPU bus, `mem_if` (`mem_valid`, `mem_ready`, `mem_addr`, `mem_wdata`, `mem_wstrb`, `mem_rdata`), the external bus to the rest of the logic, just as for the softcores.
 
-<p align="center"><img alt="soc_cpu.VPROC block diagram" width="600" src="../../0.doc/5.sim/soc_cpu_vproc.drawio.png"></p>
+<div align="center"><img alt="soc_cpu.VPROC block diagram" width="600" src="../../0.doc/5.sim/soc_cpu_vproc.drawio.png"></div>
 
 --------------------
 #### End of Document

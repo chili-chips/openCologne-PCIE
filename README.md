@@ -16,9 +16,9 @@
 
 **openCologne-PCIE** is a **soft PCIE EndPoint core** for the Cologne Chip GateMate FPGA, built with the fully opensource [nextPNR](https://github.com/YosysHQ/prjpeppercorn) tool suite. It continues [openCologne](https://github.com/chili-chips-ba/openCologne) and complements the [openPCIE](https://github.com/chili-chips-ba/openpcie) RootComplex.
 
-<p align="center">
+<div align="center">
   <img alt="openCologne-PCIE logo" width="30%" src="0.doc/artwork/openCologne-PCIE.hex.png">
-</p>
+</div>
 
 - **Layered and portable:** only the PHY is in the hard-macro (HM) domain, so the stack can move to other FPGA families and [OpenROAD](https://github.com/The-OpenROAD-Project) ASICs. It is the only soft PCIE protocol stack in opensource at the moment.
 - **Verified:** comes with its own **Verification IP (VIP)**.
@@ -34,9 +34,9 @@
 | [5.sim](5.sim/README.md) | Test bench and VIP |
 | [6.litex](6.litex/README.md) | LiteX integration |
 
-<p align="center">
+<div align="center">
   <img alt="PCIe EndPoint top-level stack" width="35%" src="0.doc/2.rtl/pcie-ep-top-stack.png">
-</p>
+</div>
 
 ### Design Blueprint: Minimal, yet functional PCIE EP core
 
@@ -63,17 +63,17 @@ PCIE is complex, and most real-life users need little of it. We build a barebone
 
 ### EP card: Intergalaktik ULX5M-M2
 
-<p align="center">
+<div align="center">
   <a href="https://canva.link/vyykwt6k7odhs3t" target="_blank" rel="noopener"><img width="70%" alt="ULX5M-M2 promo video (click to watch with sound)" src="0.doc/1.pcb/Intergalaktik-ULX5M.png"></a>
-</p>
+</div>
 
 The GateMate EP card is the [ULX5M-M2](1.pcb/README.md) by [Intergalaktik](https://intergalaktik.eu) and [Radiona](https://radiona.org), in M.2 form factor. Sources: [intergalaktik/ulx5m-m2](https://github.com/intergalaktik/ulx5m-m2).
 
 ### Test setup
 
-<p align="center">
+<div align="center">
   <a href="https://www.canva.com/design/DAHXSTcjxEc/odZj_VbgU20EEeZ1zuJlJA/watch?utm_content=DAHXSTcjxEc&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h8306e0024f" target="_blank" rel="noopener"><img width="70%" alt="openPCIE backplane intro video (click to watch)" src="0.doc/artwork/openPCIE-backplane.png"></a>
-</p>
+</div>
 
 The card plugs into the [openPCIE backplane](https://github.com/chili-chips-ba/openPCIE/tree/main/1.pcb) ([more info](https://www.chili-chips.xyz/openpcie-backplane-put-your-fpga-in-control)), where the [openPCIE](https://github.com/chili-chips-ba/openPCIE) Artix-7 is the RC. Two topologies:
 
@@ -88,9 +88,9 @@ We then also test with a PC and a Raspberry Pi as the host. Details: [1.pcb/READ
 
 # PIPE is not a dream!
 
-<p align="center">
+<div align="center">
   <img alt="PCIe physical layer sub-blocks" width="90%" src="2.rtl/1.phy/0.doc/PHY-Layers.drawio.png">
-</p>
+</div>
 
 The GateMate SerDes has not been used for PCIE before, so expect PHY issues (signal integrity, jitter). Cologne Chip developers own the PHY and the **P**hysical **I**nterface for **P**CI **E**xpress (PIPE): **`2.rtl/1.phy`** and **`2.rtl/2.pipe`**.
 
@@ -106,9 +106,9 @@ Two major elements:
 
 > **TRN-compatible:** the TL's user interface, `trn_tx_if` / `trn_rx_if`, is derived from the TRN interface of the AMD Artix-7 `PCIE_2_1` hard macro in EndPoint mode, cut to the signals this core uses. `trn_compat` maps it back to TRN for user logic written for that HM, and lists what is not supported ([details](2.rtl/README.md#compatibility-goal-an-artix-7-endpoint-in-open-source)).
 
-<p align="center">
+<div align="center">
   <img alt="RTL blocks of the EndPoint: SOC, trn_bridge, soft TL+DLL+MAC, phy_top with the Cologne Chip soft wrapper and the GateMate SerDes, its BFM below" src="0.doc/2.rtl/block-diagram.drawio.png" width="100%">
-</p>
+</div>
 
 Details: [2.rtl/README.md](2.rtl/README.md)
 
@@ -116,9 +116,9 @@ Details: [2.rtl/README.md](2.rtl/README.md)
 
 # SW Architecture
 
-<p align="center">
+<div align="center">
  <img alt="EP firmware layers: application, PCIE driver, HAL, register map and startup, talking to the CSR block over the CPU memory bus, then through pcie_top, directly or behind the backplane switch, to the host Root Complex" src="0.doc/3.sw/sw-structure.drawio.png" width="100%">
-</p>
+</div>
 
 The EP firmware runs bare-metal on the eduBOS5 RISC-V core of our GateMate SOC. It answers the host's Memory requests (PIO); the soft TL answers the configuration requests. Hosts: see [Bringup](#bringup-debug-and-lab-validation); the openPCIE Artix-7 RC firmware enumerates our EP and runs the PIO write-read-validate test.
 
@@ -132,9 +132,9 @@ Details: [3.sw/README.md](3.sw/README.md)
 
 # Simulation Architecture
 
-<p align="center">
+<div align="center">
     <img alt="openCologne-PCIE test bench: the host, openPCIE's A7RC driver + checker on RCPIPEx1__pcieVHost, on top, driving our DUT at its PIPE interface below it: MAC, DLL and TL RTL, CSR registers and the SOC CPU socket" width="100%" src="0.doc/5.sim/tb-structure.drawio.png">
-</p>
+</div>
 
 The [test bench](5.sim/README.md) uses open-source simulators only: Verilator or Icarus Verilog. The host is openPCIE's A7RC driver + checker (59 PCIe 2.1 rules) on the [_pcieVHost VIP_](https://github.com/wyvernSemi/pcievhost) in the RC role, `RCPIPEx1__pcieVHost`: it drives our DUT at its PIPE interface, trains the link and enumerates the EP. The same model already ran against the AMD `PCIE_2_1` hard macro on openPCIE, which raises the odds that our EP works first time against a physical Artix-7 RC.
 
@@ -164,9 +164,9 @@ Waveforms decode as transactions in the [WaveCrux PCIE decoders](https://github.
 
 Details: [5.sim/README.md](5.sim/README.md)
 
-<p align="center">
+<div align="center">
   <img alt="WaveCrux: the whole EP=rtl run, every layer from the PIPE to the eduBOS5 firmware, from link training to firmware PASS" src="0.doc/5.sim/wavecrux-ep-overview.png" width="100%">
-</p>
+</div>
 
 One run in [WaveCrux](https://wavecrux.app), every layer from the PIPE to the firmware: link training, enumeration, PIO, firmware PASS. The [walkthrough](5.sim/README.md#viewing-the-ep-in-wavecrux) zooms in, layer by layer.
 
@@ -174,9 +174,9 @@ One run in [WaveCrux](https://wavecrux.app), every layer from the PIPE to the fi
 
 # Implementation Workflow
 
-<p align="center">
+<div align="center">
  <img alt="Build flow: CSR generation, firmware, Yosys + nextpnr-himbaechel + gmpack to the GateMate bitstream, co-simulation, lint and logic equivalence" src="0.doc/4.build/build-flow.drawio.png" width="100%">
-</p>
+</div>
 
 See [4.build/README.md](4.build/README.md)
 
@@ -210,9 +210,9 @@ See [4.build/README.md](4.build/README.md)
 
 # LiteX integration
 
-<p align="center">
+<div align="center">
   <a href="https://github.com/enjoy-digital/litex"><img width="25%" alt="LiteX logo" src="0.doc/artwork/LiteX.logo.png"></a>
-</p>
+</div>
 
 See [6.litex/README.md](6.litex/README.md)
 
@@ -262,56 +262,56 @@ See [6.litex/README.md](6.litex/README.md)
 
 We are thankful to **NLnet Foundation** for unreserved sponsorship of this development activity.
 
-<p align="center">
+<div align="center">
    <a href="https://nlnet.nl/project/OpenCologne-PCIe"><img width="30%" alt="NLnet logo" src="0.doc/artwork/NLnet-logo.png"></a>
    <a href="https://nlnet.nl/core"><img width="15%" alt="NGI Zero, Next Gen Internet" src="0.doc/artwork/NGI0-logo.png"></a>
-</p>
+</div>
 
 This project was funded through the NGI0 Commons Fund, a fund established by NLnet with financial support from the European Commission's Next Generation Internet programme, under the aegis of DG Communications Networks, Content and Technology under grant agreement No 101135429. Additional funding is made available by the Swiss State Secretariat for Education, Research and Innovation (SERI).
 
 
 ### Partners and Contributors
 
-<p align="center">
+<div align="center">
   <a href="https://intergalaktik.eu"><img width="50%" alt="Intergalaktik logo" src="0.doc/artwork/Intergalaktik.logo.png"></a>
   <a href="https://radiona.org"><img width="20%" alt="Radiona logo" src="0.doc/artwork/Radiona.logo.png"></a>
-</p>
+</div>
 
-<p align="center">
+<div align="center">
   <a href="https://colognechip.com"><img width="45%" alt="Cologne Chip logo" src="0.doc/artwork/Cologne-Chip.logo.png"></a>
   <a href="https://colognechip.com/programmable-logic/gatemate"><img width="20%" alt="GateMate FPGA logo" src="0.doc/artwork/GateMate.png"></a>
-</p>
+</div>
 
 **wyvernSemi**'s wisdom and contribution meant a world of difference -- Thank you, we are honored to have had you on the project!
 
-<p align="center">
+<div align="center">
   <a href="https://github.com/wyvernSemi"><img width="15%" alt="wyvernSemi logo" src="0.doc/artwork/wyvernSemi-logo-rounded.png"></a>
-</p>
+</div>
 
-<p align="center">
+<div align="center">
   <a href="https://github.com/chili-chips-ba/openPCIE"><img width="15%" alt="openPCIE project logo" src="0.doc/artwork/pcie2rootc.hex.png"></a>
   <a href="https://www.envox.eu"><img width="25%" alt="EEZ / Envox logo: openPCIE backplane" src="0.doc/artwork/EEZ-web-logo.png"></a>
-</p>
+</div>
 
 **KiCad** turns electrical idea into a manufacturable board. **PrjPeppercorn**, with **Yosys** at its core, turns RTL into a loadable FPGA bitfile. **PeakRDL** turns our SystemRDL file into CSR RTL+headers+RegMap docs. **WaveCrux** greatly facilitates waveform decoding and viewing. But, that's not all -- Thank you all for these wonderful opensource tools.
 
-<p align="center">
+<div align="center">
    <a href="https://oshwa.org"><img width="20%" alt="Open Source Hardware Association logo" src="0.doc/artwork/oshw-logo-filled-black.png"></a>
    <a href="https://www.kicad.org"><img width="25%" alt="KiCad logo" src="0.doc/artwork/kicad_logo.png"></a>
    <a href="https://www.openems.de"><img width="15%" alt="openEMS logo" src="0.doc/artwork/openEMS.logo.short.noBG.png"></a>
-</p>
+</div>
 
 
-<p align="center">
+<div align="center">
   <a href="https://wavecrux.app"><img width="30%" alt="WaveCrux logo" src="0.doc/artwork/WaveCrux.logo.png"></a>
   <a href="https://github.com/steveicarus/iverilog"><img width="20%" alt="Icarus Verilog logo" src="0.doc/artwork/Icarus-Verilog.logo.png"></a>
   <a href="https://www.veripool.org/verilator"><img width="20%" alt="Verilator logo" src="0.doc/artwork/Verilator.logo.png"></a>
   <a href="https://que.no/janushdl/"><img width="20%" alt="JanusHDL logo" src="0.doc/artwork/JanusHDL.logo.png"></a>
   <a href="https://github.com/yosyshq"><img width="20%" alt="Yosys logo" src="0.doc/artwork/Yosys.logo.png"></a>
   <a href="https://github.com/YosysHQ/prjpeppercorn"><img width="20%" alt="prjpeppercorn logo: nextpnr for GateMate" src="0.doc/artwork/prjpeppercorn.logo.png"></a>
-</p>
+</div>
 
-<p align="center">
+<div align="center">
   <a href="https://github.com/MikePopoloski/slang"><img width="25%" alt="MikePopoloski slang logo" src="0.doc/artwork/slang.logo.png"></a>
   <a href="https://www.chipsalliance.org/projects"><img width="15%" alt="Chips Alliance SV Tools logo" src="0.doc/artwork/ChipsAlliance-SV-Tools.logo.png"></a>
   <a href="https://github.com/chipsalliance/verible"><img width="25%" alt="Verible logo" src="0.doc/artwork/Verible.logo.png"></a>
@@ -322,7 +322,7 @@ This project was funded through the NGI0 Commons Fund, a fund established by NLn
   <a href="https://riscv.org"><img width="12%" alt="RISC-V logo" src="0.doc/artwork/RISC-V-logo.svg"></a>
   <a href="https://github.com/enjoy-digital/litex"><img width="10%" alt="LiteX logo" src="0.doc/artwork/LiteX.logo.png"></a>
   <a href="https://www.ngscopeclient.org"><img width="20%" alt="ngscopeclient logo" src="0.doc/artwork/ngscopeclient.logo.png"></a>
-</p>
+</div>
 
 --------------------
 

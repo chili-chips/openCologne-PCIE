@@ -6,16 +6,16 @@ The sources here, [`3.mac`](../3.mac) and [`4.dll`](../4.dll) come from [Cologne
 ## Description
 The **PHY Interface for the PCI Express Architecture (PIPE)** is part of the physical layer, between the Media Access Control (MAC) Layer and the Physical Coding Sublayer (PCS). It separates the soft-core RTL from the FPGA-specific SerDes, which reduces effort and eases porting to other FPGA vendors and platforms.
 
-<p align="center">
+<div align="center">
   <img alt="Position of the PIPE layer in the PCIe stack" width="50%" src="../1.phy/0.doc/PHY-Layers-GateMate.drawio.png">
-</p>
+</div>
 
 ## The Interface
 The schematic shows the **64-Bit datapath**, where `pipe.pclk` runs at the **SERDES TX_clock** frequency. Narrower datapaths run `pipe.pclk` at a multiple of **TX_clock**, by the datapath ratio, to keep MAC and PHY synchronized: a **32-Bit datapath** (half the **64-Bit SERDES datapath**) runs `pipe.pclk` at twice **TX_clock**.
 
 The width is `DATA_BYTES` in `pipe_pkg`: the PIPE takes 8-, 16-, 32- or 64-Bit datapaths (1, 2, 4, 8). 64-Bit works, 16-Bit fails ([#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18)), 32-Bit is untested.
 
-<p align="center"><img alt="PIPE as built, 64 bits: the MAC-side pipe_if signals; ccfpga_pipe_top with the PIPE FSM, the word-align FSM and the TX and RX paths; CC_SERDES with its PLL, PLL_CLK_O as PCLK through a CC_BUFG, and its dedicated serial and REFCLK pins" src="./0.doc/PIPE_Interface.drawio.png" width="90%"></p>
+<div align="center"><img alt="PIPE as built, 64 bits: the MAC-side pipe_if signals; ccfpga_pipe_top with the PIPE FSM, the word-align FSM and the TX and RX paths; CC_SERDES with its PLL, PLL_CLK_O as PCLK through a CC_BUFG, and its dedicated serial and REFCLK pins" src="./0.doc/PIPE_Interface.drawio.png" width="90%"></div>
 
 `ccfpga_pipe_top` takes these as the members of `pipe_if.phy pipe`; `clk_core_pll` is a plain port.
 

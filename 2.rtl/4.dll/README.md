@@ -11,7 +11,7 @@ The **Data Link Layer (DLL)** sits between the **Transaction Layer (TL)** above 
 
 Soft-core RTL in the FPGA fabric. Below it, the MAC and the GateMate SerDes handle the LTSSM, 8b/10b and the serial link, reached through the PHY interface. `DATA_WIDTH` is **64 bits** (`DATA_BYTES = 8`, PCLK 31.25 MHz at Gen1), the only width built and tested. `retry_buffer.sv` also has an experimental 32-bit path, kept solely as a nextpnr timing closure stress test. It would need PCLK 62.5 MHz even at Gen1 (2.5 Gbps), and the 64-bit datapath already misses 31.25 MHz by a wide margin ([#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)), so we do not plan to validate or bring it up.
 
-<p align="center"><img alt="Our PCIe EndPoint stack: GateMate SerDes, PIPE, MAC, then the Data Link Layer between the MAC and the Transaction Layer (dll_if), TRN2PIO bridge and CSR example" src="../../0.doc/2.rtl/pcie-ep-top-stack.png" width="35%"></p>
+<div align="center"><img alt="Our PCIe EndPoint stack: GateMate SerDes, PIPE, MAC, then the Data Link Layer between the MAC and the Transaction Layer (dll_if), TRN2PIO bridge and CSR example" src="../../0.doc/2.rtl/pcie-ep-top-stack.png" width="35%"></div>
 
 ## Architecture
 A transmit datapath, a receive datapath, and the control logic binding them.
@@ -60,7 +60,7 @@ A transmit datapath, a receive datapath, and the control logic binding them.
 ## DLL Init FSM
 Tracks whether the link is usable: `DL_Inactive` out of reset, `DL_Active` only once flow-control is initialized.
 
-<p align="center"><img alt="DLL initialization state machine: DL_Inactive, then DL_Init with sub-states DL_INITFC1 and DL_INITFC2, then DL_Active; phy_linkup = 0 or reset returns to DL_Inactive" src="./0.doc/DLL_Init_FSM.drawio.png" width="50%"></p>
+<div align="center"><img alt="DLL initialization state machine: DL_Inactive, then DL_Init with sub-states DL_INITFC1 and DL_INITFC2, then DL_Active; phy_linkup = 0 or reset returns to DL_Inactive" src="./0.doc/DLL_Init_FSM.drawio.png" width="50%"></div>
 
 | State         | Meaning / transition |
 | ------------- |:-------------------- |
