@@ -154,6 +154,7 @@ path = [
   "0.doc/artwork/NLnet-Foundation.svg",
   "0.doc/artwork/NLnet-logo.png",
   "0.doc/artwork/Radiona.logo.png",
+  "0.doc/artwork/JanusHDL.logo.png",
   "0.doc/artwork/Verilator.logo.png",
   "0.doc/artwork/WaveCrux.logo.png",
   "0.doc/artwork/Yosys.logo.png",
