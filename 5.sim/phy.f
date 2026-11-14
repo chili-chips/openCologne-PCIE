@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// Verilator source list of the PHY for make IFACE=serial (with EP=rtl): top, with
-// phy_top, Cologne Chip's PIPE logic and the opensource SerDes BFM, so the host
-// drives the serial line.
+// Verilator source list of the PHY: phy_top, Cologne Chip's PIPE logic and the
+// opensource SerDes BFM, so the host drives the serial line. With EP=rtl
+// IFACE=serial under top (the Makefile adds ../2.rtl/top.sv), with IFACE=phy
+// under the EP model (ep_phy.f).
 
-../2.rtl/top.sv
 ../2.rtl/1.phy/phy_top.sv
 ../2.rtl/2.pipe/ccfpga_pipe_clk_counter.sv
 ../2.rtl/2.pipe/ccfpga_pipe_clk_divider.sv

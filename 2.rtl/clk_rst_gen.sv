@@ -51,7 +51,9 @@
 //     connector. CC_USR_RSTN replaces the INIT-value flops a Xilinx design
 //     needs for a reset after configuration.
 //   - rst_pipe_n (clk_aon): perst_por_n, released on clk_aon. PIPE Reset#;
-//     the PIPE logic turns it into the SerDes PLL reset (PLL_RESET_I).
+//     the PIPE logic turns it into the SerDes PLL reset (PLL_RESET_I), so
+//     PCLK runs only after it. The MAC does not drive Reset#: only PERST#
+//     and configuration stop PCLK.
 //   - mac_rst_n (PCLK): held until the SerDes TX is out of reset (phy_rdy).
 //   - core_rst_n is made in pcie_core, from mac_rst_n and the data link (dll_up).
 //==========================================================================

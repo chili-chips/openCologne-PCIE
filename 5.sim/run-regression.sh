@@ -4,10 +4,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 # Regression, before a push (README.md, Sanity and regression): about 8
-# minutes. 100 random seeds, Verilator against Icarus on the serial line, our
-# EP against the tester and with the real PHY, and the block benches of the
-# PHY, the DLL and the TL. The EP DMA stage runs on the EP model only (DMA=1
-# in the seeds); our EP has no DMA (#14).
+# minutes. 100 random seeds, 20 with the EP model behind our PHY, Verilator
+# against Icarus on the serial line, our EP against the tester and with the
+# real PHY, and the block benches of the PHY, the DLL and the TL. The EP DMA
+# stage runs on the EP model at the PIPE only (DMA=1 in the seeds); our EP has
+# no DMA (#14).
 # A run that fails on open issues is reported as "known" with them; update
 # KNOWN as they close. Prints one line per run, logs in obj/regression/;
 # exits 1 if a run fails that should pass, or a known one passes.
@@ -76,6 +77,13 @@ make regress SEEDS=100 REGRESS_JOBS=8 DMA=1 "$@" > $LOG/regress.log 2>&1
 r=$(tail -1 $LOG/regress.log)
 case "$r" in "0 of "*) ok=1;; *) ok=0;; esac
 report regress $((SECONDS - t0)) $ok "make regress SEEDS=100 REGRESS_JOBS=8 DMA=1" "$r; $(tail -2 $LOG/regress.log | head -1)"
+
+# the EP model behind our PHY, the host on the serial line (obj/regress/ again)
+t0=$SECONDS
+make regress SEEDS=20 REGRESS_JOBS=8 IFACE=phy "$@" > $LOG/phy-regress.log 2>&1
+r=$(tail -1 $LOG/phy-regress.log)
+case "$r" in "0 of "*) ok=1;; *) ok=0;; esac
+report phy-regress $((SECONDS - t0)) $ok "make regress SEEDS=20 REGRESS_JOBS=8 IFACE=phy" "$r"
 
 run serial         IFACE=serial "$@"
 run serial-icarus  SIM=icarus IFACE=serial "$@"

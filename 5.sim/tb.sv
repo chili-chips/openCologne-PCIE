@@ -153,6 +153,15 @@ module tb #(
   end
 `endif
 
+// Our PHY under the host: EP=rtl IFACE=serial (top), IFACE=phy (the EP model)
+`ifdef IFACE_PHY
+`define GM_PHY
+`elsif EP_RTL
+`ifdef IFACE_SERIAL
+`define GM_PHY
+`endif
+`endif
+
 `ifdef EP_RTL
   localparam  HALF_BRD_PERIOD_PS        = 50_000; // 10 MHz board clock
 
@@ -166,8 +175,9 @@ module tb #(
       #(HALF_BRD_PERIOD_PS) clk_brd = ~clk_brd;
     end
   end
+`endif
 
-`ifdef IFACE_SERIAL
+`ifdef GM_PHY
   localparam  HALF_REF_PERIOD_PS        = 5_000;  // 100 MHz PCIE REFCLK
 
   logic       refclk;
@@ -201,7 +211,10 @@ module tb #(
   end
 
   assign ser_dn_idle = (ser_dn_same == 12) && (ser_dn == ser_dn_q);
+`endif
 
+`ifdef EP_RTL
+`ifdef IFACE_SERIAL
   top dut
   (
     .clk_brd                           (clk_brd),
@@ -250,6 +263,18 @@ module tb #(
 
   always @(link_up) $display("%t tb: dll_up = %b", $time, link_up);
   always @(fw_pass) $display("%t tb: fw_pass = %b", $time, fw_pass);
+`elsif IFACE_PHY
+  // the EP model behind our PHY: phy_top, Cologne Chip's PIPE logic and the
+  // SerDes BFM, the EP model on its PIPE (models/ep_model_phy.sv)
+  ep_model_phy dut
+  (
+    .rst_n                             (rst_n),
+    .refclk                            (refclk),
+    .ser_rxp                           (ser_dn),
+    .ser_rxn                           (ser_dn_idle ? ser_dn : ~ser_dn),
+    .ser_txp                           (ser_up),
+    .ser_txn                           (ser_up_n)
+  );
 `elsif IFACE_SERIAL
   PcieVhostSerial #(
     .LinkWidth                         (1),
@@ -467,6 +492,8 @@ initial begin
 `else
     $dumpfile("tb_rtl.fst");
 `endif
+`elsif IFACE_PHY
+    $dumpfile("tb_phy.fst");
 `elsif IFACE_SERIAL
     $dumpfile("tb_serial.fst");
 `else
@@ -482,6 +509,10 @@ initial begin
     $dumpvars(2, tb.dut.u_core.wavecrux);
     $dumpvars(1, tb.dut.u_soc.cpu_view);
 `endif
+`elsif IFACE_PHY
+    $dumpvars(1, tb.dut);           // the PIPE at the adapter, the resets
+    $dumpvars(1, tb.dut.pipe_mac);  // our PHY's PIPE
+    $dumpvars(1, tb.dut.bfm_pcie);  // the EP model's decoder page
 `elsif IFACE_SERIAL
     $dumpvars(1, tb.dut);
 `else

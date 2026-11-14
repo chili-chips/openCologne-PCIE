@@ -43,6 +43,10 @@ SIM           ?= verilator
 #               the PHY: with EP=rtl all of top (phy_top, Cologne Chip's PIPE
 #               logic, the opensource SerDes BFM, phy.f; CDR_MODEL=FAST), with
 #               EP=model pcieVHost's own serialiser
+#   IFACE=phy   EP=model only: the host on the serial line, the EP model behind
+#               our PHY: phy_top as in EP=rtl IFACE=serial, with the EP model
+#               on its PIPE through models/pipe_mac_adapter.sv in place of
+#               pcie_top (ep_phy.f). A failure points at the PHY. Verilator only
 ifneq ($(origin DUT)$(origin PHY),undefinedundefined)
   $(error DUT and PHY are now EP=model|rtl and IFACE=pipe|serial (PHY=rtl and PHY=mock become IFACE=serial))
 endif
@@ -69,13 +73,27 @@ endif
 ifeq ($(IFACE),serial)
   ifeq ($(EP),rtl)
     EP_FILES  += phy.f
-    EP_VLT    += +define+CDR_MODEL=FAST -F phy.f
+    EP_VLT    += +define+CDR_MODEL=FAST ../2.rtl/top.sv -F phy.f
   endif
   EP_VLT      += +define+IFACE_SERIAL
   ICA_IFACE    = -DIFACE_SERIAL
   EP_OBJ      := $(EP_OBJ)_serial
+else ifeq ($(IFACE),phy)
+  ifneq ($(EP),model)
+    $(error IFACE=phy is the EP model behind our PHY: EP=rtl IFACE=serial already runs our EP behind it)
+  endif
+  ifneq ($(SIM),verilator)
+    $(error IFACE=phy needs SIM=verilator: not tried on Icarus (phy_top has pipe_if ports, which Icarus 13 did not parse))
+  endif
+  # the host scrambles on the line; the EP model scrambles at the PIPE, our
+  # PHY does 8b/10b (usercode/VUserMain1.cpp)
+  EP_VLT      += +define+IFACE_SERIAL +define+IFACE_PHY +define+CDR_MODEL=FAST --timescale 1ns/1ps \
+                 --assert -F ep_phy.f
+  EP_FILES     = ep_phy.f phy.f
+  IFACE_DEFS   = -DIFACE_PHY
+  EP_OBJ      := $(EP_OBJ)_phy
 else ifneq ($(IFACE),pipe)
-  $(error IFACE must be pipe or serial (got "$(IFACE)"))
+  $(error IFACE must be pipe, serial or phy (got "$(IFACE)"))
 endif
 
 # ---- host ---------------------------------------------------------------------
@@ -108,8 +126,8 @@ REGRESS_DUMP  ?= none
 # runs with --wcp-port 54321). WCX_OPEN=0: the dump only. REGRESS_DUMP=fail: after
 # make regress, every failing seed dumped that way
 WCX_OPEN      ?= 1
-WCX_FST        = $(if $(filter rtl,$(EP)),tb_rtl,tb)$(if $(filter serial,$(IFACE)),_serial).fst
-WCX_SIGNALS    = $(if $(filter serial,$(IFACE)),tb.ser_dn_line tb.ser_up_line,tb.downdata tb.updata \
+WCX_FST        = $(if $(filter rtl,$(EP)),tb_rtl,tb)$(if $(filter pipe,$(IFACE)),,_$(IFACE)).fst
+WCX_SIGNALS    = $(if $(filter serial phy,$(IFACE)),tb.ser_dn_line tb.ser_up_line,tb.downdata tb.updata \
                  tb.u_rc.tx_tlp_valid tb.u_rc.tx_tlp_data tb.u_rc.rx_tlp_valid tb.u_rc.rx_tlp_data)
 ifeq ($(filter 0 1,$(A7RC)),)
   $(error A7RC must be 0 or 1 (got "$(A7RC)"))
@@ -117,8 +135,8 @@ endif
 ifeq ($(filter 0 1,$(DMA)),)
   $(error DMA must be 0 or 1 (got "$(DMA)"))
 endif
-HOST_DEFS      = -DRC_GEN=2 -DA7RC_LITERAL=$(A7RC) $(A7RC_EXPECT) $(if $(filter serial,$(IFACE)),-DSIM_SERIAL) \
-                 $(if $(filter 0,$(DMA)),-DA7RC_NO_DMA)
+HOST_DEFS      = -DRC_GEN=2 -DA7RC_LITERAL=$(A7RC) $(A7RC_EXPECT) $(if $(filter serial phy,$(IFACE)),-DSIM_SERIAL) \
+                 $(if $(filter 0,$(DMA)),-DA7RC_NO_DMA) $(IFACE_DEFS)
 VIP_ENV        = VIP_PATCH=$(A7RC_DIR)/pcievhost-speed.patch \
                  VPROC_PATCH=$(A7RC_DIR)/vproc-coroutine.patch
 
@@ -218,7 +236,8 @@ LDLIBS         = -Wl,-whole-archive $(USERLIB) -Wl,-no-whole-archive \
 # DUMP=1: tb.fst, written natively (Verilator --trace-fst, vvp -fst); depth 3
 # reaches the decoder pages, tb.u_rc (RC) and tb.dut.bfm_pcie (EP); tb.vlt keeps the
 # upstream models out of it (IFACE=serial: tb_serial.fst, the line; the serial
-# host is upstream's, so its ports are not in it). With EP=rtl: tb_rtl.fst (IFACE=serial: tb_rtl_serial.fst),
+# host is upstream's, so its ports are not in it; IFACE=phy: tb_phy.fst, the
+# line, the PIPE of our PHY and the EP model's page). With EP=rtl: tb_rtl.fst (IFACE=serial: tb_rtl_serial.fst),
 # with the EP's decoder pages (wavecrux.f), 6 levels down with IFACE=serial; eduBOS5
 # drives its RVFI outputs (RISCV_FORMAL) for the CPU's page
 DUMP          ?= 0
@@ -372,7 +391,8 @@ wavecrux_run: all
 	$(if $(filter 1,$(WCX_OPEN)),python3 $(CURDIR)/tools/wavecrux.py $$d/$(WCX_FST) $$d/run.log $(WCX_SIGNALS),echo "  open it: make wavecrux SEED=$(SEED)")
 
 help:
-	@echo "make [SIM=verilator|icarus|janushdl] [EP=model|rtl] [IFACE=pipe|serial]   build the models and the simulation (EP=rtl: Verilator only)"
+	@echo "make [SIM=verilator|icarus|janushdl] [EP=model|rtl] [IFACE=pipe|serial|phy]   build the models and the simulation (EP=rtl, IFACE=phy: Verilator only)"
+	@echo "make IFACE=phy run                 the EP model behind our PHY (phy_top, PIPE logic, SerDes BFM), the host on the serial line"
 	@echo "make A7RC=1 run                    literal host: only what the lab RC sends (default: the tester, also back to back)"
 	@echo "make DMA=1 run                     the tester also runs its EP DMA stage (off by default: our EP has no DMA, #14)"
 	@echo "make SEED=N run                    the tester's random stimulus with seed N (default 1), no rebuild"

@@ -56,7 +56,7 @@ module phy_top
   import pipe_pkg::*;
 (
     input  logic clk_ref,     // 100 MHz PCIE REFCLK, the model's reference
-    input  logic rst_pipe_n,  // PIPE Reset#, released on clk_aon
+    input  logic rst_pipe_n,  // PIPE Reset#, released on clk_aon; also the SerDes and PLL reset
     input  logic ser_rxp,
     input  logic ser_rxn,
     output logic ser_txp,

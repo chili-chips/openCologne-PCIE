@@ -192,7 +192,7 @@ module ccfpga_pipe_top
   assign o_tx_powerdown_n     = 1'b1;
   assign o_rx_powerdown_n     = 1'b1;
 
-  assign o_rx_ei_detect_en    = 1'h0;  // old: 1'b1;
+  assign o_rx_ei_detect_en    = 1'b1;  // RxElecIdle: the detector's output (RX_EI_BIAS in phy_top)
 
   assign o_tx_char_dispval    = 8'b0000_0000;
 
@@ -204,7 +204,10 @@ module ccfpga_pipe_top
   assign o_clk_core_rx        = i_clk_core_pll;
   assign o_clk_core_rx_rec    = i_clk_core_rx_rec;
 
-  // Reset Logic
+  // Reset Logic: PIPE Reset# also resets the SerDes PLL, so PCLK stops while
+  // it is low (PIPE 2.0: Reset# is asynchronous; PhyStatus marks PCLK stable
+  // again). Reset# comes from PERST# only (clk_rst_gen), when the PLL's
+  // reference is not yet valid either.
   assign s_reset              = ~pipe.reset_n;
   assign o_pll_reset          = s_reset;
 

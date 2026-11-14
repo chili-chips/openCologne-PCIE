@@ -7,7 +7,9 @@ This directory contains the following models
 * `RCPIPEx1__pcieVHost.sv` : the host, `PIPEx1__pcieVHost` fixed to the RC role.
 * `phy_vproc_rc.sv` : the `phy_top` socket with `IFACE=pipe`, the host at the PIPE: a wrapper of `pipe_phy_core.sv`.
 * `pipe_phy_core.sv` : the PHY side of PIPE with its handshakes (PhyStatus, receiver detection, power state), shared with openPCIE (master there).
-* `pipe_sym_pkg.sv` : the symbol values on the PIPE (`NOSIG_SYM`, electrical idle) for `pipe_phy_core.sv`, shared with openPCIE (master there).
+* `pipe_sym_pkg.sv` : the symbol values on the PIPE (`NOSIG_SYM`, electrical idle) for `pipe_phy_core.sv` and `pipe_mac_adapter.sv`, shared with openPCIE (master there).
+* `pipe_mac_adapter.sv` : the MAC side of PIPE, for a pcieVHost model above a PHY (reset, receiver detection, P0, symbols both ways, assertions on the PHY's answers), the mirror of `pipe_phy_core.sv`, shared with openPCIE (master there).
+* `ep_model_phy.sv` : `IFACE=phy`, the EP model behind our PHY: `phy_top` with the EP model on its PIPE through `pipe_mac_adapter.sv`.
 * `ep_wavecrux_view.sv` : our EP's layer boundaries, for the WaveCrux decoders (`EP=rtl DUMP=1`).
 * `tlp_dw_if.sv`, `tlp_dw_monitor.sv`, `tlp_wavecrux_view.sv` : the SOC's AXI-Stream TLPs, one DW per clock, for the TLP decoder.
 * `gatemate_cells_sim.sv` : simulation models of the GateMate primitives `clk_rst_gen` uses: `CC_USR_RSTN`, `CC_BUFG`.

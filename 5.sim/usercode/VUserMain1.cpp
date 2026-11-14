@@ -274,8 +274,11 @@ extern "C" void VUserMain1(int node)
     // Make sure the link is out of electrical idle
     vp1->write(LINK_STATE, 0);
     
-    // Configure for a pipe (IFACE=serial, the serial line: 8b/10b and scrambling on)
-#ifndef SIM_SERIAL
+    // Configure for a pipe (IFACE=serial, the serial line: 8b/10b and scrambling on;
+    // IFACE=phy, behind our PHY: scrambling on, the PHY does 8b/10b)
+#ifdef IFACE_PHY
+    pcie->configurePcie(CONFIG_DISABLE_8B10B);
+#elif !defined(SIM_SERIAL)
     pcie->configurePcie(CONFIG_DISABLE_SCRAMBLING);
     pcie->configurePcie(CONFIG_DISABLE_8B10B);
 #endif

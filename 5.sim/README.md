@@ -42,14 +42,14 @@ The top-level test bench drives the DUT's PCIE link with the [pcieVHost](https:/
 `CPU=rtl | vproc | iss` picks the SOC CPU ([below](#the-cpu-node-three-ways-to-run-the-socs-software)). Two switches set the rest:
 
 - **`EP`:** the endpoint, our RTL or a model.
-- **`IFACE`:** where the host meets it, the PIPE or the serial line. `IFACE=serial` adds the PHY: with `EP=rtl`, `tb.sv` puts all of `top` under the host instead of `pcie_top` in the `phy_top` socket; with `EP=model`, the EP model serialises itself.
+- **`IFACE`:** where the host meets it, the PIPE or the serial line. `IFACE=serial` adds the PHY: with `EP=rtl`, `tb.sv` puts all of `top` under the host instead of `pcie_top` in the `phy_top` socket; with `EP=model`, the EP model serialises itself. `IFACE=phy` puts the EP model behind our PHY, the host on the serial line.
 
 Each VProc instance is a node with its own program, `VUserMain<n>` for node `n`:
 
 | Node | Model | Program | Role |
 |---|---|---|---|
 | 2 | `RCPIPEx1__pcieVHost` | [`models/a7rc-model/VUserMain2.cpp`](models/a7rc-model) (openPCIE's) | the host, openPCIE's [Artix-7 RC model](#the-host-openpcies-artix-7-rc-model): trains the link, then sends the RC firmware's requests: IDs, BAR sizing and assignment, a write and a read in BAR0; then, as the tester, the stages [below](#the-host-openpcies-artix-7-rc-model) |
-| 1 | `EPPIPEx1__pcieVHost_DUT` (`IFACE=serial`: `PcieVhostSerial`) | [`usercode/VUserMain1.cpp`](usercode/VUserMain1.cpp) | the EP model ([`stubs`](stubs/README.md)), an option next to the EP RTL + firmware: `EP=model` |
+| 1 | `EPPIPEx1__pcieVHost_DUT` (`IFACE=serial`: `PcieVhostSerial`; `IFACE=phy`: `ep_model_phy`) | [`usercode/VUserMain1.cpp`](usercode/VUserMain1.cpp) | the EP model ([`stubs`](stubs/README.md)), an option next to the EP RTL + firmware: `EP=model` |
 | 0 | `soc_cpu.VPROC` | native C/C++, or the rv32 ISS | the SOC's CPU, in place of eduBOS5, with `CPU=vproc` or `CPU=iss` (below) |
 
 The model can print the traffic of both link directions to the console, layer by layer; [`hex/ContDisps.hex`](hex/ContDisps.hex) selects what is shown.
@@ -71,6 +71,7 @@ How to run each, and today's status: [Simulation, layer by layer](../2.rtl/READM
 - **`pipe`**: the host sits at the PIPE. Fast (eight symbols per 31.25 MHz clock), and a failure points at MAC, DLL, TL or firmware.
 - **`serial`**, `EP=rtl`: the real PHY is in; the host drives the serial line. Slower (2.5 Gb/s bit rate), but covers the whole stack, on the open-source [SerDes BFM](../2.rtl/1.phy/2.opensource-serdes-model), so anyone can run it.
 - **`serial`**, `EP=model`: the serial line without the GateMate PHY; EP model and host are both upstream's `PcieVhostSerial`. Checks the host and its spec checker on the line (8b/10b, scrambling, the speed change), on Verilator and Icarus, while our EP RTL is not ready.
+- **`phy`** (`EP=model` only): the real PHY of `EP=rtl IFACE=serial`, with the EP model on its PIPE in place of our MAC, DLL, TL and SOC. Both ends are known-good models, so a failure points at the PHY: Cologne Chip's PIPE logic, the SerDes BFM or `phy_top`.
 
 ### A host already proven against real silicon
 
@@ -107,12 +108,13 @@ make DUMP=1 run              # also write tb.fst
 make IFACE=serial run        # the EP model and the host on the serial line
 make EP=rtl run              # our EP RTL + firmware, the host at the PIPE
 make EP=rtl IFACE=serial run # the same with the real PHY, the host on the serial line
+make IFACE=phy run           # the EP model behind the real PHY, the host on the serial line
 make EP=rtl DUMP=1 run       # also write tb_rtl.fst: every layer of the EP, for WaveCrux
 ```
 
 `DUMP=1` writes the FST natively (Verilator `--trace-fst`, Icarus `vvp -fst`, JanusHDL `--fst`: every signal):
 
-- **`EP=model`: `tb.fst`.** The PIPE link both ways, its clock and reset, and one decoder page per pcieVHost (`tb.u_rc`, `tb.dut.bfm_pcie`): every decoder input (PIPE, DLL, TLPs), under the names WaveCrux auto-binds. `IFACE=serial`: `tb_serial.fst`, the serial line (`tb.ser_dn_line`, `tb.ser_up_line`); on Icarus also the ports of both models (Verilator: `tb.vlt` keeps the upstream models out).
+- **`EP=model`: `tb.fst`.** The PIPE link both ways, its clock and reset, and one decoder page per pcieVHost (`tb.u_rc`, `tb.dut.bfm_pcie`): every decoder input (PIPE, DLL, TLPs), under the names WaveCrux auto-binds. `IFACE=serial`: `tb_serial.fst`, the serial line (`tb.ser_dn_line`, `tb.ser_up_line`); on Icarus also the ports of both models (Verilator: `tb.vlt` keeps the upstream models out). `IFACE=phy`: `tb_phy.fst`, the line, the PIPE of our PHY (`tb.dut.pipe_mac`), the PHY inside, and the EP model's page (`tb.dut.bfm_pcie`), about 43 MB.
 - **`EP=rtl`: `tb_rtl.fst`** (`IFACE=serial`: `tb_rtl_serial.fst`). A decoder page at every layer boundary of our EP ([below](#viewing-the-ep-in-wavecrux)).
 - **Session.** [`tb.DLL-PIPE.wavecrux`](tb.DLL-PIPE.wavecrux) opens the tracked [`tb.fst`](tb.fst) (Verilator run) with Ferrite's PIPE and DLL decoders on both directions. It binds signals by number: after a change to the dumped signals, run [`tools/wavecrux-rebind.py`](tools/wavecrux-rebind.py) on it.
 - **lz4.** Verilator 5.055 has its own FST writer, which needs the lz4 headers (`liblz4-dev`).
@@ -132,6 +134,7 @@ make EP=rtl DUMP=1 run       # also write tb_rtl.fst: every layer of the EP, for
 - `EP=rtl IFACE=serial`: `tb.sv` puts `top` under the host: `phy_top` with Cologne Chip's PIPE logic and the open-source SerDes BFM ([`phy.f`](phy.f)), on a 2.5 Gb/s serial line. The host is then upstream's `PcieVhostSerial`, at node 2 with the same model, without our PIPE wrapper's transaction taps.
 - It runs with `Gen2Clk = 1` and twice the Gen1 clocks (500 MHz, 5 GHz), divided by 2 at Gen1. With `Gen2Clk = 0` its `generate` block drives the bit clock twice, once straight and once halved (the `else` has no `begin`/`end`), and under Verilator the line ran at 1.25 Gb/s.
 - `EP=model IFACE=serial`: the same host; the EP model is a second `PcieVhostSerial` (`EndPoint = 1`, node 1), as in openPCIE's `IFACE=serial` run.
+- `IFACE=phy`: the same host; under it [`models/ep_model_phy.sv`](models/ep_model_phy.sv) ([`ep_phy.f`](ep_phy.f)): `phy_top` as in `top`, with the EP model (`PIPEx1__pcieVHost`, node 1, `VUserMain1.cpp`) on its PIPE through [`models/pipe_mac_adapter.sv`](models/pipe_mac_adapter.sv), the MAC side of a PIPE (master in openPCIE): receiver detection, P0, TxElecIdle, RxValid, and assertions on the PHY's answers. The PHY does 8b/10b, the EP model scrambles (`IFACE_PHY`). The resets are those of `clk_rst_gen`: PIPE Reset# here is also the SerDes PLL reset (`ccfpga_pipe_top`), so PCLK runs only after it, and the adapter's own PIPE reset stays open. Measured (2026-11-14, `tb_phy.fst`): PCLK from 0.56 µs, PhyStatus low 1.17 µs, receiver found 1.52 µs, P0 granted 1.62 µs, RxValid from 12.05 µs to the end of the run. RxElecIdle stays 0 throughout: the PIPE logic leaves the SerDes idle detector off (`ccfpga_pipe_top.sv`, `o_rx_ei_detect_en`).
 
 ### The host: openPCIE's Artix-7 RC model
 
@@ -185,7 +188,7 @@ The model also found that our DLL's InitFC advertised P 32/1008 and NP 32/1, whi
 |---|---|---|---|
 | `SIM` | `verilator` (default), `icarus`, `janushdl` | the simulator; the C/C++ models talk DPI-C to Verilator, VPI to Icarus and JanusHDL (the Icarus build of the models, so JanusHDL needs Icarus installed) | all three, with `EP=model`; `EP=rtl` on Verilator only |
 | `EP` | `model` (default), `rtl` | the EP: a second pcieVHost in EP mode (`EPPIPEx1__pcieVHost_DUT`, node 1), or our MAC + DLL + TL RTL with firmware | `model` passes; `rtl` passes with `A7RC=1`, fails the default tester mode, [above](#the-host-openpcies-artix-7-rc-model); `rtl` on Verilator only: Icarus does not parse the generated `csr_pkg.sv` (unpacked structs) |
-| `IFACE` | `pipe` (default), `serial` | where the host meets the EP: the PIPE (`RCPIPEx1__pcieVHost`, node 2; with `EP=rtl` in the `phy_top` socket), or the serial line (`PcieVhostSerial`), which adds the PHY: the real one with `EP=rtl`, the EP model's own with `EP=model` | all four `EP` x `IFACE` work; `EP=rtl` gives the same results on both, [above](#running-the-co-simulation) |
+| `IFACE` | `pipe` (default), `serial`, `phy` | where the host meets the EP: the PIPE (`RCPIPEx1__pcieVHost`, node 2; with `EP=rtl` in the `phy_top` socket), or the serial line (`PcieVhostSerial`), which adds the PHY: the real one with `EP=rtl`, the EP model's own with `EP=model`; `phy`: the serial line, the EP model behind the real PHY (`EP=model`, Verilator only) | all four `EP` x `IFACE` work; `EP=rtl` gives the same results on both, [above](#running-the-co-simulation); `phy` passes, tester and `A7RC=1`, 20 seeds |
 | `CPU` | `rtl`, `vproc`, `iss` | the SOC CPU, with `EP=rtl`: eduBOS5 RTL, a native C/C++ program at node 0, or the rv32 ISS ([below](#the-cpu-node-three-ways-to-run-the-socs-software)) | all three, with `EP=rtl` |
 | `A7RC` | `0` (default), `1` | the host's mode: the tester (the lab RC's sequence, then a config space sweep and back-to-back requests), or literal, only what the lab RC sends ([above](#the-host-openpcies-artix-7-rc-model)) | both pass with `EP=model` |
 | `DMA` | `0` (default), `1` | the tester's EP DMA stage: off, or on | off until our EP has DMA ([#14](https://github.com/chili-chips/openCologne-PCIE/issues/14)); the EP model passes it |
@@ -198,19 +201,20 @@ The model also found that our DLL's InitFC advertised P 32/1008 and NP 32/1, whi
 | `SIM_ARGS` | e.g. `+verilator+error+limit+100` | run-time arguments for the simulation: with that one, our EP's assertions report and the run goes on | |
 | `WCX_OPEN` | `1` (default), `0` | `make wavecrux SEED=N`: that seed with its waveform, opened in WaveCrux at the checker's first violation ([`tools/wavecrux.py`](tools/wavecrux.py); WaveCrux started with `--wcp-port 54321`); `0`: the waveform only | cursor and view set over WCP |
 | `OPTFLAG` | `-O2 -g` (default) | the C/C++ of the models and our user code; the VIP libraries are built `-O2 -g` too | `-O0` and `-O2` give the same result |
-| `DUMP` | `0` (default), `1` | write the FST: `tb.fst`, `tb_serial.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst`, by `EP` and `IFACE` | |
+| `DUMP` | `0` (default), `1` | write the FST: `tb.fst`, `tb_serial.fst`, `tb_phy.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst`, by `EP` and `IFACE` | |
 | `USRSIMFLAGS` | none (default) | extra simulator flags, such as defines | |
 
 ### Sanity and regression
 
 Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh SIM=icarus`). The EP DMA stage runs only in the regression's seeds (`DMA=1`, on the EP model): our EP has no DMA yet ([#14](https://github.com/chili-chips/openCologne-PCIE/issues/14)).
 
-**Sanity**, after every change: `bash run-sanity.sh`, six runs, about 2 minutes. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines. Our EP drops an SKP ([#6](https://github.com/chili-chips/openCologne-PCIE/issues/6)), so its three runs go on past the SVA and pass as "known #6" if PL.SKP holds every checker violation and the firmware still ends `0x0000face`.
+**Sanity**, after every change: `bash run-sanity.sh`, seven runs, about 3 minutes. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines. Our EP drops an SKP ([#6](https://github.com/chili-chips/openCologne-PCIE/issues/6)), so its three runs go on past the SVA and pass as "known #6" if PL.SKP holds every checker violation and the firmware still ends `0x0000face`.
 
 ```sh
 make run                          # EP model at the PIPE, Verilator
 make SIM=icarus run               # the same on Icarus
 make IFACE=serial run             # EP model on the serial line
+make IFACE=phy run                # EP model behind our PHY, the host on the serial line
 make EP=rtl A7RC=1 SIM_ARGS=+verilator+error+limit+100 run            # our EP RTL + firmware, the lab RC's requests
 make EP=rtl CPU=vproc A7RC=1 SIM_ARGS=+verilator+error+limit+100 run  # the same, the firmware compiled for the host
 make EP=rtl IFACE=serial A7RC=1 SIM_ARGS=+verilator+error+limit+100 run # our EP with the real PHY, through top
@@ -220,6 +224,7 @@ make EP=rtl IFACE=serial A7RC=1 SIM_ARGS=+verilator+error+limit+100 run # our EP
 
 ```sh
 make regress SEEDS=100 REGRESS_JOBS=8                 # 100 random seeds, EP model
+make regress SEEDS=20 REGRESS_JOBS=8 IFACE=phy        # 20 seeds, EP model behind our PHY
 make run > v.log; make SIM=icarus run > i.log         # Verilator against Icarus:
 diff <(grep -a '===>' v.log) <(grep -a '===>' i.log)  #   the same lines, PIPE and IFACE=serial
 make EP=rtl run                                       # our EP against the tester
@@ -232,6 +237,7 @@ make EP=rtl IFACE=serial A7RC=1 run                   # our EP with the real PHY
 | Run | Time | Today (2026-11-02) |
 |---|---|---|
 | `make regress SEEDS=100 REGRESS_JOBS=8 DMA=1` | 20 s | 0 of 100 failed; every rule checked in some seed (the EP model answers CRS in one seed in four), but `PL.SPEED` and `PL.EIOS`: not applicable, our EP and the EP model are Gen1 |
+| `make regress SEEDS=20 REGRESS_JOBS=8 IFACE=phy` | 76 s | 0 of 20 failed (2026-11-14): Cologne Chip's PIPE logic and the SerDes BFM pass the checker's 59 rules against a known-good EP; a tester run takes 14 s (826 µs simulated), `A7RC=1` 7 s |
 | Verilator against Icarus | 3 min (Icarus serial) | the same `===>` lines, PIPE and serial |
 | `make EP=rtl run` | 90 s | FAIL: [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3), [#4](https://github.com/chili-chips/openCologne-PCIE/issues/4), [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6), [#9](https://github.com/chili-chips/openCologne-PCIE/issues/9), [#13](https://github.com/chili-chips/openCologne-PCIE/issues/13). Stops on `SVA #6` at 139 µs (a dropped SKP). Let on with `SIM_ARGS=+verilator+error+limit+100`: `SVA #3` at 6.03 ms, then from the first Recovery at 6.29 ms the EP stays in L0 to the 10 ms limit (2026-11-14) |
 | `make EP=rtl IFACE=serial A7RC=1 run` | 35 s | FAIL: [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6), stops at 216.0 µs on `SVA #6`: the MAC drops an SKP Ordered Set |
@@ -481,7 +487,7 @@ Four fixes got there, all in openPCIE's `pcievhost-speed.patch`:
 |---|---|---|---|
 | `RC_GEN=2` | `Makefile` | the host advertises Gen2, and changes the link to Gen2 when the EP offers it | openPCIE |
 | `A7RC_EP_EXPECT` | `Makefile` (`EP=rtl`) | the host's expectations of our EP: `usercode/a7rc_ep.h` | openPCIE |
-| `SIM_SERIAL` | `Makefile` (`IFACE=serial`) | the host does 8b/10b and scrambling itself, on the serial line | openPCIE |
+| `SIM_SERIAL` | `Makefile` (`IFACE=serial`, `phy`) | the host does 8b/10b and scrambling itself, on the serial line | openPCIE |
 | `A7RC_LITERAL` | `Makefile` (`A7RC`) | `1`: the host sends only what the lab RC sends; `0`: the tester | openPCIE |
 | `EXCLUDE_LTSSM` | `Makefile` | leaves the LTSSM out of the pcieVHost model; the user code links `ltssm.c` instead | VIP |
 | `VPROC_SV` | `Makefile`, `tools/build-vip.sh` | VProc over SystemVerilog DPI-C (Verilator) | VIP |
@@ -492,11 +498,12 @@ Four fixes got there, all in openPCIE's `pcievhost-speed.patch`:
 | `_REENTRANT` | `tools/build-vip.sh` (Icarus) | thread-safe C library (the nodes now run as coroutines on the simulator's thread) | C library |
 | `VPROC` | `Makefile` | the HAL's VProc back end (`csr_regs.h`, `pcie.c`), compiled with `CPU=vproc` | ours |
 | `EP_RTL` | `Makefile` (`EP=rtl`) | `tb.sv` instantiates the EP RTL instead of the EP model | ours |
-| `IFACE_SERIAL` | `Makefile` (`IFACE=serial`) | `tb.sv` connects the host on the serial line | ours |
-| `CDR_MODEL=FAST` | `Makefile` (`EP=rtl IFACE=serial`) | the SerDes BFM's CDR model | ours |
+| `IFACE_SERIAL` | `Makefile` (`IFACE=serial`, `phy`) | `tb.sv` connects the host on the serial line | ours |
+| `IFACE_PHY` | `Makefile` (`IFACE=phy`) | `tb.sv` puts `ep_model_phy` under the host; `VUserMain1.cpp` scrambles at the PIPE, without 8b/10b | ours |
+| `CDR_MODEL=FAST` | `Makefile` (`EP=rtl IFACE=serial`, `IFACE=phy`) | the SerDes BFM's CDR model | ours |
 | `SOC_CPU_VPROC` | `Makefile` (`CPU=vproc`, `iss`) | `soc_top.sv` puts `soc_cpu.VPROC.sv` in the CPU socket | ours |
 | `RISCV_FORMAL` | `Makefile` (`EP=rtl DUMP=1`) | eduBOS5 drives its RVFI outputs, for the CPU's WaveCrux page | ours |
-| `DUMP` | `Makefile` (`DUMP=1`) | `tb.sv` writes `tb.fst`, `tb_serial.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst` | ours |
+| `DUMP` | `Makefile` (`DUMP=1`) | `tb.sv` writes `tb.fst`, `tb_serial.fst`, `tb_phy.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst` | ours |
 
 ### From XSIM to Verilator, via Icarus
 

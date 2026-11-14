@@ -5,7 +5,7 @@
 [![REUSE:Compliant](https://badgen.net/badge/REUSE/Compliant/green)](REUSE.toml)
 [![eduBOS5:YES](https://badgen.net/badge/eduBOS5/YES/green)](https://github.com/chili-chips/openPCIE/blob/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/README.md)
 [![pcievhost:YES](https://badgen.net/badge/pcievhost/YES/green)](5.sim/models/pcievhost/README.md)
-[![WaveCrux:Pass](https://badgen.net/badge/WaveCrux/Pass/green)](2.rtl/4.dll/README.md#viewing-the-dll-in-wavecrux)
+[![WaveCrux:YES](https://badgen.net/badge/WaveCrux/YES/green)](2.rtl/4.dll/README.md#viewing-the-dll-in-wavecrux)
 [![JanusHDL:WIP](https://badgen.net/badge/JanusHDL/WIP/orange)](https://que.no/janushdl/)
 [![Lint](https://badgen.net/github/checks/chili-chips/openCologne-PCIE/main/run-lint?label=Lint)](https://github.com/chili-chips/openCologne-PCIE/actions/workflows/lint.yml)
 [![Verible](https://badgen.net/github/checks/chili-chips/openCologne-PCIE/main/verible?label=Verible)](https://github.com/chili-chips/openCologne-PCIE/actions/workflows/verible.yml)
