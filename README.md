@@ -362,6 +362,13 @@ Our posts so far:
 - [2025-10-02, LinkedIn (announcement)](https://www.linkedin.com/feed/update/urn:li:activity:7379769413421559808)
 - [2025-08-25, LinkedIn (pcievhost)](https://www.linkedin.com/feed/update/urn:li:ugcPost:7362742908170473473?commentUrn=urn%3Ali%3Acomment%3A%28ugcPost%3A7362742908170473473%2C7363111076936232962%29&dashCommentUrn=urn%3Ali%3Afsd_comment%3A%287363111076936232962%2Curn%3Ali%3AugcPost%3A7362742908170473473%29)
 
+**Issues filed upstream.** JanusHDL has no public tracker (it is closed source, so it can read encrypted IP), so its issues are here, under the [`JanusHDL` label](https://github.com/issues?q=org%3Achili-chips+label%3AJanusHDL):
+
+| Tool / project | Issue | What | State |
+|---|---|---|---|
+| JanusHDL | [#1](https://github.com/chili-chips/openCologne-PCIE/issues/1) | 0.17.0: what simulates and what does not | open |
+| JanusHDL | [#2](https://github.com/chili-chips/openCologne-PCIE/issues/2) | performance against Verilator and Icarus | open |
+
 Planned fairs and conferences:
 
 | Venue | Cologne Chip presence |
