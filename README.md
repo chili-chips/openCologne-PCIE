@@ -15,21 +15,41 @@
 [![PCIE:TODO](https://badgen.net/badge/PCIE/TODO/red)](#project-status)
 [![LiteX:TODO](https://badgen.net/badge/LiteX/TODO/red)](6.litex/README.md)
 
-**openCologne-PCIE** is a **soft PCIE EndPoint core** for the Cologne Chip GateMate FPGA, built with the fully opensource [nextPNR](https://github.com/YosysHQ/prjpeppercorn) tool suite. It continues [openCologne](https://github.com/chili-chips/openCologne) and complements the [openPCIE](https://github.com/chili-chips/openpcie) RootComplex.
+**openCologne-PCIE** is a **soft PCIE EndPoint core** for the Cologne Chip GateMate FPGA, built with the fully opensource [nextPNR-himbaechel](https://github.com/YosysHQ/prjpeppercorn) _"PrjPeppercorn"_ tools. It continues [openCologne](https://github.com/chili-chips/openCologne) and complements the [openPCIE](https://github.com/chili-chips/openpcie) RootComplex.
 
 <div align="center">
   <img alt="openCologne-PCIE logo" width="30%" src="0.doc/artwork/openCologne-PCIE.hex.png">
 </div>
 
-- **Layered and portable:** only the PHY is in the hard-macro (HM) domain, so the stack can move to other FPGA families and [OpenROAD](https://github.com/The-OpenROAD-Project) ASICs. It is the only soft PCIE protocol stack in opensource at the moment.
-- **Verified:** comes with its own **Verification IP (VIP)**.
-- **Hardware:** two **PCIE cards for GateMate**. They host all three GateMate variants (A1, A2, A4) and plug into 3rd-party carriers, including our opensource [PCIE Backplane](https://github.com/chili-chips/openPCIE/tree/main/1.pcb/openpci2-backplane).
-- **LiteX:** integration planned through [LitePCIE](https://github.com/enjoy-digital/litepcie), toward an end-to-end, community-maintained _openCompute_ PCIE ecosystem.
+- **Clearly layered and portable:**
+  - SerDes PHY is the only Hard Macro (HM)
+    - project RTL stack can move to other FPGA families and [OpenROAD](https://github.com/The-OpenROAD-Project) ASICs
+  - Transaction layer interface compatible with Artix7 PCIE_2_1 HM
+  - **`This is the only soft PCIE protocol stack in opensource at the moment`**
+    
+- **End-to-End simulated:**
+  - comes with unique opensource **Verification IP (VIP)**
+  - three simulators: _Verilator, Icarus, JanusHDL_
+  - best-in-class waveform viewers and protocol decoders: _WaveCrux_ suite
+    
+- **Hardware PCBs:**
+  - two PCIE cards for GateMate: M.2 and "Slot"
+  - capable of hosting (BOM variant) all three GateMate die packaging options (A1, A2, A4)
+  - Plug-and-Play with 3rd-party carriers, including our opensource [PCIE Backplane](https://github.com/chili-chips/openPCIE/tree/main/1.pcb/openpci2-backplane).
 
+- **LiteX integration:**
+  - planned through [LitePCIE](https://github.com/enjoy-digital/litepcie), contributing to an end-to-end, community-maintained _openCompute_ PCIE ecosystem.
+
+- **Fully lab-tested for interoperability with:**
+  - AMD/Xilinx Artix7 Root Complex
+    - with and without PCIE Gen2.1 Switch in the path (ASM1184e)
+  - Linux PC, as a plug-in card into standard desktop motherboard
+  - RaspberryPi
+    
 | Go to | For |
 |---|---|
 | [1.pcb](1.pcb/README.md) | EP card and test setup |
-| [2.rtl](2.rtl/README.md) | RTL: PHY, PIPE, MAC, DLL, TL, SOC |
+| [2.rtl](2.rtl/README.md) | RTL: PHY, PIPE, MAC, DLL, TL, TRN, SOC |
 | [3.sw](3.sw/README.md) | EP firmware |
 | [4.build](4.build/README.md) | Build flow |
 | [5.sim](5.sim/README.md) | Test bench and VIP |
