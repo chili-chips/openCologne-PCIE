@@ -4,7 +4,7 @@ This is where the developers of **PIO TestApp** (the software part of) document 
 
 <div align="center"><img src="../0.doc/3.sw/sw-structure.drawio.png" width="100%" alt="Firmware layers: application, PCIE driver, HAL, register map and startup, talking to the CSR block over the CPU memory bus, then through pcie_top to the PCIE link"></div>
 
-### EP firmware
+### EndPoint firmware
 
 The EP firmware runs bare-metal on the eduBOS5 core of our GateMate SOC. It is the twin of the openPCIE RC firmware, with the roles swapped: there, the CPU sends requests and waits for Completions; here, it waits for the host's requests and sends the Completions.
 
@@ -29,17 +29,22 @@ Build (WSL, with the xPack RISC-V GCC on `PATH`):
 cd 4.build/sw_build && make      # firmware.elf, .bin and .hex for the SOC RAM
 ```
 
+---
+# Three Test Applications
+
 We plan on creating not one, but three "Getting Started" examples, for the three representative compute platforms:
 1) **Soft Embedded / BareMetal**: Artix-7 FPGA acting as a RootComplex with soft on-chip RISC-V CPU, on our openPCIE backplane
 2) **General-purpose desktop/server class**: Linux PC
 3) **Hard Embedded / Hosted**: RaspberryPi
 
-## 1) Artix-7 FPGA as RootPort
+## 1) Artix-7 FPGA as the RootPort for our EndPoint
+`TODO`
 
-## 2) PC as RootPort
+## 2) Linux PC as the RootPort for our EndPoint
+`TODO`
 
-## 3) RaspberryPi as RootPort
-
+## 3) RaspberryPi as the RootPort for our EndPoint
+`TODO`
 
 --------------------
 #### End of Document
