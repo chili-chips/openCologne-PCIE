@@ -25,8 +25,10 @@ This is work area for the PCB-related thoughts and explanations, including the s
   
 <div align="center">
   <img alt="ULX5M M.2 V1.0 Messy Test Setup" width="45%" src="../0.doc/1.pcb/M2-Ver1--Messy-Test-Setup.jpg">
+  <img alt="PCIE-interop-with-RPI5.FlatCable.png" width="45%" src="../0.doc/1.pcb/PCIE-interop-with-RPI5.FlatCable.png">
   <img alt="ULX5M M.2 V1.0 SerDes Settings" width="45%" src="../0.doc/1.pcb/test-results/serdes-test-results---2026-10-18.settings2.png">
   <img alt="ULX5M M.2 V1.0 Test Results with extra filters" width="45%" src="../0.doc/1.pcb/test-results/serdes-test-results---2026-10-26--with-extra-filters.png">
+  <img alt="CologneChip-Serdes-Characterization-Jig" width="45%" src="../0.doc/1.pcb/CologneChip-Serdes-Characterization-Jig.png">
 </div>
 
 For comparison, see our [2.5Gbps SerDes settings](https://github.com/chili-chips/openCologne-PCIE/blob/main/2.rtl/1.phy/1.serdes-test.STANDALONE/README.md#serdes-loopback-tests) for a standalone PRBS loopback test on CologneChip EVK.
