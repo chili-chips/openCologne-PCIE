@@ -25,9 +25,9 @@ One file, one `module tb_phy` per test, chosen at compile time:
 * **PIPE test** (default): the testbench and testcase of gatemate-pipe (`tb_ccfpga_serdes.sv`, `testcase_pipe.sv`, merged here). The PIPE width is `DATA_BYTES` in `pipe_pkg` (8: 64 bits; the narrower datapaths are no longer built). The SerDes bring-up is done with `writeCfg` / `writeRegfile` tasks. The SerDes is set up and clocked as in `phy_top`: at 64 bits `PLL_FCNTRL = 6'h3A`, the PLL clock at the word rate (31.25 MHz), used as PCLK and as the SerDes TX and RX core clock (`o_tx_clk`); at 16 bits `6'h1A` and the PIPE logic's divider. testcase_pipe.sv waits a fixed `#350` between sending a test packet and checking it; here the first packet measures that latency (12 PCLK cycles with the opensource BFM; 17 with the vendor model, measured with the earlier divided PCLK) and each of the 100 packets after it must come back with the same latency.
 * **Model check** (`TB_PHY_EQUIV`): the open model with its TX looped back to its RX. Training words (a comma and fillers) until the receiver aligns, then a marker word and 400 payload words, each compared with what was sent; the latency is printed. With `HAVE_VENDOR_SERDES` the vendor model runs beside it, `CROSS_LINK` links the two.
 
-## The former 16-bit test (`pipe16`)
+## The 16-bit PIPE: a placeholder
 
-The 16-bit PIPE gets its PCLK from a `CC_PLL` at 4x the SerDes core clock, which feeds a 4-to-1 multiplexer onto the 64-bit SerDes word. In gatemate-pipe (`ccfpga_pipe_top.sv`, 16-bit branch) that `CC_PLL` is commented out and PCLK is the SerDes PLL clock itself, 62.5 MHz instead of 125 MHz, so 16-bit words are lost. The fault is in the PIPE RTL ([BA#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18)); the test passes once the PLL is back.
+Only the 64-bit PIPE is part of this round. The 16-bit branch of `ccfpga_pipe_top.sv` is a placeholder for a later one: it is not built and has no test. It would take its PCLK from a `CC_PLL` at 4x the SerDes core clock, feeding a 4-to-1 multiplexer onto the 64-bit SerDes word; that `CC_PLL` is not there yet.
 
 ## The vendor model
 

@@ -287,7 +287,7 @@ module virtual_channel_tx
   fc_data_t   send_data_credit;
   fc_class_e  send_update_type;
   dllp_type_e send_packet_type;
-  always_comb begin  // if / else, not ?: on enums (Icarus 14, BA#53, iverilog#1048)
+  always_comb begin  // if / else, not ?: on enums (Icarus 14, #18, iverilog#1048)
     if (fc_sending) begin
       send_hdr_credit  = fc_send_hdr;
       send_data_credit = fc_send_data;

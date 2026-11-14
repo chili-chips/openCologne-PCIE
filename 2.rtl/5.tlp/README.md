@@ -59,10 +59,10 @@ Next to the TL:
 
 ### Data Link Layer (dll_if)
 - **DL_Up** is `dl_state` in DL_Init FC_INIT2 or DL_Active, registered. While DL_Up is low the TL is held in reset: DL_Down resets the TL, as required for an upstream port. The TX credit limits are the exception: `fc_credit` takes them from InitFC1 and InitFC2 in DL_Init, and clears them in DL_Inactive. In FC_INIT2 the TL already takes TLPs (DL_Up, 3.2.1); a credit it releases there goes out as an UpdateFC at once, between the InitFC2s. A partner still in FC_INIT1 ignores it, and the next UpdateFC carries the cumulative count.
-- **TLPs**: the TL starts a TLP only while `tx_tlp_ready` is high, sends it in consecutive words, then waits for `tx_tlp_ready` to drop before the next one, matching the one-TLP DLL retry buffer. The last word of a TLP with an odd number of DWs is marked with `tx_tlp_last_half`, the DLL's `tl_tx_tlp_last_half` ([BA#21](https://github.com/chili-chips-ba/openCologne-PCIE/issues/21)): the DLL then sends only its lower 4 bytes.
+- **TLPs**: the TL starts a TLP only while `tx_tlp_ready` is high, sends it in consecutive words, then waits for `tx_tlp_ready` to drop before the next one, matching the one-TLP DLL retry buffer. The last word of a TLP with an odd number of DWs is marked with `tx_tlp_last_half`, the DLL's `tl_tx_tlp_last_half`: the DLL then sends only its lower 4 bytes.
 - **DLLPs**: the TL requests UpdateFC DLLPs (`tx_packet_type` is always UpdateFC) and takes the credits of the InitFC1, InitFC2 and UpdateFC DLLPs the DLL receives.
 
-InitFC credits ([BA#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)): the DLL used to send InitFC1 and InitFC2 with fixed credits (P 32/1008, NP 32/1, Cpl infinite). It now builds them from the `INIT_*` parameters, which `pcie_core` sets to the TL's. The fix is on our fork ([2.pipe](../2.pipe/README.md#sources)), offered upstream as [gatemate-pipe#17](https://github.com/colognechip/gatemate-pipe/pull/17).
+InitFC credits: the DLL used to send InitFC1 and InitFC2 with fixed credits (P 32/1008, NP 32/1, Cpl infinite). It now builds them from the `INIT_*` parameters, which `pcie_core` sets to the TL's.
 
 ### SOC side (trn_tx_if, trn_rx_if and cfg_if)
 
@@ -217,9 +217,8 @@ ERR_FATAL is sent when Fatal Error Reporting Enable or SERR# Enable is set. ERR_
 
 | What | Base 2.1 | Issue |
 |---|---|---|
-| An MRdLk gets its Unsupported Request completion as Cpl, not CplLk | 2.2.9 | [BA#39](https://github.com/chili-chips-ba/openCologne-PCIE/issues/39) |
-| No correctable errors: Correctable Error Detected is never set, ERR_COR never sent; the DLL reports no Bad TLP or Bad DLLP; a poisoned TLP sets only Detected Parity Error | 6.2.5, 2.7.2.2 | [BA#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40) |
-| Link Capabilities advertise L0s, which every component must support, but the MAC has none (no EIOS, no FTS); the 64 ns L0s Acceptable Latency keeps hosts that check it (e.g. Linux) from enabling it | 5.4.1, 7.8.6 | [BA#47](https://github.com/chili-chips-ba/openCologne-PCIE/issues/47) |
+| No correctable errors: Correctable Error Detected is never set, ERR_COR never sent | 6.2.5, 2.7.2.2 | [#13](https://github.com/chili-chips/openCologne-PCIE/issues/13) |
+| Link Capabilities advertise L0s; the MAC has none | 5.4.1, 7.8.6 | [#11](https://github.com/chili-chips/openCologne-PCIE/issues/11) |
 | PM_Enter_L1 is never sent: D3hot does not take the link to L1 | 5.3.2.1 | |
 
 ## Simulation

@@ -10,7 +10,7 @@
 # usage:  bash run-dll-phy.sh [--dump] [--scramble] [--inject=stp|end]
 #
 # --inject: a TLP with its STP or END corrupted at the RC's receiver, in place
-# of steps 4 to 7. Fails until BA#24 is fixed (no REPLAY_TIMER).
+# of steps 4 to 7. Fails until #3 is fixed (no REPLAY_TIMER).
 #
 # Build products and the waveform go to $SERDES_BUILD_DIR/dll (default
 # ~/.cache/opencologne-pcie).

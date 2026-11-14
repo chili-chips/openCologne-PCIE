@@ -28,7 +28,7 @@ Two complete stacks, an Endpoint and a Root Complex, connected by a bit-level se
 ```sh
 bash 2.rtl/4.dll/sim/run-dll-phy.sh           # ~15 s
 bash 2.rtl/4.dll/sim/run-dll-phy.sh --dump    # with a waveform
-bash 2.rtl/4.dll/sim/run-dll-phy.sh --inject=end   # BA#24: in place of steps 4 to 7, a TLP with its END (or stp: STP) hit
+bash 2.rtl/4.dll/sim/run-dll-phy.sh --inject=end   # #3: in place of steps 4 to 7, a TLP with its END (or stp: STP) hit
 ```
 
 Build products and the waveform go to `$SERDES_BUILD_DIR/dll` (default `~/.cache/opencologne-pcie`). Needs Icarus Verilog 14 or later (interface ports); tested with 14.0 from the OSS CAD Suite.
@@ -43,7 +43,7 @@ The test first trains both LTSSMs from Detect.Quiet to L0, every state change is
 6. TLPs of 3, 5 and 7 DW in both directions, the last word marked with `tl_tx_tlp_last_half`: each is sent once, with 12, 20 or 28 TLP bytes on the line
 7. step 4 with a 5 DW TLP, its last TLP byte corrupted
 
-**Known gap:** [BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) (upstream [gatemate-pipe#15](https://github.com/colognechip/gatemate-pipe/issues/15)): the DLL has no REPLAY_TIMER, so a TLP whose STP or END is hit is never Naked or replayed, and the EP stops sending TLPs. `--inject=stp` and `--inject=end` show it: both fail until BA#24 is fixed (the regression lists them as known).
+**Known gap:** [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3): the DLL has no REPLAY_TIMER, so a TLP whose STP or END is hit is never Naked or replayed, and the EP stops sending TLPs. `--inject=stp` and `--inject=end` show it: both fail until #3 is fixed (the regression lists them as known).
 
 Every TLP the two DLLs send has its LCRC checked on the way out against a CRC-32 the testbench computes over the sequence number and TLP bytes; in step 6 also its length.
 
@@ -77,7 +77,7 @@ The MAC implements the upstream port. The Root Complex is a second instance of i
 * scrambling is disabled in both MACs, as with `DISABLE_SCRAMBLING` in the MAC's pcievhost test
 * the SerDes is set up and clocked as in `phy_top`: `PLL_FCNTRL = 6'h3A`, the PLL clock at the word rate, used as PCLK and as the SerDes TX and RX core clock, all 31.25 MHz
 * the PIPE reset is released 256 `clk_aon` cycles after the global reset, the MAC and DLL reset once the SerDes reports ready, synchronised to PCLK
-* the DLL gets `phy_linkup` when the MAC reports link up and the LTSSM is in L0; unlike `pcie_core` ([BA#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)), `pcie_stack.sv` does not hold it through Recovery
+* the DLL gets `phy_linkup` when the MAC reports link up and the LTSSM is in L0; unlike `pcie_core`, `pcie_stack.sv` does not hold it through Recovery
 * the errors in steps 4, 5 and 7 are forced on the RC's DLL input (`u_vc.rx_sym`, data and K flags) for one PCLK, at a fixed byte from the frame's STP or SDP: a K symbol becomes a data byte, a data byte gets bit 0 flipped. The same field is hit every run, whatever the timing
 
 --------------------

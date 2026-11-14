@@ -13,14 +13,14 @@
 //
 //     SKP     in L0, the MAC sends an SKP Ordered Set on the PIPE at least
 //             every 1538 + Max_Payload_Size (128) + 28 Symbol Times, 8 a
-//             PCLK (4.2.7.1; BA#38)
+//             PCLK (4.2.7.1; #6)
 //     SKP-MUX the SKP word the MAC's SKP generator sends (and took off its
 //             queue) reaches the PIPE: no data, OS or IDLE in that cycle,
-//             which ccfpga_tx_MAC's output mux puts first (#38)
+//             which ccfpga_tx_MAC's output mux puts first (#6)
 //     REPLAY  a TLP in the retry buffer is Acked (the buffer empties) or
 //             replayed within the REPLAY_TIMER limit: 711 Symbol Times at
 //             2.5 GT/s x1 and 128 bytes, +100% (3.5.2.1, Table 3-4), plus
-//             the TLP itself; the timer counts in L0 only (#24)
+//             the TLP itself; the timer counts in L0 only (#3)
 //     FCINIT  when the DLL enters DL_Active, the TL holds the TX credit
 //             limits of P, NP and Cpl, taken in DL_Init: the DLL leaves
 //             FC_INIT1 only with an InitFC of each type (3.2.1, 3.3.1)
@@ -53,18 +53,18 @@ module ep_sva (
   a_skp :
   assert property (@(posedge pclk) disable iff (!rst_n || !l0)
       (skp || $rose(l0)) |-> ##[1:SKP_MAX] skp)
-  else $error("**** SVA BA#38: no SKP Ordered Set from the EP's MAC on the PIPE for %0d PCLK (%0d Symbol Times) in L0",
+  else $error("**** SVA #6: no SKP Ordered Set from the EP's MAC on the PIPE for %0d PCLK (%0d Symbol Times) in L0",
               SKP_MAX, 8 * SKP_MAX);
 
   a_skp_mux :
   assert property (@(posedge pclk) disable iff (!rst_n) skp_gen |-> !tx_other)
-  else $error("**** SVA BA#38: the MAC dropped an SKP Ordered Set: data, OS or IDLE in its cycle");
+  else $error("**** SVA #6: the MAC dropped an SKP Ordered Set: data, OS or IDLE in its cycle");
 
   a_replay :
   assert property (@(posedge pclk) disable iff (!rst_n || !l0 || !dl_active)
       ($fell(buf_empty) || $rose(replay) || ($rose(l0) && !buf_empty)) |->
       ##[1:REPLAY_MAX] (buf_empty || $rose(replay)))
-  else $error("**** SVA BA#24: a TLP in the EP's retry buffer neither Acked nor replayed in %0d PCLK in L0",
+  else $error("**** SVA #3: a TLP in the EP's retry buffer neither Acked nor replayed in %0d PCLK in L0",
               REPLAY_MAX);
 
   a_fc_init :

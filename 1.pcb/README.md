@@ -42,7 +42,7 @@ Here is CologneChip own test jig for SerDes characterization, which achieved 3Gb
 
 ---
 #### Ver2 (WIP 🟠)
-For better Signal Integrity (SI) FPGA is moved next to edge connector, see [BA#4](https://github.com/chili-chips-ba/openCologne-PCIE/issues/4#issuecomment-4604732435). Power filtering that came out of our experimentation with Ver1 was also added. With all that, we are hoping for 5Gbps on Take2🤞.
+For better Signal Integrity (SI) FPGA is moved next to edge connector. Power filtering that came out of our experimentation with Ver1 was also added. With all that, we are hoping for 5Gbps on Take2🤞.
 
 <div align="center">
   <img alt="ULX5M M.2 V1.0 card, top side" width="60%" src="../0.doc/1.pcb/ulx5m-m2-v2--1.top.jpg">

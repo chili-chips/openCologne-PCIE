@@ -9,7 +9,7 @@ The **Data Link Layer (DLL)** sits between the **Transaction Layer (TL)** above 
 - generates and consumes DLLPs: ACK/NAK and flow-control;
 - runs the **flow-control initialization** handshake before the link carries traffic.
 
-Soft-core RTL in the FPGA fabric. Below it, the MAC and the GateMate SerDes handle the LTSSM, 8b/10b and the serial link, reached through the PHY interface. `DATA_WIDTH` is **64 bits** (`DATA_BYTES = 8`, PCLK 31.25 MHz at Gen1), the only width built and tested. `retry_buffer.sv` also has an experimental 32-bit path, kept solely as a nextpnr timing closure stress test. It would need PCLK 62.5 MHz even at Gen1 (2.5 Gbps), and the 64-bit datapath already misses 31.25 MHz by a wide margin ([BA#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)), so we do not plan to validate or bring it up.
+Soft-core RTL in the FPGA fabric. Below it, the MAC and the GateMate SerDes handle the LTSSM, 8b/10b and the serial link, reached through the PHY interface. `DATA_WIDTH` is **64 bits** (`DATA_BYTES = 8`, PCLK 31.25 MHz at Gen1), the only width built and tested. `retry_buffer.sv` also has an experimental 32-bit path, kept solely as a nextpnr timing closure stress test. It would need PCLK 62.5 MHz even at Gen1 (2.5 Gbps), and the 64-bit datapath already misses 31.25 MHz by a wide margin ([#15](https://github.com/chili-chips/openCologne-PCIE/issues/15)), so we do not plan to validate or bring it up.
 
 <div align="center"><img alt="Our PCIe EndPoint stack: GateMate SerDes, PIPE, MAC, then the Data Link Layer between the MAC and the Transaction Layer (dll_if), TRN2PIO bridge and CSR example" src="../../0.doc/2.rtl/pcie-ep-top-stack.png" width="35%"></div>
 
@@ -26,7 +26,7 @@ A transmit datapath, a receive datapath, and the control logic binding them.
 
 - **TLP handler**: sequence-number assignment and checking, LCRC generation/validation, and the ACK/NAK scheduling logic (`NEXT_RCV_SEQ`).
 - **DLLP handler**: builds and parses ACK/NAK and flow-control DLLPs; on ACK it retires TLPs from the retry buffer, on NAK it triggers a replay.
-- **Retry buffer**: holds unacknowledged TLPs (currently has size of one) for replay. Replay on NAK only; no replay timer or replay number yet ([BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)).
+- **Retry buffer**: holds unacknowledged TLPs (currently has size of one) for replay. Replay on NAK only; no replay timer or replay number yet ([#3](https://github.com/chili-chips/openCologne-PCIE/issues/3)).
 - **DLL Init FSM**: gates the link through `DL_Inactive → DL_Init → DL_Active`, including flow-control initialization.
 
 ## The Interface
@@ -148,7 +148,7 @@ Field layout: `type | Reserved | AckNak_Seq_Num | 16-bit CRC`.
   - LCRC match → the control data is removed and the TLP is forwarded to the TL: the DLL marks the start and end of the TLP, `NEXT_RCV_SEQ` is incremented, and an ACK is scheduled.
 - A NAK is scheduled for every bad TLP: there is no `NAK_SCHEDULED` flag holding back a second one.
 - An ACK is sent as soon as it is scheduled; there is no `AckNak_LATENCY_TIMER` yet.
-- An STP is taken only while no TLP is being checked or forwarded; a TLP right behind another one is lost ([BA#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26)).
+- An STP is taken only while no TLP is being checked or forwarded; a TLP right behind another one is lost ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4)).
 - Nullification of a TLP with `EDB` is **not** supported in this first version.
 
 ## DLLP Handler
@@ -167,24 +167,24 @@ Field layout: `type | Reserved | AckNak_Seq_Num | 16-bit CRC`.
 - Received TLP LCRC fails: send a **NAK** with the sequence number of the last TLP received intact; passes: an **ACK** with the error-free packet's sequence number.
 
 ## Retry Buffer
-- The retry buffer replays on NAK only. There is no replay timer and no replay number yet ([BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)).
-- The first version offers a retry buffer of **size one**, in block RAM ([gatemate-pipe#20](https://github.com/colognechip/gatemate-pipe/pull/20)); a later version may move to **size two**, implemented as a ping-pong scheme.
+- The retry buffer replays on NAK only. There is no replay timer and no replay number yet ([#3](https://github.com/chili-chips/openCologne-PCIE/issues/3)).
+- The first version offers a retry buffer of **size one**, in block RAM; a later version may move to **size two**, implemented as a ping-pong scheme.
 
 ## Where it departs from PCIe 2.1
 
 | What | Base 2.1 | Issue |
 |---|---|---|
 | The DLL frames its packets (STP, SDP, END); the spec puts framing in the Physical Layer | 4.2.2 | |
-| No `REPLAY_TIMER`, no `REPLAY_NUM`: a TLP lost on the line is never replayed | 3.5.2.1 | [BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
-| No Receiver Error input from the Physical Layer: a TLP it corrupts is not discarded and answered with a Nak on that ground | 3.5.3.1 | [BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
-| A TLP right behind another one is dropped without a Nak | 3.5.3.1 | [BA#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26) |
+| No `REPLAY_TIMER`, no `REPLAY_NUM`: a TLP lost on the line is never replayed | 3.5.2.1 | [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3) |
+| No Receiver Error input from the Physical Layer, so no Nak on that ground | 3.5.3.1 | [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3) |
+| A TLP right behind another one is dropped without a Nak | 3.5.3.1 | [#4](https://github.com/chili-chips/openCologne-PCIE/issues/4) |
 | Sequence number checked before the LCRC: a duplicate with a bad LCRC is answered with an Ack, not a Nak | 3.5.3.1 | |
 | No `NAK_SCHEDULED`: a Nak for every bad TLP, not one until a good TLP arrives | 3.5.3.1 | |
 | No `AckNak_LATENCY_TIMER`: one Ack per TLP, sent at once | 3.5.3.1 | |
 | Nullified TLPs (EDB) not recognised | 3.5.3.1 | |
-| InitFC1/InitFC2 repeated only every 34 µs, not back to back when idle | 3.3.1 | [BA#25](https://github.com/chili-chips-ba/openCologne-PCIE/issues/25) |
+| InitFC1/InitFC2 repeated only every 34 µs, not back to back when idle | 3.3.1 | [#5](https://github.com/chili-chips/openCologne-PCIE/issues/5) |
 | FC_INIT2 waits for all three InitFC2 (or an UpdateFC or a TLP), not any one InitFC2 | 3.3.1 | |
-| Bad TLP and Bad DLLP not reported as Correctable errors | 6.2.5 | [BA#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40) |
+| Bad TLP and Bad DLLP not reported as Correctable errors | 6.2.5 | [#13](https://github.com/chili-chips/openCologne-PCIE/issues/13) |
 | No PM DLLPs: D3hot does not take the link to L1 | 3.4, 5.3.2.1 | |
 
 <!--## Prerequisites
@@ -197,7 +197,7 @@ The simulation can be run using the pcieVHost model … *TODO*
 The testbench drives the DLL from both sides. On the **upstream** side it plays the Transaction Layer: it injects TLP payload (`tl_tx_*`) and requests DLLP transmissions (`tl_tx_dllp_valid`) to exercise framing, sequence-number assignment, LCRC generation and the transmission-priority logic. On the **downstream** side it models the PHY, feeding framed TLPs/DLLPs on `phy_rx_data`/`phy_rx_data_k` and driving `phy_linkup` so the DLL Init FSM walks through `DL_Inactive → DL_Init → DL_Active`, including flow-control initialization. Fault injection on the received stream (bad CRC/LCRC, out-of-sequence and duplicate sequence numbers) is used to check the ACK/NAK scheduling, the retry buffer and the replay/latency timers.-->
 
 ## Sources and testbench
-The DLL sources are in this folder. Its block testbench in [gatemate-pipe](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration/sim), `sim/tb_dll_logic.sv`, loops the DLL's `phy_tx_data` back into `phy_rx_data`:
+The DLL sources are in this folder. Cologne Chip's block testbench, `sim/tb_dll_logic.sv` in [gatemate-pipe](https://github.com/colognechip/gatemate-pipe), loops the DLL's `phy_tx_data` back into `phy_rx_data`:
 
 | Step | Exercises |
 |---|---|

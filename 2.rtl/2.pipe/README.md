@@ -1,7 +1,7 @@
 # gatemate-pipe
 
 ## Sources
-The sources here, [`3.mac`](../3.mac) and [`4.dll`](../4.dll) come from [Cologne Chip's gatemate-pipe](https://github.com/colognechip/gatemate-pipe) (`dll_test`), plus our changes. [Our fork](https://github.com/chili-chips-ba/gatemate-pipe/tree/ocp-integration) carries the same changes on branch `ocp-integration`, and we offer each change to Cologne Chip as a pull request: [#17](https://github.com/colognechip/gatemate-pipe/pull/17) (InitFC credits), [#19](https://github.com/colognechip/gatemate-pipe/pull/19) (64-bit PCLK straight from `PLL_CLK_O`), [#20](https://github.com/colognechip/gatemate-pipe/pull/20) (the DLL retry buffer in block RAM), [#21](https://github.com/colognechip/gatemate-pipe/pull/21) (no latch in the scrambler, lint).
+The sources here, [`3.mac`](../3.mac) and [`4.dll`](../4.dll) started from [Cologne Chip's gatemate-pipe](https://github.com/colognechip/gatemate-pipe) (`dll_test`). We forked them and maintain them here. Changed since: SystemVerilog packages and interfaces, InitFC credits from the TL, the 64-bit PCLK straight from `PLL_CLK_O`, the DLL retry buffer in block RAM, no latch in the scrambler, and our lint and format rules.
 
 ## Description
 The **PHY Interface for the PCI Express Architecture (PIPE)** is part of the physical layer, between the Media Access Control (MAC) Layer and the Physical Coding Sublayer (PCS). It separates the soft-core RTL from the FPGA-specific SerDes, which reduces effort and eases porting to other FPGA vendors and platforms.
@@ -13,7 +13,7 @@ The **PHY Interface for the PCI Express Architecture (PIPE)** is part of the phy
 ## The Interface
 The schematic shows the **64-Bit datapath**, where `pipe.pclk` runs at the **SERDES TX_clock** frequency. Narrower datapaths run `pipe.pclk` at a multiple of **TX_clock**, by the datapath ratio, to keep MAC and PHY synchronized: a **32-Bit datapath** (half the **64-Bit SERDES datapath**) runs `pipe.pclk` at twice **TX_clock**.
 
-The width is `DATA_BYTES` in `pipe_pkg`: the PIPE takes 8-, 16-, 32- or 64-Bit datapaths (1, 2, 4, 8). 64-Bit works, 16-Bit fails ([BA#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18)), 32-Bit is untested.
+The width is `DATA_BYTES` in `pipe_pkg`: the PIPE takes 8-, 16-, 32- or 64-Bit datapaths (1, 2, 4, 8). This round builds and tests the 64-Bit datapath only; the narrower ones are placeholders for later.
 
 <div align="center"><img alt="PIPE as built, 64 bits: the MAC-side pipe_if signals; ccfpga_pipe_top with the PIPE FSM, the word-align FSM and the TX and RX paths; CC_SERDES with its PLL, PLL_CLK_O as PCLK through a CC_BUFG, and its dedicated serial and REFCLK pins" src="./0.doc/PIPE_Interface.drawio.png" width="90%"></div>
 

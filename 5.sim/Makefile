@@ -86,7 +86,7 @@ A7RC_DIR       = $(CURDIR)/models/a7rc-model
 # A7RC=0 (default): the host is a tester: the lab RC's sequence, then what its
 # firmware never sends but the spec allows (README.md, Tester and literal).
 # A7RC=1: literal, only what the lab RC sends
-# DMA=0 (default): the tester skips its EP DMA stage (our EP has no DMA, BA#41);
+# DMA=0 (default): the tester skips its EP DMA stage (our EP has no DMA, #14);
 # DMA=1: runs it
 # SEED: the seed of the tester's random stimulus (default 1), read at run time
 # (A7RC_SEED): no rebuild. make regress SEEDS=N runs seeds 1 to N, each with a
@@ -227,7 +227,8 @@ ifeq ($(DUMP),1)
   ICADUMP      = -DDUMP
   VVPDUMP      = -fst
   ifeq ($(EP),rtl)
-    VLTDUMP    = --trace-fst --trace-depth 6 +define+DUMP +define+RISCV_FORMAL tb.vlt -F wavecrux.f
+    VLTDUMP    = --trace-fst --trace-depth 6 +define+DUMP +define+RISCV_FORMAL tb.vlt
+    VLTVIEWS   = -F wavecrux.f   # after rtl.f: the views import its packages (Verilator 5.055: USEBEFOREDECL)
   endif
 endif
 
@@ -238,7 +239,7 @@ endif
 VLTFLAGS       = --binary -sv --timing --top-module tb -Mdir $(OBJDIR) $(VLTDUMP) \
                  -Wno-fatal -Wno-WIDTH -Wno-lint -Wno-style                     \
                  +define+VPROC_SV +define+VPROC_BYTE_ENABLE                      \
-                 $(EP_VLT) -F tb.f $(USRSIMFLAGS)                              \
+                 $(EP_VLT) $(VLTVIEWS) -F tb.f $(USRSIMFLAGS)                  \
                  -MAKEFLAGS "--quiet CFG_LDFLAGS_VERILATED="                    \
                  -CFLAGS "$(CPPSTD) -Wno-attributes"                            \
                  -LDFLAGS "$(LDLIBS)"
@@ -373,7 +374,7 @@ wavecrux_run: all
 help:
 	@echo "make [SIM=verilator|icarus|janushdl] [EP=model|rtl] [IFACE=pipe|serial]   build the models and the simulation (EP=rtl: Verilator only)"
 	@echo "make A7RC=1 run                    literal host: only what the lab RC sends (default: the tester, also back to back)"
-	@echo "make DMA=1 run                     the tester also runs its EP DMA stage (off by default: our EP has no DMA, BA#41)"
+	@echo "make DMA=1 run                     the tester also runs its EP DMA stage (off by default: our EP has no DMA, #14)"
 	@echo "make SEED=N run                    the tester's random stimulus with seed N (default 1), no rebuild"
 	@echo "make regress SEEDS=N               the tester over seeds 1 to N (default 10), in obj/regress/<seed>/"
 	@echo "    REGRESS_JOBS=J                 J seeds side by side (default 1); REGRESS_QUIET=0 keeps the packet display"

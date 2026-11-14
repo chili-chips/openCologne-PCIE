@@ -51,10 +51,10 @@ The versions this repo has been run with so far. "Runs" means the step completes
 
 | Date | Design | CPE_LT | CPE_FF | RAM_HALF | PCLK | Result |
 |---|---|---|---|---|---|---|
-| 2026-11-02 | retry buffer in flip-flops ([BA#33](https://github.com/chili-chips-ba/openCologne-PCIE/issues/33)) | 80,093 (195%) | 39,808 (97%) | 20 / 64 | – | does not place |
-| 2026-11-02 | retry buffer in block RAM ([gatemate-pipe#20](https://github.com/colognechip/gatemate-pipe/pull/20)) | 22,076 (53%) | 7,261 (17%) | 22 / 64 | 12.2 MHz, 3 hold violations | routes; fails timing ([BA#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
-| 2026-11-02 | no latch in the MAC scrambler ([gatemate-pipe#21](https://github.com/colognechip/gatemate-pipe/pull/21)) | 22,181 (54%) | 7,147 (17%) | 22 / 64 | 12.75 MHz, no hold violation | routes; fails setup ([BA#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
-| 2026-11-13 | the same RTL (renames and formatting only), OSS CAD Suite 2026-11-12 | 21,536 (52%) | 7,076 (17%) | 22 / 64 | 13.07 MHz | routes; fails setup ([BA#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
+| 2026-11-02 | retry buffer in flip-flops | 80,093 (195%) | 39,808 (97%) | 20 / 64 | – | does not place |
+| 2026-11-02 | retry buffer in block RAM | 22,076 (53%) | 7,261 (17%) | 22 / 64 | 12.2 MHz, 3 hold violations | routes; fails timing ([#15](https://github.com/chili-chips/openCologne-PCIE/issues/15)) |
+| 2026-11-02 | no latch in the MAC scrambler | 22,181 (54%) | 7,147 (17%) | 22 / 64 | 12.75 MHz, no hold violation | routes; fails setup ([#15](https://github.com/chili-chips/openCologne-PCIE/issues/15)) |
+| 2026-11-13 | the same RTL (renames and formatting only), OSS CAD Suite 2026-11-12 | 21,536 (52%) | 7,076 (17%) | 22 / 64 | 13.07 MHz | routes; fails setup ([#15](https://github.com/chili-chips/openCologne-PCIE/issues/15)) |
 
 Out of 40,960 CPE_LT and CPE_FF, and 64 RAM_HALF.
 

@@ -46,7 +46,7 @@ package pipe_pkg;
 
   // The datapath: DATA_BYTES symbols per PCLK, for every layer from the PIPE
   // up. 8 (64-bit) is the build and the only width tested; the PIPE also
-  // takes 4, 2 and 1 (32, 16, 8 bits): 16-bit fails (#18), 32 and 8 untested
+  // takes 4, 2 and 1 (32, 16, 8 bits): placeholders for later, not built
   localparam int DATA_BYTES = 8;
   localparam int DATA_WIDTH = DATA_BYTES * 8;
 

@@ -113,8 +113,10 @@ precedence = "override"
 SPDX-FileCopyrightText = "Google Inc."
 SPDX-License-Identifier = "Apache-2.0"
 
-# Cologne Chip's PIPE and MAC/LTSSM, from gatemate-pipe (BSD-3-Clause:
-# colognechip/gatemate-pipe#22). Our interfaces in them carry their own header.
+# Cologne Chip's PIPE and MAC/LTSSM, from gatemate-pipe (BSD-3-Clause).
+# Published by Cologne Chip without a license header; BSD-3-Clause as a
+# participant in this project.
+# Our interfaces in them carry their own header.
 [[annotations]]
 path = ["2.rtl/2.pipe/**", "2.rtl/3.mac/ccfpga_*"]
 precedence = "closest"

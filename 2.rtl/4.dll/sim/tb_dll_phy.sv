@@ -707,8 +707,8 @@ module tb_dll_phy
       tlp_words[2] = 64'hFEDCBA0987654321;
       if (inject != "") begin
          // A TLP whose framing is hit: the RC drops it without a Nak, and the
-         // EP, with no REPLAY_TIMER, never replays it (#24)
-         $display("=== Step 4: TLP with its %0s corrupted at the RC's receiver (#24) ===", inject);
+         // EP, with no REPLAY_TIMER, never replays it (#3)
+         $display("=== Step 4: TLP with its %0s corrupted at the RC's receiver (#3) ===", inject);
          if (inject != "stp" && inject != "end") begin
             errors = errors + 1;
             $display("ERROR: +inject=%0s, expected stp or end", inject);
