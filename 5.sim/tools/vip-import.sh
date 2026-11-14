@@ -20,8 +20,9 @@
 #   - rv32: openPCIE's rv32-openpcie.patch (models/rv32)
 #   - SystemVerilog names, after the patches (they name upstream's files):
 #     modules .sv, `include headers .svh, the `include lines to match
+#   - READMEs: <p align="center"> blocks become <div align="center">
 # pcieVHost's src/ltssm.c is not copied: the make file compiles openPCIE's
-# models/pcievhost/ltssm/ltssm.c, with its LTSSM patch (see 5.sim/README.md).
+# models/a7rc-model/ltssm.c, with its LTSSM patch (see 5.sim/README.md).
 #
 # DEPS_WORK (default ~/.cache/opencologne-pcie-deps) holds the upstream
 # clones. Needs git, patch, sed.
@@ -119,6 +120,10 @@ for f in "$U"/rv32/iss/src/*; do cp_lf "$f" "$D/rv32/iss/src/$(basename "$f")"; 
 for f in LICENSE README.md; do cp_lf "$U/rv32/$f" "$D/rv32/$f"; done
 # change: openPCIE's two ISS fixes
 patch -s --no-backup-if-mismatch -p0 -d "$D/rv32/iss/src" < "$HERE/../models/rv32/rv32-openpcie.patch"
+
+# ---- upstream READMEs: centred blocks in <div>, which GitLab also honors ---------
+sed -i -e '/<p align="center">/,/<\/p>/{s#<p align="center">#<div align="center">#;s#</p>#</div>#}' \
+  "$D"/{vproc,pcievhost,mem_model,rv32}/README.md
 
 echo "imported: VProc $VPROC_REF, pcieVHost $PCIEVHOST_REF, mem_model $MEM_MODEL_REF, rv32 $RV32_REF"
 echo "next: update vip/README.md, then run both simulators"

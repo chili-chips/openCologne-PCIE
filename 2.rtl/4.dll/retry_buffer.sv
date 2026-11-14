@@ -45,25 +45,25 @@ module retry_buffer
     localparam int DEPTH           = 1 << BRAM_ADDR_WIDTH,
     localparam int LFSR_WIDTH      = LCRC_W
 ) (
-    input logic clk,
-    input logic reset,
+    input  logic       clk,
+    input  logic       reset,
 
-    input logic       tlp_valid,
-    input logic       tlp_first,
-    input logic       tlp_last,
-    input logic       tlp_last_half,  // only for DATA_BYTES=8
-    input pipe_data_t tlp_in_data,
+    input  logic       tlp_valid,
+    input  logic       tlp_first,
+    input  logic       tlp_last,
+    input  logic       tlp_last_half,    // only for DATA_BYTES=8
+    input  pipe_data_t tlp_in_data,
 
-    input seq_num_t current_seq_num,  // Sequence number of the TLP being sent
+    input  seq_num_t   current_seq_num,  // Sequence number of the TLP being sent
 
-    output logic empty,
+    output logic       empty,
 
-    input logic release_flag,
-    input logic retransmit_flag,
+    input  logic       release_flag,
+    input  logic       retransmit_flag,
 
-    input  logic      tlp_sending,
-    output logic      tlp_scheduled,
-    output pipe_sym_t tlp_out
+    input  logic       tlp_sending,
+    output logic       tlp_scheduled,
+    output pipe_sym_t  tlp_out
 );
 
   typedef logic [BRAM_ADDR_WIDTH-1:0] bram_addr_t;
@@ -78,9 +78,9 @@ module retry_buffer
   bram_addr_t read_cnt;
 
 
-  logic       last_half;
+  logic  last_half;
   assign last_half = (DATA_BYTES == 8) & tlp_last & tlp_last_half;
-  logic stored_last_half;
+  logic  stored_last_half;
 
   typedef enum logic [2:0] {
     IDLE        = 3'd0,
@@ -166,25 +166,25 @@ module retry_buffer
   logic [LFSR_WIDTH-1:0] crc_seq_1;
   logic                  crc_en;
   // enabled when sequence number and TLP available
-  assign crc_en = tlp_valid & ((state == IDLE & tlp_first) | state == STORE_TLP);
+  assign                 crc_en = tlp_valid & ((state == IDLE & tlp_first) | state == STORE_TLP);
 
   logic [LFSR_WIDTH-1:0] crc_state;  // store current CRC state
 
-  logic                  seq_crc_en;  // the sequence number enters the LCRC with the first TLP word
+  logic  seq_crc_en;  // the sequence number enters the LCRC with the first TLP word
   assign seq_crc_en = (state == IDLE & tlp_first) & tlp_valid;
 
   lcrc_byte u_seq_crc_0 (
-      .data_in({stp_prefix.rsvd, stp_prefix.seq_hi}),
-      .crc_en (seq_crc_en),
-      .crc_in (crc_state),
-      .crc_out(crc_seq_0)
+      .data_in ({stp_prefix.rsvd, stp_prefix.seq_hi}),
+      .crc_en  (seq_crc_en),
+      .crc_in  (crc_state),
+      .crc_out (crc_seq_0)
   );
 
   lcrc_byte u_seq_crc_1 (
-      .data_in(stp_prefix.seq_lo),
-      .crc_en (seq_crc_en),
-      .crc_in (crc_seq_0),
-      .crc_out(crc_seq_1)
+      .data_in (stp_prefix.seq_lo),
+      .crc_en  (seq_crc_en),
+      .crc_in  (crc_seq_0),
+      .crc_out (crc_seq_1)
   );
 
   logic [LFSR_WIDTH-1:0] crc_tlp_in;
@@ -196,20 +196,20 @@ module retry_buffer
   assign lfsr_in = {lfsr_out[(DATA_BYTES-1)*LFSR_WIDTH-1:0], crc_tlp_in};
 
   logic [LFSR_WIDTH-1:0] crc_next;
-  assign crc_next = lfsr_out[DATA_BYTES*LFSR_WIDTH-1-:LFSR_WIDTH];
+  assign                 crc_next = lfsr_out[DATA_BYTES*LFSR_WIDTH-1-:LFSR_WIDTH];
 
   genvar i;
   generate
     for (i = 0; i < DATA_BYTES; i = i + 1) begin : g_crc_bytes
       // the half-word end of a TLP: the upper DW is no part of the CRC
-      logic byte_en;
+      logic  byte_en;
       assign byte_en = crc_en & (i < DATA_BYTES / 2 | !last_half);
 
       lcrc_byte u_crc_byte (
-          .data_in(tlp_in_data[i*8+:8]),
-          .crc_en (byte_en),
-          .crc_in (lfsr_in[i*LFSR_WIDTH+:LFSR_WIDTH]),
-          .crc_out(lfsr_out[i*LFSR_WIDTH+:LFSR_WIDTH])
+          .data_in (tlp_in_data[i*8+:8]),
+          .crc_en  (byte_en),
+          .crc_in  (lfsr_in[i*LFSR_WIDTH+:LFSR_WIDTH]),
+          .crc_out (lfsr_out[i*LFSR_WIDTH+:LFSR_WIDTH])
       );
     end
   endgenerate
@@ -233,9 +233,9 @@ module retry_buffer
   // last words (the rest of the TLP, the LCRC, END) go in after the last TLP
   // word: tail_word0 in PRE_WRITE at write_ptr - 1, tail_word1 (32-bit only)
   // one clock later at write_ptr. Nothing reads them before.
-  logic tlp_beat;
-  assign tlp_beat = tlp_valid & ((state == IDLE & tlp_first) | state == STORE_TLP);
-  logic       [23:0] carry;
+  logic        tlp_beat;
+  assign       tlp_beat = tlp_valid & ((state == IDLE & tlp_first) | state == STORE_TLP);
+  logic [23:0] carry;
   pipe_data_t        tail_word0;
   logic              tail_we0;
 
@@ -249,7 +249,7 @@ module retry_buffer
   end
 
   logic [31:0] lcrc_on_wire;  // byte 0 in [7:0]
-  assign lcrc_on_wire = lcrc_wire(crc_computed_next);
+  assign       lcrc_on_wire = lcrc_wire(crc_computed_next);
 
   generate
     if (DATA_WIDTH == 64) begin : g_64

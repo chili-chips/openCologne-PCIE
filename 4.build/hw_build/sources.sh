@@ -35,16 +35,16 @@ design_rtl() {
   echo "$r"/5.tlp/tlp_rx_handler.sv "$r"/5.tlp/tlp_queue.sv "$r"/5.tlp/tlp_order.sv \
        "$r"/5.tlp/tlp_rx_dispatch.sv "$r"/5.tlp/config_space.sv "$r"/5.tlp/cpl_gen.sv \
        "$r"/5.tlp/fc_credit.sv "$r"/5.tlp/tlp_tx_arbiter.sv
-  echo "$r"/6.trn_bridge/trn_bridge.sv "$r"/6.trn_bridge/trn_rx.sv "$r"/6.trn_bridge/trn_tx.sv "$r"/6.trn_bridge/trn_tx_throttle.sv
-  echo "$r"/7.soc/riscv_pcie_soc.sv "$r"/7.soc/soc_csr.sv "$g"/csr.sv
+  echo "$r"/6.trn_bridge/trn_top.sv "$r"/6.trn_bridge/trn_rx.sv "$r"/6.trn_bridge/trn_tx.sv "$r"/6.trn_bridge/trn_tx_throttle.sv
+  echo "$r"/7.soc/soc_top.sv "$r"/7.soc/soc_csr.sv "$g"/csr.sv
   echo "$e"/edubos5.sv "$e"/edubos5_alu.sv "$e"/edubos5_rf.sv
   ls "$p"/*.sv | grep -v -E '_(if|pkg)\.sv'
   ls "$m"/*.sv | grep -v -E '_(if|pkg)\.sv'
   ls "$d"/*.sv | grep -v -E '_(if|pkg)\.sv'
   if [ "${3:-}" = sim ]; then
-    echo "$r"/1.phy/2.serdes-model/ccfpga_serdes_pkg.sv "$r"/1.phy/2.serdes-model/ccfpga_serdes.BFM.sv
+    echo "$r"/1.phy/2.opensource-serdes-model/ccfpga_serdes_pkg.sv "$r"/1.phy/2.opensource-serdes-model/ccfpga_serdes.BFM.sv
   else
-    echo "$r"/1.phy/2.serdes-model/ccfpga_serdes.SYNTH.sv
+    echo "$r"/1.phy/2.opensource-serdes-model/ccfpga_serdes.SYNTH.sv
   fi
 }
 

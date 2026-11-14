@@ -25,7 +25,7 @@ verilator --binary --timing --trace-fst -Wno-fatal -Wno-lint -Wno-style --timesc
   "$R/2.pipe/pipe_pkg.sv" "$R/4.dll/dll_pkg.sv" "$R/5.tlp/trn_pkg.sv" "$R/5.tlp/tl_pkg.sv" "$R/6.trn_bridge/axis_pkg.sv" "$G/csr_pkg.sv" "$E/edubos5_pkg.sv" \
   "$R/6.trn_bridge/axis_if.sv" "$R/5.tlp/cfg_if.sv" "$R/7.soc/mem_if.sv" "$R/7.soc/rvfi_if.sv" \
   "$E/edubos5_rf.sv" "$E/edubos5_alu.sv" "$E/edubos5.sv" "$G/csr.sv" \
-  "$R/7.soc/soc_csr.sv" "$R/7.soc/riscv_pcie_soc.sv" "$E/wavecrux/soc_cpu_view.sv" \
+  "$R/7.soc/soc_csr.sv" "$R/7.soc/soc_top.sv" "$E/wavecrux/soc_cpu_view.sv" \
   "$HERE/tb_soc.sv" > "$B/build.log" 2>&1 || { tail -20 "$B/build.log"; exit 1; }
 ARGS=()
 if [ "${1:-}" = tx ]; then

@@ -41,37 +41,37 @@ module virtual_channel_rx
   import pipe_pkg::*;
   import dll_pkg::*;
 (
-    input logic clk,
-    input logic reset,
-    input logic link_active,
-    input logic link_inactive,
+    input  logic              clk,
+    input  logic              reset,
+    input  logic              link_active,
+    input  logic              link_inactive,
 
-    input dllp_wire_t dllp_data,
-    input logic       sdp_detected,
+    input  dllp_wire_t        dllp_data,
+    input  logic              sdp_detected,
 
-    input pipe_data_t        tlp_data,
-    input logic              stp_detected,
-    input logic              end_detected,
-    input tlp_seq_t          sequence_number,
-    input logic       [31:0] lcrc,
-    input logic              tlp_valid,
-    input logic              tlp_half,
+    input  pipe_data_t        tlp_data,
+    input  logic              stp_detected,
+    input  logic              end_detected,
+    input  tlp_seq_t          sequence_number,
+    input  logic       [31:0] lcrc,
+    input  logic              tlp_valid,
+    input  logic              tlp_half,
 
-    output dllp_sub_t  update_type,
-    output dllp_type_e packet_type,
-    output fc_hdr_t    hdrfc,
-    output fc_data_t   datafc,
-    output logic       crc_valid,
+    output dllp_sub_t         update_type,
+    output dllp_type_e        packet_type,
+    output fc_hdr_t           hdrfc,
+    output fc_data_t          datafc,
+    output logic              crc_valid,
 
-    output pipe_data_t rx_tlp_data,
-    output logic       rx_tlp_valid,
-    output logic       rx_tlp_first,
-    output logic       rx_tlp_last,
+    output pipe_data_t        rx_tlp_data,
+    output logic              rx_tlp_valid,
+    output logic              rx_tlp_first,
+    output logic              rx_tlp_last,
 
-    output logic     nak_trigger,
-    output seq_num_t nak_seq_num,
-    output logic     ack_trigger,
-    output seq_num_t ack_seq_num
+    output logic              nak_trigger,
+    output seq_num_t          nak_seq_num,
+    output logic              ack_trigger,
+    output seq_num_t          ack_seq_num
 );
 
   pipe_data_t        tlp_data_w;
@@ -104,10 +104,10 @@ module virtual_channel_rx
   end
 
   crc_gen u_crc (
-      .crc_en (sdp_detected),
-      .data_in({dllp_data.body, dllp_data.dtype}),
+      .crc_en  (sdp_detected),
+      .data_in ({dllp_data.body, dllp_data.dtype}),
 
-      .calc_crc(calc_crc)
+      .calc_crc (calc_crc)
   );
 
   assign dllp_valid = calc_crc == dllp_data.crc;
@@ -150,32 +150,32 @@ module virtual_channel_rx
   end
 
   tlp_rx_buffer #(
-      .BRAM_ADDR_WIDTH(9)
+      .BRAM_ADDR_WIDTH (9)
   ) u_tlp_rx_buffer (
-      .clk        (clk),
-      .reset      (reset),
-      .link_active(link_active),
+      .clk         (clk),
+      .reset       (reset),
+      .link_active (link_active),
 
-      .stp_detected   (stp_detected),
-      .end_detected   (end_detected),
-      .data_tl_in     (tlp_data),
-      .sequence_number(sequence_number),
-      .lcrc           (lcrc),
-      .tlp_valid      (tlp_valid),
-      .tlp_half       (tlp_half),
+      .stp_detected    (stp_detected),
+      .end_detected    (end_detected),
+      .data_tl_in      (tlp_data),
+      .sequence_number (sequence_number),
+      .lcrc            (lcrc),
+      .tlp_valid       (tlp_valid),
+      .tlp_half        (tlp_half),
 
-      .next_rcv_seq(next_rcv_seq),
+      .next_rcv_seq (next_rcv_seq),
 
-      .nak_scheduled   (nak_scheduled),
-      .nak_seq_num     (nak_seq_number),
-      .ack_scheduled   (ack_scheduled),
-      .ack_seq_num     (ack_seq_number),
-      .new_tlp_accepted(new_tlp_accepted),
+      .nak_scheduled    (nak_scheduled),
+      .nak_seq_num      (nak_seq_number),
+      .ack_scheduled    (ack_scheduled),
+      .ack_seq_num      (ack_seq_number),
+      .new_tlp_accepted (new_tlp_accepted),
 
-      .rx_data_tl  (tlp_data_w),
-      .rx_tlp_valid(tlp_valid_w),
-      .rx_tlp_first(tlp_first_w),
-      .rx_tlp_last (tlp_last_w)
+      .rx_data_tl   (tlp_data_w),
+      .rx_tlp_valid (tlp_valid_w),
+      .rx_tlp_first (tlp_first_w),
+      .rx_tlp_last  (tlp_last_w)
   );
 
   always_ff @(posedge clk or posedge reset) begin

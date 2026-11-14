@@ -65,37 +65,37 @@ module trn_compat
   import trn_pkg::*;
   import tl_pkg::*;
 (
-    trn_tx_if.src trn_tx,  // to the TL
-    trn_rx_if.dst trn_rx,  // from the TL
+           trn_tx_if.src       trn_tx,         // to the TL
+           trn_rx_if.dst       trn_rx,         // from the TL
 
-    input  trn_dat_t       trn_td,
-    input  logic           trn_tsof,
-    input  logic           trn_teof,
-    input  logic           trn_tsrc_rdy,
-    output logic           trn_tdst_rdy,
-    output logic     [5:0] trn_tbuf_av,
-    input  logic           trn_trem,      // not read
-    input  logic           trn_tsrc_dsc,  // not supported
-    input  logic           trn_terrfwd,   // not supported
-    input  logic           trn_tstr,      // not supported
-    input  logic           trn_tecrc_gen, // not supported
+    input  trn_dat_t           trn_td,
+    input  logic               trn_tsof,
+    input  logic               trn_teof,
+    input  logic               trn_tsrc_rdy,
+    output logic               trn_tdst_rdy,
+    output logic         [5:0] trn_tbuf_av,
+    input  logic               trn_trem,       // not read
+    input  logic               trn_tsrc_dsc,   // not supported
+    input  logic               trn_terrfwd,    // not supported
+    input  logic               trn_tstr,       // not supported
+    input  logic               trn_tecrc_gen,  // not supported
 
-    output trn_dat_t trn_rd,
-    output logic     trn_rrem,       // 0: the last beat holds one DW
-    output logic     trn_rsof,
-    output logic     trn_reof,
-    output logic     trn_rsrc_rdy,
-    input  logic     trn_rdst_rdy,
-    output logic     trn_rsrc_dsc,   // 0
-    output logic     trn_rerrfwd,    // 0
-    output logic     trn_recrc_err,  // 0
-    output bar_hit_t trn_rbar_hit,
+    output trn_dat_t           trn_rd,
+    output logic               trn_rrem,       // 0: the last beat holds one DW
+    output logic               trn_rsof,
+    output logic               trn_reof,
+    output logic               trn_rsrc_rdy,
+    input  logic               trn_rdst_rdy,
+    output logic               trn_rsrc_dsc,   // 0
+    output logic               trn_rerrfwd,    // 0
+    output logic               trn_recrc_err,  // 0
+    output bar_hit_t           trn_rbar_hit,
 
-    output logic trn_lnk_up,
-    input  logic dll_up,      // pcie_core: the data link is up
+    output logic               trn_lnk_up,
+    input  logic               dll_up,         // pcie_core: the data link is up
 
-    input logic clk,
-    input logic rst_n  // core_rst_n: follows dll_up
+    input  logic               clk,
+    input  logic               rst_n           // core_rst_n: follows dll_up
 );
 
   logic      rx_mid;  // a TLP on TRN RX: first beat taken, eof not yet

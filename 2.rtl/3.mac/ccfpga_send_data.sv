@@ -12,10 +12,10 @@
 module ccfpga_send_data
   import pipe_pkg::*;
 (
-    input logic      i_clk,
-    input logic      i_reset,
-    input logic      i_l0_enabled,
-    input pipe_sym_t i_tx_sym_dll,  // from the DLL
+    input  logic      i_clk,
+    input  logic      i_reset,
+    input  logic      i_l0_enabled,
+    input  pipe_sym_t i_tx_sym_dll,   // from the DLL
 
     output pipe_sym_t o_tx_sym,
     output logic      o_sending_data

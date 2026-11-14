@@ -1,10 +1,10 @@
 # SOC: eduBOS5 + PCIE CSR window
 
-`riscv_pcie_soc` is the user side of our EP: a small RISC-V SOC that talks to the PCIE core over the same AXI-Stream / TRN interface an AMD Artix-7 EP gives its user logic. Twin of the openPCIE SOC; only the CSR window and firmware change, as the roles swap: the RC sends requests and waits for Completions, the EP waits for requests and sends Completions.
+`soc_top` is the user side of our EP: a small RISC-V SOC that talks to the PCIE core over the same AXI-Stream / TRN interface an AMD Artix-7 EP gives its user logic. Twin of the openPCIE SOC; only the CSR window and firmware change, as the roles swap: the RC sends requests and waits for Completions, the EP waits for requests and sends Completions.
 
 | File | What it is |
 |---|---|
-| [`riscv_pcie_soc.sv`](riscv_pcie_soc.sv) | CPU, 8 KB RAM, address decode, Tx FSM and Rx capture around the CSR block |
+| [`soc_top.sv`](soc_top.sv) | CPU, 8 KB RAM, address decode, Tx FSM and Rx capture around the CSR block |
 | [`soc_csr.sv`](soc_csr.sv) | bridges the CPU bus to the PeakRDL-generated register block |
 | [`mem_if.sv`](mem_if.sv) | the CPU memory bus: valid / addr / wdata / wstrb, ready / rdata |
 | [`4.build/csr_build/csr.rdl`](../../4.build/csr_build/csr.rdl) | the register map, the single source of the CSR RTL, C headers and docs |
@@ -73,7 +73,7 @@ The SOC adds none: it is the user side, which the spec does not cover. The depar
 
 `bash sim/run-soc.sh tx` tests the Tx path instead: the [`soc_tx`](../../3.sw/tests/soc_tx/main.c) firmware sends 3-DW and 4-DW MWr and MRd, and `tb_soc` checks every `s_axis_tx` beat (data, `tkeep`, `tlast`).
 
-- `riscv_pcie_soc` carries the CPU's retired instructions on [`rvfi_if`](rvfi_if.sv) (`// KEEPME`): the standard [RVFI](https://github.com/YosysHQ/riscv-formal) signals, one `rvfi_valid` per instruction.
+- `soc_top` carries the CPU's retired instructions on [`rvfi_if`](rvfi_if.sv) (`// KEEPME`): the standard [RVFI](https://github.com/YosysHQ/riscv-formal) signals, one `rvfi_valid` per instruction.
 - No RTL reads them; they are for WaveCrux and formal checks.
 - eduBOS5 drives them when built with `RISCV_FORMAL` (simulation only); under VProc they read 0, as a native program has no instructions.
 

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // Verilator source list of the EP's WaveCrux views, for make EP=rtl DUMP=1:
-// simulation only, bound into pcie_core and riscv_pcie_soc; nothing in the
+// simulation only, bound into pcie_core and soc_top; nothing in the
 // design reads them (models/ep_wavecrux_view.sv).
 
 models/tlp_dw_if.sv

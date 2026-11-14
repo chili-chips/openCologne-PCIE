@@ -41,24 +41,24 @@ module dll_fsm
   import pipe_pkg::*;
   import dll_pkg::*;
 (
-    input logic reset,              // Asynchronous Reset
-    input logic i_clk,              // Parallel Interface Clock
-    input logic i_link_up,          // Link Up Status
-    input logic i_initfc1_rx_done,  // Receive InitFC1 for all 3 types
-    input logic i_initfc1_tx_done,  // Transmit InitFC1 for all 3 types
-    input logic i_initfc2_rx_done,  // Receive InitFC2 for all 3 types
-    input logic i_initfc2_tx_done,  // Transmit InitFC2 for all 3 types
+    input  logic      reset,              // Asynchronous Reset
+    input  logic      i_clk,              // Parallel Interface Clock
+    input  logic      i_link_up,          // Link Up Status
+    input  logic      i_initfc1_rx_done,  // Receive InitFC1 for all 3 types
+    input  logic      i_initfc1_tx_done,  // Transmit InitFC1 for all 3 types
+    input  logic      i_initfc2_rx_done,  // Receive InitFC2 for all 3 types
+    input  logic      i_initfc2_tx_done,  // Transmit InitFC2 for all 3 types
 
-    output logic      o_initfc1_en,  // Enable InitFC1 Transmission
-    output logic      o_initfc2_en,  // Enable InitFC2 Transmission
-    output dl_state_e o_fsm_state    // Current FSM State
+    output logic      o_initfc1_en,       // Enable InitFC1 Transmission
+    output logic      o_initfc2_en,       // Enable InitFC2 Transmission
+    output dl_state_e o_fsm_state         // Current FSM State
 );
 
-  logic s_initfc1_sent;
-  logic s_initfc2_sent;
-  logic initfc1_tx_done;
+  logic  s_initfc1_sent;
+  logic  s_initfc2_sent;
+  logic  initfc1_tx_done;
   assign initfc1_tx_done = s_initfc1_sent | i_initfc1_tx_done;
-  logic initfc2_tx_done;
+  logic  initfc2_tx_done;
   assign initfc2_tx_done = s_initfc2_sent | i_initfc2_tx_done;
 
   dl_state_e s_state, s_next_state;

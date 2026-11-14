@@ -14,7 +14,7 @@
 #
 # All three outputs land in this folder, or in OUT=<dir>. The hardware build
 # consumes firmware.hex --
-# riscv_pcie_soc.sv reads it with $readmemh("firmware.hex", ram), one 32-bit
+# soc_top.sv reads it with $readmemh("firmware.hex", ram), one 32-bit
 # word per line, hex, no prefix.
 #
 # The EP needs no start-up delay and so no SIM=1 build: it waits for the

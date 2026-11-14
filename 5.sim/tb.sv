@@ -458,7 +458,7 @@ endtask
 // host's ports (u_rc), the decoder page. With EP=rtl, the EP's decoder
 // pages instead of the EP model's: its layer boundaries (pcie_core.wavecrux,
 // models/ep_wavecrux_view.sv) and the SOC CPU's retired instructions
-// (riscv_pcie_soc.cpu_view), in a file of their own
+// (soc_top.cpu_view), in a file of their own
 `ifdef DUMP
 initial begin
 `ifdef EP_RTL

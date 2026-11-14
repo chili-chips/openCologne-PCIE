@@ -46,8 +46,8 @@ module crc_gen
     localparam int DLLP_WIDTH = 32,         // the 4 bytes a DLLP CRC covers
     localparam int LFSR_WIDTH = DLLP_CRC_W
 ) (
-    input logic                      crc_en,
-    input logic [DLLP_WIDTH - 1 : 0] data_in,
+    input  logic                      crc_en,
+    input  logic [DLLP_WIDTH - 1 : 0] data_in,
 
     output logic [LFSR_WIDTH - 1 : 0] calc_crc
 );
@@ -69,10 +69,10 @@ module crc_gen
   generate
     for (i = 0; i < DLLP_WIDTH / BYTE; i = i + 1) begin : g_bytes
       crc_byte u_crc_byte (
-          .data_in(data_in[i*8+:8]),
-          .crc_en (crc_en),
-          .crc_in (lfsr_vector[i*LFSR_WIDTH+:LFSR_WIDTH]),
-          .crc_out(lfsr_out[i*LFSR_WIDTH+:LFSR_WIDTH])
+          .data_in (data_in[i*8+:8]),
+          .crc_en  (crc_en),
+          .crc_in  (lfsr_vector[i*LFSR_WIDTH+:LFSR_WIDTH]),
+          .crc_out (lfsr_out[i*LFSR_WIDTH+:LFSR_WIDTH])
       );
     end
   endgenerate

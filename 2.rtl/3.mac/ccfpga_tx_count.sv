@@ -17,21 +17,21 @@ module ccfpga_tx_count
     parameter int COUNT_WIDTH = 5,
     parameter int IDLE_WIDTH  = 8
 ) (
-    input logic i_clk,
-    input logic i_tx_os_flag_rst,
-    input logic i_tx_idle_flag_rst,
-    input logic i_tx_poll_flag_rst,
+    input  logic                       i_clk,
+    input  logic                       i_tx_os_flag_rst,
+    input  logic                       i_tx_idle_flag_rst,
+    input  logic                       i_tx_poll_flag_rst,
 
-    input logic                       i_os_sent,
-    input logic                       i_os_valid,
-    input logic                       i_os_rec_cfg_detected,
-    input logic                       i_idle_sent,
-    input logic                       i_idle_detected,
-    input logic [COUNT_WIDTH - 1 : 0] i_max_count,
+    input  logic                       i_os_sent,
+    input  logic                       i_os_valid,
+    input  logic                       i_os_rec_cfg_detected,
+    input  logic                       i_idle_sent,
+    input  logic                       i_idle_detected,
+    input  logic [COUNT_WIDTH - 1 : 0] i_max_count,
 
-    output logic o_tx_os_flag,
-    output logic o_tx_idle_flag,
-    output logic o_tx_poll_flag
+    output logic                       o_tx_os_flag,
+    output logic                       o_tx_idle_flag,
+    output logic                       o_tx_poll_flag
 );
 
   localparam logic [COUNT_WIDTH-1:0] IDLE_MAX_COUNT = COUNT_WIDTH'(16);

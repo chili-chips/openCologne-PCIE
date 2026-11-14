@@ -53,8 +53,8 @@
 //==========================================================================
 
 module top (
-    input logic clk_brd,  // board oscillator
-    input logic perst_n,  // PERST# from the connector, active low
+    input  logic clk_brd,  // board oscillator
+    input  logic perst_n,  // PERST# from the connector, active low
 
     output logic link_up,  // for an LED: the data link is up
     output logic fw_pass   // for an LED: the firmware has reported PASS
@@ -74,24 +74,24 @@ module top (
   pipe_if pipe_mac ();
 
   phy_top u_phy_top (
-      .clk_ref   (refclk),
-      .rst_pipe_n(rst_pipe_n),
-      .ser_rxp   (ser_rxp),
-      .ser_rxn   (ser_rxn),
-      .ser_txp   (ser_txp),
-      .ser_txn   (ser_txn),
-      .pipe      (pipe_mac),
-      .phy_rdy   (phy_rdy)
+      .clk_ref    (refclk),
+      .rst_pipe_n (rst_pipe_n),
+      .ser_rxp    (ser_rxp),
+      .ser_rxn    (ser_rxn),
+      .ser_txp    (ser_txp),
+      .ser_txn    (ser_txn),
+      .pipe       (pipe_mac),
+      .phy_rdy    (phy_rdy)
   );
 
   pcie_top u_pcie_top (
-      .clk_brd   (clk_brd),
-      .perst_n   (perst_n),
-      .pipe_mac  (pipe_mac),
-      .phy_rdy   (phy_rdy),
-      .rst_pipe_n(rst_pipe_n),
-      .dll_up    (link_up),
-      .fw_pass   (fw_pass)
+      .clk_brd    (clk_brd),
+      .perst_n    (perst_n),
+      .pipe_mac   (pipe_mac),
+      .phy_rdy    (phy_rdy),
+      .rst_pipe_n (rst_pipe_n),
+      .dll_up     (link_up),
+      .fw_pass    (fw_pass)
   );
 
 endmodule

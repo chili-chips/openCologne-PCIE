@@ -1,6 +1,6 @@
 # PHY block-level simulation
 
-`tb_phy.sv` tests the PHY: the PIPE layer of [gatemate-pipe](https://github.com/colognechip/gatemate-pipe) on a GateMate SerDes model, or the opensource SerDes BFM ([2.serdes-model](../2.serdes-model/)) on its own. `run-phy.sh` compiles one of its tests with Icarus Verilog and runs it. None of them needs the proprietary SerDes sources. The layers above get their own block-level flows (the DLL over this PHY: [4.dll/sim](../../4.dll/sim/)); the top level is [5.sim](../../../5.sim/).
+`tb_phy.sv` tests the PHY: the PIPE layer of [gatemate-pipe](https://github.com/colognechip/gatemate-pipe) on a GateMate SerDes model, or the opensource SerDes BFM ([2.opensource-serdes-model](../2.opensource-serdes-model/)) on its own. `run-phy.sh` compiles one of its tests with Icarus Verilog and runs it. None of them needs the proprietary SerDes sources. The layers above get their own block-level flows (the DLL over this PHY: [4.dll/sim](../../4.dll/sim/)); the top level is [5.sim](../../../5.sim/).
 
 | test | what it exercises | run time |
 |---|---|---|
@@ -27,7 +27,7 @@ One file, one `module tb_phy` per test, chosen at compile time:
 
 ## The former 16-bit test (`pipe16`)
 
-The 16-bit PIPE gets its PCLK from a `CC_PLL` at 4x the SerDes core clock, which feeds a 4-to-1 multiplexer onto the 64-bit SerDes word. In gatemate-pipe (`ccfpga_pipe_top.sv`, 16-bit branch) that `CC_PLL` is commented out and PCLK is the SerDes PLL clock itself, 62.5 MHz instead of 125 MHz, so 16-bit words are lost. The fault is in the PIPE RTL ([#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18)); the test passes once the PLL is back.
+The 16-bit PIPE gets its PCLK from a `CC_PLL` at 4x the SerDes core clock, which feeds a 4-to-1 multiplexer onto the 64-bit SerDes word. In gatemate-pipe (`ccfpga_pipe_top.sv`, 16-bit branch) that `CC_PLL` is commented out and PCLK is the SerDes PLL clock itself, 62.5 MHz instead of 125 MHz, so 16-bit words are lost. The fault is in the PIPE RTL ([BA#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18)); the test passes once the PLL is back.
 
 ## The vendor model
 

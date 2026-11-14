@@ -37,19 +37,19 @@
 //              https://opensource.org/license/bsd-3-clause
 //--------------------------------------------------------------------------
 
-module riscv_pcie_soc
+module soc_top
   import tl_pkg::*;
   import axis_pkg::*;
 (
-    input logic clk,
-    input logic resetn,
+    input  logic          clk,
+    input  logic          resetn,
 
-    axis_if.master s_axis_tx,  // TLPs to the PCIE stack
-    axis_if.slave  m_axis_rx,  // TLPs from the PCIE stack
+           axis_if.master s_axis_tx,  // TLPs to the PCIE stack
+           axis_if.slave  m_axis_rx,  // TLPs from the PCIE stack
 
-    cfg_if.soc cfg,  // status sideband from the PCIE core
+           cfg_if.soc     cfg,        // status sideband from the PCIE core
 
-    output logic fw_pass  // the firmware has reported PASS, for an LED
+    output logic          fw_pass     // the firmware has reported PASS, for an LED
 );
 
   mem_if mem ();  // CPU memory bus
@@ -105,16 +105,16 @@ module riscv_pcie_soc
 `endif
 `ifdef SOC_CPU_VPROC
   soc_cpu_vproc #(
-      .NODE(4'd0)
+      .NODE (4'd0)
   ) cpu (
-      .clk      (clk),
-      .resetn   (resetn),
-      .mem_valid(mem.valid),
-      .mem_ready(mem.ready),
-      .mem_addr (mem.addr),
-      .mem_wdata(mem.wdata),
-      .mem_wstrb(mem.wstrb),
-      .mem_rdata(mem.rdata)
+      .clk       (clk),
+      .resetn    (resetn),
+      .mem_valid (mem.valid),
+      .mem_ready (mem.ready),
+      .mem_addr  (mem.addr),
+      .mem_wdata (mem.wdata),
+      .mem_wstrb (mem.wstrb),
+      .mem_rdata (mem.rdata)
   );
 
   // KEEPME: no retired-instruction stream here, rvfi reads 0
@@ -177,32 +177,32 @@ module riscv_pcie_soc
 `endif
 
   edubos5 #(
-      .EN_WAIT4REGS(EDUBOS5_WAIT4REGS)
+      .EN_WAIT4REGS (EDUBOS5_WAIT4REGS)
   ) cpu (
       .clk           (clk),
       .arst_n        (resetn),
 `ifdef RISCV_FORMAL
-      .rvfi_valid    (rvfi.rvfi_valid),      // KEEPME
-      .rvfi_order    (rvfi.rvfi_order),      // KEEPME
-      .rvfi_insn     (rvfi.rvfi_insn),       // KEEPME
-      .rvfi_trap     (rvfi.rvfi_trap),       // KEEPME
-      .rvfi_halt     (rvfi.rvfi_halt),       // KEEPME
-      .rvfi_intr     (rvfi.rvfi_intr),       // KEEPME
-      .rvfi_mode     (rvfi.rvfi_mode),       // KEEPME
-      .rvfi_ixl      (rvfi.rvfi_ixl),        // KEEPME
-      .rvfi_rs1_addr (rvfi.rvfi_rs1_addr),   // KEEPME
-      .rvfi_rs2_addr (rvfi.rvfi_rs2_addr),   // KEEPME
-      .rvfi_rs1_rdata(rvfi.rvfi_rs1_rdata),  // KEEPME
-      .rvfi_rs2_rdata(rvfi.rvfi_rs2_rdata),  // KEEPME
-      .rvfi_rd_addr  (rvfi.rvfi_rd_addr),    // KEEPME
-      .rvfi_rd_wdata (rvfi.rvfi_rd_wdata),   // KEEPME
-      .rvfi_pc_rdata (rvfi.rvfi_pc_rdata),   // KEEPME
-      .rvfi_pc_wdata (rvfi.rvfi_pc_wdata),   // KEEPME
-      .rvfi_mem_addr (rvfi.rvfi_mem_addr),   // KEEPME
-      .rvfi_mem_rmask(rvfi.rvfi_mem_rmask),  // KEEPME
-      .rvfi_mem_wmask(rvfi.rvfi_mem_wmask),  // KEEPME
-      .rvfi_mem_rdata(rvfi.rvfi_mem_rdata),  // KEEPME
-      .rvfi_mem_wdata(rvfi.rvfi_mem_wdata),  // KEEPME
+      .rvfi_valid     (rvfi.rvfi_valid),      // KEEPME
+      .rvfi_order     (rvfi.rvfi_order),      // KEEPME
+      .rvfi_insn      (rvfi.rvfi_insn),       // KEEPME
+      .rvfi_trap      (rvfi.rvfi_trap),       // KEEPME
+      .rvfi_halt      (rvfi.rvfi_halt),       // KEEPME
+      .rvfi_intr      (rvfi.rvfi_intr),       // KEEPME
+      .rvfi_mode      (rvfi.rvfi_mode),       // KEEPME
+      .rvfi_ixl       (rvfi.rvfi_ixl),        // KEEPME
+      .rvfi_rs1_addr  (rvfi.rvfi_rs1_addr),   // KEEPME
+      .rvfi_rs2_addr  (rvfi.rvfi_rs2_addr),   // KEEPME
+      .rvfi_rs1_rdata (rvfi.rvfi_rs1_rdata),  // KEEPME
+      .rvfi_rs2_rdata (rvfi.rvfi_rs2_rdata),  // KEEPME
+      .rvfi_rd_addr   (rvfi.rvfi_rd_addr),    // KEEPME
+      .rvfi_rd_wdata  (rvfi.rvfi_rd_wdata),   // KEEPME
+      .rvfi_pc_rdata  (rvfi.rvfi_pc_rdata),   // KEEPME
+      .rvfi_pc_wdata  (rvfi.rvfi_pc_wdata),   // KEEPME
+      .rvfi_mem_addr  (rvfi.rvfi_mem_addr),   // KEEPME
+      .rvfi_mem_rmask (rvfi.rvfi_mem_rmask),  // KEEPME
+      .rvfi_mem_wmask (rvfi.rvfi_mem_wmask),  // KEEPME
+      .rvfi_mem_rdata (rvfi.rvfi_mem_rdata),  // KEEPME
+      .rvfi_mem_wdata (rvfi.rvfi_mem_wdata),  // KEEPME
 `endif
       .imem_addr     (imem_addr),
       .imem_rdat     (imem_rdat),
@@ -324,18 +324,18 @@ module riscv_pcie_soc
   //=========================================================================
 
   soc_csr #(
-      .RD_FLOP(CSR_RD_FLOP)
+      .RD_FLOP (CSR_RD_FLOP)
   ) u_soc_csr (
-      .clk   (clk),
-      .resetn(resetn),
+      .clk    (clk),
+      .resetn (resetn),
 
-      .sel (addr.bridge),
-      .mem (mem),
-      .rdat(bridge_rdat),
-      .rdy (bridge_rdy),
+      .sel  (addr.bridge),
+      .mem  (mem),
+      .rdat (bridge_rdat),
+      .rdy  (bridge_rdy),
 
-      .csr_in (csr_in),
-      .csr_out(csr_out)
+      .csr_in  (csr_in),
+      .csr_out (csr_out)
   );
 
   // ---- Tx: the CPU-written registers feed the FSM -------------------------

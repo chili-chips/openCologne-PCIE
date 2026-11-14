@@ -49,7 +49,7 @@ ${VERILATOR} --binary --timing -Wno-fatal -Wno-lint -Wno-style --timescale 1ns/1
     "${RTL}/6.trn_bridge/trn_rx.sv" \
     "${RTL}/6.trn_bridge/trn_tx.sv" \
     "${RTL}/6.trn_bridge/trn_tx_throttle.sv" \
-    "${RTL}/6.trn_bridge/trn_bridge.sv" \
+    "${RTL}/6.trn_bridge/trn_top.sv" \
     "${HERE}/tb_tl_top.sv" > verilator.log 2>&1 || { cat verilator.log; exit 1; }
 
 ./obj/tb_tl_top +seed="${SEED}"

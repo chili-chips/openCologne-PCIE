@@ -15,10 +15,10 @@ module ccfpga_mac_top
   import pipe_pkg::*;
   import mac_pkg::*;
 (
-    input logic i_reset_n,  // Asynchronous Reset
+    input  logic       i_reset_n,  // Asynchronous Reset
 
-    pipe_if.mac pipe,  // PIPE, MAC side (Reset# comes from the parent)
-    mac_if.mac  mac    // to and from the DLL, and the link state
+           pipe_if.mac pipe,       // PIPE, MAC side (Reset# comes from the parent)
+           mac_if.mac  mac         // to and from the DLL, and the link state
 );
 
   // The interface ports, mapped onto the internal names
@@ -29,18 +29,18 @@ module ccfpga_mac_top
   localparam int CYCLE_TIME = 4 * DATA_BYTES;  // 4, 8, 16, 32 for DATA_BYTES 1, 2, 4, 8
   // -----------------------------------------------------------------------------------------------
   // Reset
-  logic reset;
-  assign reset = !i_reset_n;
+  logic       reset;
+  assign      reset = !i_reset_n;
   // L0 flags
-  logic l0_enabled;  // L0 state
+  logic       l0_enabled;  // L0 state
   // -----------------------------------------------------------------------------------------------
   // Receiver side signals
-  logic s_rx_flag;  // Receiver flag
-  logic s_rx_flag_rst;  // Receiver flag Reset from FSM
-  logic s_rx_rst;  // Receiver flag Reset
-  logic s_rx_os_flag_rst;  // Receiver OS flag Reset
-  logic s_rx_idle_flag_rst;  // Receiver IDLE flag Reset
-  logic s_rx_idle_flag;  // Max count for received IDLE reached
+  logic       s_rx_flag;  // Receiver flag
+  logic       s_rx_flag_rst;  // Receiver flag Reset from FSM
+  logic       s_rx_rst;  // Receiver flag Reset
+  logic       s_rx_os_flag_rst;  // Receiver OS flag Reset
+  logic       s_rx_idle_flag_rst;  // Receiver IDLE flag Reset
+  logic       s_rx_idle_flag;  // Max count for received IDLE reached
   logic [7:0] link_num;  // Expected link number in Ordered Set
   logic [7:0] lane_num;  // Expected lane number in Ordered Set
   ts_ctrl_t ts_ctrl;  // Expected control
@@ -216,118 +216,118 @@ module ccfpga_mac_top
   // -----------------------------------------------------------------------------------------------
   // ----- LTSSM -----
   ccfpga_LTSSM_fsm u_ltssm_fsm (
-      .i_reset_n         (i_reset_n),           // Asynchronous Reset
-      .i_pclk            (pipe.pclk),           // Parallel Interface Clock
-      .i_rx_status       (pipe.rx_status),      // Receiver Status
-      .i_timeout         (s_timeout),           // Timeout flag
-      .i_rx_flag         (s_rx_flag),           // Rx Flag
-      .i_tx_flag         (s_tx_flag),           // Tx Flag
-      .i_tx_poll_flag    (s_tx_poll_flag),      // Polling Active Tx Flag
-      .i_rx_rec_cfg_flag (s_rx_rec_cfg_flag),   // Recovery Rcvrcfg Rx Flag
-      .i_rx_rec_idle_flag(s_rx_rec_idle_flag),  // Recovery Idle Rx Flag
-      .i_rx_elec_idle    (pipe.rx_elec_idle),   // Electrical Idle at Receiver
-      .i_link_detected   (s_link_detected),     // Link Detected
-      .i_lane_detected   (s_lane_detected),     // Lane Detected
+      .i_reset_n          (i_reset_n),           // Asynchronous Reset
+      .i_pclk             (pipe.pclk),           // Parallel Interface Clock
+      .i_rx_status        (pipe.rx_status),      // Receiver Status
+      .i_timeout          (s_timeout),           // Timeout flag
+      .i_rx_flag          (s_rx_flag),           // Rx Flag
+      .i_tx_flag          (s_tx_flag),           // Tx Flag
+      .i_tx_poll_flag     (s_tx_poll_flag),      // Polling Active Tx Flag
+      .i_rx_rec_cfg_flag  (s_rx_rec_cfg_flag),   // Recovery Rcvrcfg Rx Flag
+      .i_rx_rec_idle_flag (s_rx_rec_idle_flag),  // Recovery Idle Rx Flag
+      .i_rx_elec_idle     (pipe.rx_elec_idle),   // Electrical Idle at Receiver
+      .i_link_detected    (s_link_detected),     // Link Detected
+      .i_lane_detected    (s_lane_detected),     // Lane Detected
 
-      .o_tx_detect_rx        (pipe.tx_detect_rx),       // Receiver Detection (P1)/Loopback (P0)
-      .o_tx_elec_idle        (pipe.tx_elec_idle),       // Electrical Idle
-      .o_tx_compliance       (pipe.tx_compliance),      // Compliance Pattern
-      .o_send_os_trigger     (s_send_os_trigger),       // Trigger the sending of OS
-      .o_send_idle_trigger   (s_send_idle_trigger),     // Trigger the sending of IDLE
-      .o_send_data_trigger   (s_send_data_trigger),     // Trigger the sending of data
-      .o_fsm_state           (s_fsm_state),             // fsm status
-      .o_timeout_clk_rst     (s_timeout_clk_rst),       // Clock Timeout Reset
-      .o_timeout_os_rst      (s_timeout_os_rst),        // OS Timeout Reset
-      .o_rx_flag_rst         (s_rx_flag_rst),           // Rx Flag Reset
-      .o_tx_flag_rst         (s_tx_flag_rst),           // Tx Flag Reset
-      .o_tx_poll_flag_rst    (s_tx_poll_flag_rst),      // Polling Active Tx Reset flag
-      .o_rx_rec_cfg_flag_rst (s_rx_rec_cfg_flag_rst),   // Recovery Rcvrcfg Rx Reset flag
-      .o_rx_rec_idle_flag_rst(s_rx_rec_idle_flag_rst),  // Recovery Idle Rx Reset flag
-      .o_link_detected_rst   (s_link_detected_rst),     // Link Detected Reset
-      .o_lane_detected_rst   (s_lane_detected_rst)      // Lane Detected Reset
+      .o_tx_detect_rx         (pipe.tx_detect_rx),       // Receiver Detection (P1)/Loopback (P0)
+      .o_tx_elec_idle         (pipe.tx_elec_idle),       // Electrical Idle
+      .o_tx_compliance        (pipe.tx_compliance),      // Compliance Pattern
+      .o_send_os_trigger      (s_send_os_trigger),       // Trigger the sending of OS
+      .o_send_idle_trigger    (s_send_idle_trigger),     // Trigger the sending of IDLE
+      .o_send_data_trigger    (s_send_data_trigger),     // Trigger the sending of data
+      .o_fsm_state            (s_fsm_state),             // fsm status
+      .o_timeout_clk_rst      (s_timeout_clk_rst),       // Clock Timeout Reset
+      .o_timeout_os_rst       (s_timeout_os_rst),        // OS Timeout Reset
+      .o_rx_flag_rst          (s_rx_flag_rst),           // Rx Flag Reset
+      .o_tx_flag_rst          (s_tx_flag_rst),           // Tx Flag Reset
+      .o_tx_poll_flag_rst     (s_tx_poll_flag_rst),      // Polling Active Tx Reset flag
+      .o_rx_rec_cfg_flag_rst  (s_rx_rec_cfg_flag_rst),   // Recovery Rcvrcfg Rx Reset flag
+      .o_rx_rec_idle_flag_rst (s_rx_rec_idle_flag_rst),  // Recovery Idle Rx Reset flag
+      .o_link_detected_rst    (s_link_detected_rst),     // Link Detected Reset
+      .o_lane_detected_rst    (s_lane_detected_rst)      // Lane Detected Reset
   );
   // -----------------------------------------------------------------------------------------------
   // ----- Receiver of MAC layer -----
   ccfpga_rx_MAC #(
-      .COUNT_WIDTH(4)
+      .COUNT_WIDTH (4)
   ) u_rx_mac (
-      .i_clk      (pipe.pclk),
-      .i_reset    (reset),
-      .i_fsm_state(s_fsm_state),
+      .i_clk       (pipe.pclk),
+      .i_reset     (reset),
+      .i_fsm_state (s_fsm_state),
 
-      .i_rx_sym(rx_plain),
+      .i_rx_sym (rx_plain),
 
-      .i_rx_os_flag_rst      (s_rx_os_flag_rst),
-      .i_rx_idle_flag_rst    (s_rx_idle_flag_rst),
-      .i_timeout_os_rst      (s_timeout_os_rst),
-      .i_rx_rec_cfg_flag_rst (s_rx_rec_cfg_flag_rst),
-      .i_rx_rec_idle_flag_rst(s_rx_rec_idle_flag_rst),
-      .i_ts1_pattern_en      (ts1_pattern_en),
-      .i_ts2_pattern_en      (ts2_pattern_en),
-      .i_max_count           (rx_max_count),
-      .i_l0_enabled          (l0_enabled),
+      .i_rx_os_flag_rst       (s_rx_os_flag_rst),
+      .i_rx_idle_flag_rst     (s_rx_idle_flag_rst),
+      .i_timeout_os_rst       (s_timeout_os_rst),
+      .i_rx_rec_cfg_flag_rst  (s_rx_rec_cfg_flag_rst),
+      .i_rx_rec_idle_flag_rst (s_rx_rec_idle_flag_rst),
+      .i_ts1_pattern_en       (ts1_pattern_en),
+      .i_ts2_pattern_en       (ts2_pattern_en),
+      .i_max_count            (rx_max_count),
+      .i_l0_enabled           (l0_enabled),
 
-      .o_os_valid           (os_valid),
-      .o_inversion_detected (inversion_detected),
-      .o_os_rec_cfg_detected(os_rec_cfg_detected),
-      .o_idle_detected      (idle_detected),
+      .o_os_valid            (os_valid),
+      .o_inversion_detected  (inversion_detected),
+      .o_os_rec_cfg_detected (os_rec_cfg_detected),
+      .o_idle_detected       (idle_detected),
 
-      .o_rx_os_flag      (s_rx_os_flag),
-      .o_timeout_os      (s_timeout_os),
-      .o_rx_idle_flag    (s_rx_idle_flag),
-      .o_rx_rec_cfg_flag (s_rx_rec_cfg_flag),
-      .o_rx_rec_idle_flag(s_rx_rec_idle_flag),
+      .o_rx_os_flag       (s_rx_os_flag),
+      .o_timeout_os       (s_timeout_os),
+      .o_rx_idle_flag     (s_rx_idle_flag),
+      .o_rx_rec_cfg_flag  (s_rx_rec_cfg_flag),
+      .o_rx_rec_idle_flag (s_rx_rec_idle_flag),
 
-      .o_link_num     (link_num),
-      .o_lane_num     (lane_num),
-      .o_ts_ctrl      (ts_ctrl),
-      .o_link_detected(s_link_detected),
-      .o_lane_detected(s_lane_detected),
+      .o_link_num      (link_num),
+      .o_lane_num      (lane_num),
+      .o_ts_ctrl       (ts_ctrl),
+      .o_link_detected (s_link_detected),
+      .o_lane_detected (s_lane_detected),
 
-      .o_rx_sym_dll(mac.rx)
+      .o_rx_sym_dll (mac.rx)
   );
   // -----------------------------------------------------------------------------------------------
   // ----- Transmitter of MAC layer -----
   ccfpga_tx_MAC u_tx_mac (
-      .i_clk  (pipe.pclk),
-      .i_reset(reset),
+      .i_clk   (pipe.pclk),
+      .i_reset (reset),
 
-      .i_tx_sym_dll(mac.tx),
+      .i_tx_sym_dll (mac.tx),
 
-      .i_tx_os_flag_rst  (s_tx_os_flag_rst),
-      .i_tx_idle_flag_rst(s_tx_idle_flag_rst),
-      .i_tx_poll_flag_rst(s_tx_poll_flag_rst),
+      .i_tx_os_flag_rst   (s_tx_os_flag_rst),
+      .i_tx_idle_flag_rst (s_tx_idle_flag_rst),
+      .i_tx_poll_flag_rst (s_tx_poll_flag_rst),
 
-      .i_os_valid           (os_valid),
-      .i_os_rec_cfg_detected(os_rec_cfg_detected),
-      .i_idle_detected      (idle_detected),
-      .i_l0_enabled         (l0_enabled),
+      .i_os_valid            (os_valid),
+      .i_os_rec_cfg_detected (os_rec_cfg_detected),
+      .i_idle_detected       (idle_detected),
+      .i_l0_enabled          (l0_enabled),
 
-      .i_send_os_trigger  (s_send_os_trigger),
-      .i_send_idle_trigger(s_send_idle_trigger),
-      .i_os_type          (os_type),
-      .i_max_count        (tx_max_count),
+      .i_send_os_trigger   (s_send_os_trigger),
+      .i_send_idle_trigger (s_send_idle_trigger),
+      .i_os_type           (os_type),
+      .i_max_count         (tx_max_count),
 
-      .i_link_num(link_num),
-      .i_lane_num(lane_num),
-      .i_ts_ctrl (ts_ctrl),
+      .i_link_num (link_num),
+      .i_lane_num (lane_num),
+      .i_ts_ctrl  (ts_ctrl),
 
-      .o_tx_os_flag  (s_tx_os_flag),
-      .o_tx_idle_flag(s_tx_idle_flag),
-      .o_tx_poll_flag(s_tx_poll_flag),
-      .o_sending_os  (sending_os),
+      .o_tx_os_flag   (s_tx_os_flag),
+      .o_tx_idle_flag (s_tx_idle_flag),
+      .o_tx_poll_flag (s_tx_poll_flag),
+      .o_sending_os   (sending_os),
 
-      .o_tx_sym(tx_plain)
+      .o_tx_sym (tx_plain)
   );
   // -----------------------------------------------------------------------------------------------
   // ----- Clock count (Timeout) -----
   ccfpga_clk_counter #(
-      .BIT_WIDTH(21)
+      .BIT_WIDTH (21)
   ) u_timeout_counter (
-      .i_clk      (pipe.pclk),
-      .i_reset    (s_timeout_clk_rst),  // Asynchronous Reset
-      .i_max_count(clk_max_count),      // Max Count
-      .o_flag     (s_timeout_clk)       // Output Flag when Count reaches max count
+      .i_clk       (pipe.pclk),
+      .i_reset     (s_timeout_clk_rst),  // Asynchronous Reset
+      .i_max_count (clk_max_count),      // Max Count
+      .o_flag      (s_timeout_clk)       // Output Flag when Count reaches max count
   );
   // -----------------------------------------------------------------------------------------------
   // ----- Scrambler -----
@@ -347,13 +347,13 @@ module ccfpga_mac_top
 
   // Scrambler instance
   ccfpga_scrambler u_scrambler (
-      .i_clk         (pipe.pclk),
-      .i_reset       (reset),
-      .i_scrambler_en(scrambler_en),
-      .i_sym_in      (tx_plain),
-      .i_sym_is_ts   (tx_sym_is_ts),
+      .i_clk          (pipe.pclk),
+      .i_reset        (reset),
+      .i_scrambler_en (scrambler_en),
+      .i_sym_in       (tx_plain),
+      .i_sym_is_ts    (tx_sym_is_ts),
 
-      .o_sym_out(tx_scrambled)
+      .o_sym_out (tx_scrambled)
   );
 
   // ----- Descrambler -----
@@ -374,13 +374,13 @@ module ccfpga_mac_top
 
   // Descrambler instance (for Rx data)
   ccfpga_scrambler u_descrambler (
-      .i_clk         (pipe.pclk),
-      .i_reset       (reset),
-      .i_scrambler_en(descrambler_en),
-      .i_sym_in      (rx_scrambled),
-      .i_sym_is_ts   (rx_sym_is_ts),
+      .i_clk          (pipe.pclk),
+      .i_reset        (reset),
+      .i_scrambler_en (descrambler_en),
+      .i_sym_in       (rx_scrambled),
+      .i_sym_is_ts    (rx_sym_is_ts),
 
-      .o_sym_out(rx_plain)
+      .o_sym_out (rx_plain)
   );
 
   // TODO: Question: if we sending nothing, maybe waiting for data from upper layer

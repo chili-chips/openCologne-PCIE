@@ -6,7 +6,7 @@ Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's 
 |---|---|
 | [`phy_top.sv`](phy_top.sv) | the PHY: `ccfpga_pipe_top` + one `ccfpga_serdes` |
 | [`1.serdes-test.STANDALONE`](1.serdes-test.STANDALONE/README.md) | SerDes PRBS loopback on the GateMate EVB, tested on the board |
-| [`2.serdes-model`](2.serdes-model) | the SerDes BFM (simulation) and `ccfpga_serdes.SYNTH.sv` (chip) |
+| [`2.opensource-serdes-model`](2.opensource-serdes-model) | the SerDes BFM (simulation) and `ccfpga_serdes.SYNTH.sv` (chip) |
 | [`3.sim`](3.sim/README.md) | PHY tests |
 
 #### References:
@@ -68,19 +68,19 @@ So a GateMate board can route each pair the short way: no crossing vias, no stub
 --------------------
 ## Open-source SerDes simulation model
 
-`2.serdes-model/` holds a copy of the open-source **SerDes BFM**, a behavioural model of the GateMate SerDes at the level of Cologne Chip's sim model `ccfpga_serdes`, not the `CC_SERDES` primitive. Its sibling `ccfpga_serdes.SYNTH.sv` puts `CC_SERDES` behind the same ports for the chip: `phy_top` has one SerDes instance, the file list picks the file. So the PIPE, MAC and DLL simulate with open tools. Master copy, documentation, tests and 8b/10b proofs: [openCologne `7.SerDes/1.sim-model`](https://github.com/chili-chips/openCologne/blob/main/7.SerDes/1.sim-model/README.md).
+`2.opensource-serdes-model/` holds a copy of the open-source **SerDes BFM**, a behavioural model of the GateMate SerDes at the level of Cologne Chip's sim model `ccfpga_serdes`, not the `CC_SERDES` primitive. Its sibling `ccfpga_serdes.SYNTH.sv` puts `CC_SERDES` behind the same ports for the chip: `phy_top` has one SerDes instance, the file list picks the file. So the PIPE, MAC and DLL simulate with open tools. Master copy, documentation, tests and 8b/10b proofs: [openCologne `7.SerDes/1.sim-model`](https://github.com/chili-chips/openCologne/blob/main/7.SerDes/1.sim-model/README.md).
 
 | flow | result |
 |---|---|
 | PIPE test, 64-bit (`3.sim/run-phy.sh pipe64`) | PASSED |
-| DLL, MAC, PIPE and SerDes, two link partners (`4.dll/sim/run-dll-phy.sh`) | PASSED; with `--inject=stp` or `end` FAILED: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
+| DLL, MAC, PIPE and SerDes, two link partners (`4.dll/sim/run-dll-phy.sh`) | PASSED; with `--inject=stp` or `end` FAILED: [BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
 
 PHY flows: [3.sim/README.md](3.sim/README.md). DLL over this PHY: [4.dll/sim/README.md](../4.dll/sim/README.md); its test-bench PHY (SerDes model + PIPE + bring-up FSM) is [`phy_model.sv`](../4.dll/sim/phy_model.sv).
 
 --------------------
 ## ccfpga_serdes I/O
 
-The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), documents the hard macro, `CC_SERDES`: 61 pins. Cologne Chip's simulation model and our BFM (`2.serdes-model/ccfpga_serdes.BFM.sv`) are the `ccfpga_serdes` wrapper around it: the same 84 ports, its own logic on 23 of them. For the chip, `ccfpga_serdes.SYNTH.sv` is the wrapper, with no logic: it connects the 61 pins.
+The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), documents the hard macro, `CC_SERDES`: 61 pins. Cologne Chip's simulation model and our BFM (`2.opensource-serdes-model/ccfpga_serdes.BFM.sv`) are the `ccfpga_serdes` wrapper around it: the same 84 ports, its own logic on 23 of them. For the chip, `ccfpga_serdes.SYNTH.sv` is the wrapper, with no logic: it connects the 61 pins.
 
 - 🟪 **HM**: a `CC_SERDES` pin (**Pin**), through the wrapper. All 61 are.
 - 🟥 **wrapper only**: the vendor model's own logic (config port, scan, test, core resets, serial pins, reference clock). On the chip unused, or the constant in brackets.
@@ -281,7 +281,7 @@ DS1001 documents the HM; the other three are the `ccfpga_serdes` wrapper around 
 
 HM only, not set through the wrapper: 95 of the 208 parameters. The TX driver sets for electrical idle (`*_EI`) and receiver detection (`*_RXDET`), 12 each; test mode's port overrides (`*_OVR`, 26) and their values (e.g. `RX_RESET`, `TX_POLARITY`); debug, calibration and eye-measurement controls; `RX_CDR_TRANS_TH`, `SERDES_TESTMODE`.
 
-**1. Defaults that differ** (all others agree, wherever they exist; asked in [#43](https://github.com/chili-chips-ba/openCologne-PCIE/issues/43), [#44](https://github.com/chili-chips-ba/openCologne-PCIE/issues/44))
+**1. Defaults that differ** (all others agree, wherever they exist; asked in [BA#43](https://github.com/chili-chips-ba/openCologne-PCIE/issues/43), [BA#44](https://github.com/chili-chips-ba/openCologne-PCIE/issues/44))
 
 | Parameter | DS1001 | `CC_SERDES` (Yosys) | vendor model | BFM | SYNTH | the BFM models it |
 |---|---|---|---|---|---|---|
@@ -300,7 +300,7 @@ HM only, not set through the wrapper: 95 of the 208 parameters. The TX driver se
 |---|---|---|---|
 | `SERDES_ENABLE`, `SERDES_AUTO_INIT` | – | 0, 0 | `CC_SERDES` parameters: the BFM starts like the chip |
 | SerDes enable | `0x5C` on the config port | also `SERDES_ENABLE`, and `0x5C` on the register file | as the chip |
-| `RX_EI_EN_O` | idle only with X or Z on both pins; with `RX_EI_BW_SEL` 1 to 15 never high (its filter takes the output, not the samples) | idle when P = N, after `RX_EI_BW_SEL` reference clocks, as DS1001 Table 2.43 | our line has no X or Z ([#43](https://github.com/chili-chips-ba/openCologne-PCIE/issues/43)) |
+| `RX_EI_EN_O` | idle only with X or Z on both pins; with `RX_EI_BW_SEL` 1 to 15 never high (its filter takes the output, not the samples) | idle when P = N, after `RX_EI_BW_SEL` reference clocks, as DS1001 Table 2.43 | our line has no X or Z ([BA#43](https://github.com/chili-chips-ba/openCologne-PCIE/issues/43)) |
 
 **3. Where the wrapper (all three) differs from `CC_SERDES`**
 
@@ -309,7 +309,7 @@ HM only, not set through the wrapper: 95 of the 208 parameters. The TX driver se
 | `RX_CDR_LOCK_CFG` width | 15 bits | 8 bits |
 | Ports | 84, lower case, some renamed (`tx_powerdown_n_i`, `tx_resetdone_o`, `rx_detect_done_o`, `clk_core_pll_o` ...) | 61, upper case (`TX_POWER_DOWN_N_I`, `TX_RESET_DONE_O`, `TX_DETECT_RX_DONE_O`, `PLL_CLK_O` ...) |
 | Wrapper-only ports | 23: config port, scan, test, core resets, serial pins, reference clock | – |
-| Parameter names | `ALIGN_*`, `RX_RESETDONE_GATE` | `RX_ALIGN_*`, `RX_RESET_DONE_GATE` ([#29](https://github.com/chili-chips-ba/openCologne-PCIE/issues/29)) |
+| Parameter names | `ALIGN_*`, `RX_RESETDONE_GATE` | `RX_ALIGN_*`, `RX_RESET_DONE_GATE` ([BA#29](https://github.com/chili-chips-ba/openCologne-PCIE/issues/29)) |
 | Wrapper-only parameters | `TX_BUFFER_ADDR_WIDTH`; four `RX_*_OVR` | one field, `RX_EN_EQA_EXT_VALUE` |
 | HM-only parameters | – | 95: `*_EI`, `*_RXDET`, `*_OVR`, debug (above) |
 
@@ -317,18 +317,18 @@ HM only, not set through the wrapper: 95 of the 208 parameters. The TX driver se
 
 | Issue | On |
 |---|---|
-| [#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18) | the 16-bit PIPE clock; a `ccfpga_serdes` wrapper for `CC_SERDES`, which we now provide (`ccfpga_serdes.SYNTH.sv`) |
-| [#28](https://github.com/chili-chips-ba/openCologne-PCIE/issues/28) | DS1001 Table 2.51: `RX_ALIGN_COMMA_WORD` width and default |
-| [#29](https://github.com/chili-chips-ba/openCologne-PCIE/issues/29) | `RX_RESET_DONE_GATE` (`CC_SERDES`) vs `RX_RESETDONE_GATE` (vendor model) |
-| [#30](https://github.com/chili-chips-ba/openCologne-PCIE/issues/30) | DS1001: the RX clock-correction behaviour |
-| [#43](https://github.com/chili-chips-ba/openCologne-PCIE/issues/43) | `RX_EI_EN_O`: the idle line, the `RX_EI_BW_SEL` filter, the `RX_EI_BIAS` default |
-| [#44](https://github.com/chili-chips-ba/openCologne-PCIE/issues/44) | five defaults of the vendor model vs DS1001: `PLL_CI`, `PLL_CP`, `RX_CDR_CKP`, `PLL_SET_OP_LOCK`, `RX_CDR_LOCK_CFG` (and its width) |
-| [#45](https://github.com/chili-chips-ba/openCologne-PCIE/issues/45) | DS1001: seven ADPLL defaults, Tables 2.18/2.19 vs the register map |
-| [#49](https://github.com/chili-chips-ba/openCologne-PCIE/issues/49) | the SerDes pins (`SER_TX_*`, `SER_RX_*`, `SER_CLK*`) cannot be top-level ports: `CC_SERDES` has no port for them |
+| [BA#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18) | the 16-bit PIPE clock; a `ccfpga_serdes` wrapper for `CC_SERDES`, which we now provide (`ccfpga_serdes.SYNTH.sv`) |
+| [BA#28](https://github.com/chili-chips-ba/openCologne-PCIE/issues/28) | DS1001 Table 2.51: `RX_ALIGN_COMMA_WORD` width and default |
+| [BA#29](https://github.com/chili-chips-ba/openCologne-PCIE/issues/29) | `RX_RESET_DONE_GATE` (`CC_SERDES`) vs `RX_RESETDONE_GATE` (vendor model) |
+| [BA#30](https://github.com/chili-chips-ba/openCologne-PCIE/issues/30) | DS1001: the RX clock-correction behaviour |
+| [BA#43](https://github.com/chili-chips-ba/openCologne-PCIE/issues/43) | `RX_EI_EN_O`: the idle line, the `RX_EI_BW_SEL` filter, the `RX_EI_BIAS` default |
+| [BA#44](https://github.com/chili-chips-ba/openCologne-PCIE/issues/44) | five defaults of the vendor model vs DS1001: `PLL_CI`, `PLL_CP`, `RX_CDR_CKP`, `PLL_SET_OP_LOCK`, `RX_CDR_LOCK_CFG` (and its width) |
+| [BA#45](https://github.com/chili-chips-ba/openCologne-PCIE/issues/45) | DS1001: seven ADPLL defaults, Tables 2.18/2.19 vs the register map |
+| [BA#49](https://github.com/chili-chips-ba/openCologne-PCIE/issues/49) | the SerDes pins (`SER_TX_*`, `SER_RX_*`, `SER_CLK*`) cannot be top-level ports: `CC_SERDES` has no port for them |
 
 **Notes**
 
-- DS1001 contradicts itself on 7 ADPLL defaults ([#45](https://github.com/chili-chips-ba/openCologne-PCIE/issues/45)): Tables 2.18 and 2.19 give `PLL_CP` 12, `PLL_AO` 10, `PLL_SAR_LIMIT` 0, `PLL_SET_OP_LOCK` 1, `PLL_REF_RTERM` 0, `PLL_CONFIG_SEL` 1, `PLL_BISC_MODE` 0; its register map (Table 2.59) and `CC_SERDES` give 80, 0, 2, 0, 1, 0, 4.
+- DS1001 contradicts itself on 7 ADPLL defaults ([BA#45](https://github.com/chili-chips-ba/openCologne-PCIE/issues/45)): Tables 2.18 and 2.19 give `PLL_CP` 12, `PLL_AO` 10, `PLL_SAR_LIMIT` 0, `PLL_SET_OP_LOCK` 1, `PLL_REF_RTERM` 0, `PLL_CONFIG_SEL` 1, `PLL_BISC_MODE` 0; its register map (Table 2.59) and `CC_SERDES` give 80, 0, 2, 0, 1, 0, 4.
 - DS1001 names some ports differently from `CC_SERDES`: `CLK_CORE_O`, `CLK_CORE_TX_I`, `CLK_CORE_RX_I`, `CLK_REG_I` (for `PLL_CLK_O`, `TX_CLK_I`, `RX_CLK_I`, `REGFILE_CLK_I`), `RX_PRBS_CNT_RESET_N_I`, and `RESET_CORE_TX_N_I`, a vendor-model port with no `CC_SERDES` pin.
 - PRBS codes 011 and 100: reserved in DS1001; the vendor model and the BFM give PRBS-23 and PRBS-31 there, TX and RX.
 

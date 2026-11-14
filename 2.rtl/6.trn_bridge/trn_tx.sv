@@ -40,11 +40,11 @@
 module trn_tx
   import trn_pkg::*;
 (
-    axis_if.slave s_axis_tx,
-    trn_tx_if.src trn_tx,     // TLPs to the TL
+           axis_if.slave s_axis_tx,
+           trn_tx_if.src trn_tx,     // TLPs to the TL
 
-    input logic clk,
-    input logic core_rst_n
+    input  logic         clk,
+    input  logic         core_rst_n
 );
 
 
@@ -55,7 +55,7 @@ module trn_tx
   logic                  trn_pkt_started;
   logic                  beat_rdy;
 
-  logic                  axi_beat_live;
+  logic  axi_beat_live;
   assign axi_beat_live = s_axis_tx.tvalid & s_axis_tx.tready;
 
   assign trn_tx.dat    = trn_dw_swap(beat_tdata);

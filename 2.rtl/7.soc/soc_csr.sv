@@ -157,28 +157,28 @@ module soc_csr
   end
 
 
-  logic cpuif_req_is_wr;  // a write: any byte strobe
+  logic  cpuif_req_is_wr;  // a write: any byte strobe
   assign cpuif_req_is_wr = |mem.wstrb;
 
   csr u_csr (
-      .clk   (clk),
-      .arst_n(resetn),
+      .clk    (clk),
+      .arst_n (resetn),
 
-      .s_cpuif_req         (cpuif_req),
-      .s_cpuif_req_is_wr   (cpuif_req_is_wr),
-      .s_cpuif_addr        ({mem.addr[CSR_MIN_ADDR_WIDTH-1:2], 2'b00}),
-      .s_cpuif_wr_data     (mem.wdata),
-      .s_cpuif_wr_biten    (cpuif_wr_biten),
-      .s_cpuif_req_stall_wr(  /*LINT:OK*/),
-      .s_cpuif_req_stall_rd(  /*LINT:OK*/),
-      .s_cpuif_rd_ack      (cpuif_rd_ack),
-      .s_cpuif_rd_err      (  /*LINT:OK*/),
-      .s_cpuif_rd_data     (cpuif_rd_data),
-      .s_cpuif_wr_ack      (cpuif_wr_ack),
-      .s_cpuif_wr_err      (  /*LINT:OK*/),
+      .s_cpuif_req          (cpuif_req),
+      .s_cpuif_req_is_wr    (cpuif_req_is_wr),
+      .s_cpuif_addr         ({mem.addr[CSR_MIN_ADDR_WIDTH-1:2], 2'b00}),
+      .s_cpuif_wr_data      (mem.wdata),
+      .s_cpuif_wr_biten     (cpuif_wr_biten),
+      .s_cpuif_req_stall_wr (  /*LINT:OK*/),
+      .s_cpuif_req_stall_rd (  /*LINT:OK*/),
+      .s_cpuif_rd_ack       (cpuif_rd_ack),
+      .s_cpuif_rd_err       (  /*LINT:OK*/),
+      .s_cpuif_rd_data      (cpuif_rd_data),
+      .s_cpuif_wr_ack       (cpuif_wr_ack),
+      .s_cpuif_wr_err       (  /*LINT:OK*/),
 
-      .hwif_in (csr_in),
-      .hwif_out(csr_out)
+      .hwif_in  (csr_in),
+      .hwif_out (csr_out)
   );
 
   //=========================================

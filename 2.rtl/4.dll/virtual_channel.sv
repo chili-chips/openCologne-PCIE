@@ -67,12 +67,12 @@ module virtual_channel
   logic      initfc1_en;
   logic      initfc2_en;
   dl_state_e fsm_state;
-  logic      link_active;
-  assign link_active = (fsm_state == DL_ACTIVE);
-  assign o_fsm_state = fsm_state;
-  logic link_inactive;
+  logic  link_active;
+  assign link_active   = (fsm_state == DL_ACTIVE);
+  assign o_fsm_state   = fsm_state;
+  logic  link_inactive;
   assign link_inactive = (fsm_state == DL_INACTIVE);
-  logic tlp_rx_enable;
+  logic  tlp_rx_enable;
   assign tlp_rx_enable = (fsm_state == DL_ACTIVE) | (fsm_state == DL_INITFC2);
   // Tx side
   pipe_sym_t                      tx_sym_c;
@@ -132,61 +132,61 @@ module virtual_channel
   logic      initfc1;
   logic      initfc2;
   dl_state_e fsm_state_d;
-  logic      fsm_state_changed;
+  logic  fsm_state_changed;
   assign fsm_state_changed = (fsm_state != fsm_state_d);
 
-  logic end_lost;
+  logic  end_lost;
   assign end_lost = 1'b0;  // no source yet; packet_handler also ends a TLP at MAX_TLP_WORDS
 
   packet_handler u_dllp_assembly (
-      .clk     (clk),
-      .reset   (reset),
-      .rx_sym  (rx_sym),
-      .end_lost(end_lost), // tlp_rx_buffer for one TLP is full but no END is detected
+      .clk      (clk),
+      .reset    (reset),
+      .rx_sym   (rx_sym),
+      .end_lost (end_lost), // tlp_rx_buffer for one TLP is full but no END is detected
 
-      .sdp_detected   (sdp_detected),
-      .stp_detected   (stp_detected),
-      .end_detected   (end_detected),
-      .data_dllp      (data_dllp),
-      .data_tl        (data_tl),
-      .sequence_number(sequence_number),
-      .lcrc           (lcrc),
-      .tlp_valid      (tlp_valid),
-      .tlp_half       (tlp_half)
+      .sdp_detected    (sdp_detected),
+      .stp_detected    (stp_detected),
+      .end_detected    (end_detected),
+      .data_dllp       (data_dllp),
+      .data_tl         (data_tl),
+      .sequence_number (sequence_number),
+      .lcrc            (lcrc),
+      .tlp_valid       (tlp_valid),
+      .tlp_half        (tlp_half)
   );
 
   virtual_channel_rx u_vc_rx (
-      .clk          (clk),
-      .reset        (reset),
-      .link_active  (tlp_rx_enable),
-      .link_inactive(link_inactive),
+      .clk           (clk),
+      .reset         (reset),
+      .link_active   (tlp_rx_enable),
+      .link_inactive (link_inactive),
 
-      .dllp_data   (data_dllp),
-      .sdp_detected(sdp_detected),
+      .dllp_data    (data_dllp),
+      .sdp_detected (sdp_detected),
 
-      .tlp_data       (data_tl),
-      .stp_detected   (stp_detected),
-      .end_detected   (end_detected),
-      .sequence_number(sequence_number),
-      .lcrc           (lcrc),
-      .tlp_valid      (tlp_valid),
-      .tlp_half       (tlp_half),
+      .tlp_data        (data_tl),
+      .stp_detected    (stp_detected),
+      .end_detected    (end_detected),
+      .sequence_number (sequence_number),
+      .lcrc            (lcrc),
+      .tlp_valid       (tlp_valid),
+      .tlp_half        (tlp_half),
 
-      .update_type(update_type),
-      .packet_type(packet_type),
-      .hdrfc      (hdrfc),
-      .datafc     (datafc),
-      .crc_valid  (crc_valid),
+      .update_type (update_type),
+      .packet_type (packet_type),
+      .hdrfc       (hdrfc),
+      .datafc      (datafc),
+      .crc_valid   (crc_valid),
 
-      .rx_tlp_data (rx_data_tl),
-      .rx_tlp_valid(rx_valid_tl),
-      .rx_tlp_first(rx_first_tl),
-      .rx_tlp_last (rx_last_tl),
+      .rx_tlp_data  (rx_data_tl),
+      .rx_tlp_valid (rx_valid_tl),
+      .rx_tlp_first (rx_first_tl),
+      .rx_tlp_last  (rx_last_tl),
 
-      .nak_trigger(nak_trigger),
-      .nak_seq_num(nak_seq_num),
-      .ack_trigger(ack_trigger),
-      .ack_seq_num(ack_seq_num)
+      .nak_trigger (nak_trigger),
+      .nak_seq_num (nak_seq_num),
+      .ack_trigger (ack_trigger),
+      .ack_seq_num (ack_seq_num)
   );
 
   always_ff @(posedge clk or posedge reset) begin
@@ -349,67 +349,67 @@ module virtual_channel
   end
 
   dll_clk_counter #(
-      .BIT_WIDTH(14)  // Width of Count Register
+      .BIT_WIDTH (14)  // Width of Count Register
   ) u_init_counter (
-      .i_clk    (clk),
-      .i_reset  (reset),
-      .i_clear  (fsm_state_changed),
-      .max_count(INIT_CYCLE_CNT),
-      .o_flag   (init_counter_flag)
+      .i_clk     (clk),
+      .i_reset   (reset),
+      .i_clear   (fsm_state_changed),
+      .max_count (INIT_CYCLE_CNT),
+      .o_flag    (init_counter_flag)
   );
 
-  logic updatefc_clear;  // the UpdateFC timer runs only while the link is active
-  logic updatefc_req;
+  logic  updatefc_clear;  // the UpdateFC timer runs only while the link is active
+  logic  updatefc_req;
   assign updatefc_clear = !link_active;
   assign updatefc_req   = updatefc_counter_flag & link_active;
 
   dll_clk_counter #(
-      .BIT_WIDTH(14)  // Width of Count Register
+      .BIT_WIDTH (14)  // Width of Count Register
   ) u_updatefc_counter (
-      .i_clk    (clk),
-      .i_reset  (reset),
-      .i_clear  (updatefc_clear),
-      .max_count(UPDATEFC_CYCLE_CNT),
-      .o_flag   (updatefc_counter_flag)
+      .i_clk     (clk),
+      .i_reset   (reset),
+      .i_clear   (updatefc_clear),
+      .max_count (UPDATEFC_CYCLE_CNT),
+      .o_flag    (updatefc_counter_flag)
   );
 
   virtual_channel_tx #(
-      .RETRY_ADDR_WIDTH(RETRY_ADDR_WIDTH)
+      .RETRY_ADDR_WIDTH (RETRY_ADDR_WIDTH)
   ) u_vc_tx (
-      .clk          (clk),
-      .reset        (reset),
-      .link_inactive(link_inactive),
+      .clk           (clk),
+      .reset         (reset),
+      .link_inactive (link_inactive),
 
-      .virtual_channel(virtual_channel_number),
-      .tl_dllp        (tx_dllp),
-      .updatefc_req   (updatefc_req),
+      .virtual_channel (virtual_channel_number),
+      .tl_dllp         (tx_dllp),
+      .updatefc_req    (updatefc_req),
 
-      .initfc1_en   (initfc1_en),
-      .initfc2_en   (initfc2_en),
-      .initfc1_req  (initfc1),
-      .initfc2_req  (initfc2),
+      .initfc1_en    (initfc1_en),
+      .initfc2_en    (initfc2_en),
+      .initfc1_req   (initfc1),
+      .initfc2_req   (initfc2),
       //.tlp_en(tlp_en),
-      .tlp_valid    (tx_tlp.valid),
-      .tlp_first    (tx_tlp.first),
-      .tlp_last     (tx_tlp.last),
-      .tlp_last_half(tx_tlp.half),
-      .tlp_data     (tx_tlp.data),
+      .tlp_valid     (tx_tlp.valid),
+      .tlp_first     (tx_tlp.first),
+      .tlp_last      (tx_tlp.last),
+      .tlp_last_half (tx_tlp.half),
+      .tlp_data      (tx_tlp.data),
 
-      .release_flag   (tlp_released_flag),
-      .retransmit_flag(tlp_retransmit_flag),
+      .release_flag    (tlp_released_flag),
+      .retransmit_flag (tlp_retransmit_flag),
 
-      .nak_trigger        (nak_trigger),
-      .ack_trigger        (ack_trigger),
-      .nak_sequence_number(nak_seq_num),
-      .ack_sequence_number(ack_seq_num),
+      .nak_trigger         (nak_trigger),
+      .ack_trigger         (ack_trigger),
+      .nak_sequence_number (nak_seq_num),
+      .ack_sequence_number (ack_seq_num),
 
-      .dllp_initfc1_sent(dllp_initfc1_sent),
-      .dllp_initfc2_sent(dllp_initfc2_sent),
+      .dllp_initfc1_sent (dllp_initfc1_sent),
+      .dllp_initfc2_sent (dllp_initfc2_sent),
 
-      .retry_buffer_empty(retry_buffer_empty),
+      .retry_buffer_empty (retry_buffer_empty),
       //.dllp_sent(dllp_sent),
       //.tlp_sent(tlp_sent),
-      .tx_sym            (tx_sym_c)
+      .tx_sym             (tx_sym_c)
   );
 
   always_ff @(posedge clk or posedge reset) begin
@@ -432,17 +432,17 @@ module virtual_channel
   end
 
   dll_fsm u_init_fsm (
-      .reset            (reset),
-      .i_clk            (clk),
-      .i_link_up        (linkup),
-      .i_initfc1_rx_done(initfc1_seq_received),
-      .i_initfc1_tx_done(dllp_initfc1_sent),
-      .i_initfc2_rx_done(initfc2_seq_received),
-      .i_initfc2_tx_done(dllp_initfc2_sent),
+      .reset             (reset),
+      .i_clk             (clk),
+      .i_link_up         (linkup),
+      .i_initfc1_rx_done (initfc1_seq_received),
+      .i_initfc1_tx_done (dllp_initfc1_sent),
+      .i_initfc2_rx_done (initfc2_seq_received),
+      .i_initfc2_tx_done (dllp_initfc2_sent),
 
-      .o_initfc1_en(initfc1_en),
-      .o_initfc2_en(initfc2_en),
-      .o_fsm_state (fsm_state)
+      .o_initfc1_en (initfc1_en),
+      .o_initfc2_en (initfc2_en),
+      .o_fsm_state  (fsm_state)
   );
 
 endmodule

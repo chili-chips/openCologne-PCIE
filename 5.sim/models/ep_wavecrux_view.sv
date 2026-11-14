@@ -42,7 +42,7 @@
 //   text (ltssm_name, dl_name: ASCII format), link_up.
 //
 //   The SOC CPU's retired instructions, for WaveCrux's RISC-V decoder, are
-//   bound at the end of this file: riscv_pcie_soc.cpu_view.
+//   bound at the end of this file: soc_top.cpu_view.
 //==========================================================================
 
 module ep_wavecrux_view
@@ -423,7 +423,7 @@ bind pcie_core ep_wavecrux_view wavecrux (
 // The SOC CPU's retired instructions under the RVFI names, for WaveCrux's
 // RISC-V decoder and RVFI Commit Inspector (CPU.eduBOS5/wavecrux). eduBOS5
 // drives rvfi with RISCV_FORMAL, which the make file adds with DUMP=1
-bind riscv_pcie_soc soc_cpu_view cpu_view (
+bind soc_top soc_cpu_view cpu_view (
     .clk      (clk),
     .valid    (rvfi.rvfi_valid),
     .order    (rvfi.rvfi_order),

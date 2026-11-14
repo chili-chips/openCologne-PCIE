@@ -134,7 +134,7 @@ module tb_tl_top
         else       bridge_rst_n <= (dl_state == DL_ACTIVE);
     end
 
-    trn_bridge u_trn_bridge (
+    trn_top u_trn_bridge (
         .s_axis_tx(s_axis_tx),
         .m_axis_rx(m_axis_rx),
         .trn_tx(bridge_tx),

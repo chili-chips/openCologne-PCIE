@@ -16,11 +16,11 @@ module ccfpga_rx_MAC_data
   import pipe_pkg::*;
   import mac_pkg::*;
 (
-    input logic      i_clk,         // Clock
-    input logic      i_l0_enabled,  // L0 state enable signal
-    input pipe_sym_t i_rx_sym,      // Rx data and K flags
+    input  logic      i_clk,         // Clock
+    input  logic      i_l0_enabled,  // L0 state enable signal
+    input  pipe_sym_t i_rx_sym,      // Rx data and K flags
 
-    output pipe_sym_t o_rx_sym_dll  // Data and K flags forwarded to DLL
+    output pipe_sym_t o_rx_sym_dll   // Data and K flags forwarded to DLL
 );
 
 

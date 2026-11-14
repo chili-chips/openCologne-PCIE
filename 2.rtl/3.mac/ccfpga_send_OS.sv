@@ -15,19 +15,19 @@ module ccfpga_send_OS
   import pipe_pkg::*;
   import mac_pkg::*;
 (
-    input logic i_clk,
-    input logic i_send_os_trigger,
-    input logic i_reset,
+    input  logic            i_clk,
+    input  logic            i_send_os_trigger,
+    input  logic            i_reset,
 
-    input logic     [7:0] i_link_num,
-    input logic     [7:0] i_lane_num,
-    input ts_ctrl_t       i_ts_ctrl,
-    input os_type_e       i_os_type,
-    input logic           i_skp_in_queue,
+    input  logic      [7:0] i_link_num,
+    input  logic      [7:0] i_lane_num,
+    input  ts_ctrl_t        i_ts_ctrl,
+    input  os_type_e        i_os_type,
+    input  logic            i_skp_in_queue,
 
-    output pipe_sym_t o_tx_sym,
-    output logic      o_os_sent,
-    output logic      o_sending_os
+    output pipe_sym_t       o_tx_sym,
+    output logic            o_os_sent,
+    output logic            o_sending_os
 );
 
   localparam int PATTERN_WIDTH   = OS_W;
@@ -50,9 +50,9 @@ module ccfpga_send_OS
   logic   [PATTERN_BYTES - 1 : 0] held_pattern_k;
 
   ts_os_t                         cur_pattern;
-  assign cur_pattern = (step == 0) ? pattern : held_pattern;
+  assign                        cur_pattern   = (step == 0) ? pattern : held_pattern;
   logic [PATTERN_BYTES - 1 : 0] cur_pattern_k;
-  assign cur_pattern_k = (step == 0) ? pattern_k : held_pattern_k;
+  assign                        cur_pattern_k = (step == 0) ? pattern_k : held_pattern_k;
 
   always_ff @(posedge i_clk or posedge i_reset) begin
     if (i_reset) begin

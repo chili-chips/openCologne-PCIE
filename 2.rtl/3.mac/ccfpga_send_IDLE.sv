@@ -12,10 +12,10 @@
 module ccfpga_send_IDLE
   import pipe_pkg::*;
 (
-    input logic i_clk,
-    input logic i_send_idle_trigger,
-    input logic i_reset,
-    input logic i_skp_in_queue,
+    input  logic      i_clk,
+    input  logic      i_send_idle_trigger,
+    input  logic      i_reset,
+    input  logic      i_skp_in_queue,
 
     output pipe_sym_t o_tx_sym,
     output logic      o_idle_sent,

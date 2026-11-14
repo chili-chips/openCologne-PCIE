@@ -36,15 +36,15 @@
 module ccfpga_pipe_tx_demux
   import pipe_pkg::*;
 (
-    input logic i_clk,
-    input logic i_reset,
-    input logic i_enable,
+    input  logic        i_clk,
+    input  logic        i_reset,
+    input  logic        i_enable,
 
-    input pipe_data_t  i_data,       // PIPE: data
-    input pipe_flags_t i_kcode,      // PIPE: K symbol
-    input pipe_flags_t i_compliance, // PIPE: compliance, negative disparity
+    input  pipe_data_t  i_data,        // PIPE: data
+    input  pipe_flags_t i_kcode,       // PIPE: K symbol
+    input  pipe_flags_t i_compliance,  // PIPE: compliance, negative disparity
 
-    output serdes_tx_t o_tx  // SerDes: symbols, K flags, disparity mode
+    output serdes_tx_t  o_tx           // SerDes: symbols, K flags, disparity mode
 );
 
   // The PIPE fills the SerDes word one slice per PCLK, lowest first

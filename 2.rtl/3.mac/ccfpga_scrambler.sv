@@ -14,13 +14,13 @@ module ccfpga_scrambler
   import pipe_pkg::*;
   import mac_pkg::*;
 (
-    input logic                           i_clk,
-    input logic                           i_reset,
-    input logic                           i_scrambler_en,
-    input pipe_sym_t                      i_sym_in,
-    input logic      [DATA_BYTES - 1 : 0] i_sym_is_ts,
+    input  logic                           i_clk,
+    input  logic                           i_reset,
+    input  logic                           i_scrambler_en,
+    input  pipe_sym_t                      i_sym_in,
+    input  logic      [DATA_BYTES - 1 : 0] i_sym_is_ts,
 
-    output pipe_sym_t o_sym_out
+    output pipe_sym_t                      o_sym_out
 );
 
   localparam int LFSR_WIDTH = 16;
@@ -62,23 +62,23 @@ module ccfpga_scrambler
   generate
     for (i = 0; i < DATA_BYTES; i = i + 1) begin : g_scrambler
       ccfpga_scrambler_byte u_scrambler_byte (
-          .i_data_in      (i_sym_in.data[i*8+:8]),
-          .i_data_in_kcode(i_sym_in.kcode[i]),
-          .i_scrambler_en (i_scrambler_en),
-          .i_lfsr_in      (lfsr_vector[i*LFSR_WIDTH+:LFSR_WIDTH]),
-          .o_lfsr_out     (lfsr_out[i*LFSR_WIDTH+:LFSR_WIDTH]),
-          .o_data_out     (lfsr_value[i*8+:8])
+          .i_data_in       (i_sym_in.data[i*8+:8]),
+          .i_data_in_kcode (i_sym_in.kcode[i]),
+          .i_scrambler_en  (i_scrambler_en),
+          .i_lfsr_in       (lfsr_vector[i*LFSR_WIDTH+:LFSR_WIDTH]),
+          .o_lfsr_out      (lfsr_out[i*LFSR_WIDTH+:LFSR_WIDTH]),
+          .o_data_out      (lfsr_value[i*8+:8])
       );
     end
   endgenerate
 
   ccfpga_scrambler_data u_scrambler_data (
-      .i_data_in      (i_sym_in.data),
-      .i_data_in_kcode(i_sym_in.kcode),
-      .i_sym_is_ts    (i_sym_is_ts),
-      .i_scrambler_en (i_scrambler_en),
-      .i_lfsr_value   (lfsr_value),
-      .o_data_out     (scrambled_data_next)
+      .i_data_in       (i_sym_in.data),
+      .i_data_in_kcode (i_sym_in.kcode),
+      .i_sym_is_ts     (i_sym_is_ts),
+      .i_scrambler_en  (i_scrambler_en),
+      .i_lfsr_value    (lfsr_value),
+      .o_data_out      (scrambled_data_next)
   );
 
   assign o_sym_out.data  = scrambled_data;

@@ -68,7 +68,7 @@ module ccfpga_rx_MAC_OS
   logic           inc_count_rec_idle;  // Increment TS1 count with PAD-Lane in Recovery.Idle
   logic           clear_count_rec_idle;  // Clear TS1 count with PAD-Lane in Recovery.Idle
 
-  logic           detect_inversion_en;
+  logic  detect_inversion_en;
   assign detect_inversion_en = i_fsm_state == POLLING_ACTIVE;  // Enable in POLLING_ACTIVE
 
   logic                   os_detected;  // an Ordered Set is received (one clock)
@@ -78,37 +78,37 @@ module ccfpga_rx_MAC_OS
   logic [            1:0] rx_count_rec_idle;  // Ordered Set count for Recovery idle
 
   ccfpga_OS_process u_os_process (
-      .i_clk  (i_clk),
-      .i_reset(i_reset),
+      .i_clk   (i_clk),
+      .i_reset (i_reset),
 
-      .i_data(i_data),
+      .i_data (i_data),
 
-      .i_rx_os_flag_rst     (i_rx_os_flag_rst),
-      .i_rx_rec_cfg_flag_rst(i_rx_rec_cfg_flag_rst),
-      .i_com_detected       (i_com_detected),
-      .i_ts1_pattern_en     (i_ts1_pattern_en),
-      .i_ts2_pattern_en     (i_ts2_pattern_en),
-      .i_link_num           (o_link_num),
-      .i_lane_num           (o_lane_num),
-      .i_detect_inversion_en(detect_inversion_en),
+      .i_rx_os_flag_rst      (i_rx_os_flag_rst),
+      .i_rx_rec_cfg_flag_rst (i_rx_rec_cfg_flag_rst),
+      .i_com_detected        (i_com_detected),
+      .i_ts1_pattern_en      (i_ts1_pattern_en),
+      .i_ts2_pattern_en      (i_ts2_pattern_en),
+      .i_link_num            (o_link_num),
+      .i_lane_num            (o_lane_num),
+      .i_detect_inversion_en (detect_inversion_en),
 
-      .o_os_valid           (o_os_valid),
-      .o_os_detected        (os_detected),
-      .o_os_rec_cfg_detected(o_os_rec_cfg_detected),
-      .o_inversion_detected (o_inversion_detected),
+      .o_os_valid            (o_os_valid),
+      .o_os_detected         (os_detected),
+      .o_os_rec_cfg_detected (o_os_rec_cfg_detected),
+      .o_inversion_detected  (o_inversion_detected),
 
-      .o_rx_link(rx_link),
-      .o_rx_lane(rx_lane),
-      .o_rx_ctrl(rx_ctrl),
+      .o_rx_link (rx_link),
+      .o_rx_lane (rx_lane),
+      .o_rx_ctrl (rx_ctrl),
 
-      .o_inc_count_os        (inc_count_os),
-      .o_clear_count_os      (clear_count_os),
-      .o_inc_count_timeout   (inc_count_timeout),
-      .o_clear_count_timeout (clear_count_timeout),
-      .o_inc_count_rec_cfg   (inc_count_rec_cfg),
-      .o_clear_count_rec_cfg (clear_count_rec_cfg),
-      .o_inc_count_rec_idle  (inc_count_rec_idle),
-      .o_clear_count_rec_idle(clear_count_rec_idle)
+      .o_inc_count_os         (inc_count_os),
+      .o_clear_count_os       (clear_count_os),
+      .o_inc_count_timeout    (inc_count_timeout),
+      .o_clear_count_timeout  (clear_count_timeout),
+      .o_inc_count_rec_cfg    (inc_count_rec_cfg),
+      .o_clear_count_rec_cfg  (clear_count_rec_cfg),
+      .o_inc_count_rec_idle   (inc_count_rec_idle),
+      .o_clear_count_rec_idle (clear_count_rec_idle)
   );
 
   // Counting logic

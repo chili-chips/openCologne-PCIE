@@ -66,18 +66,18 @@ module pcie_core
   import trn_pkg::*;
   import dll_pkg::*;
 (
-    input logic rst_pipe_n,  // PIPE Reset#
-    input logic mac_rst_n,   // PCLK: MAC and DLL
+    input  logic          rst_pipe_n,  // PIPE Reset#
+    input  logic          mac_rst_n,   // PCLK: MAC and DLL
 
-    pipe_if.mac pipe,
+           pipe_if.mac    pipe,
 
-    output logic dll_up,     // PCLK: data link up (DL_Active)
-    output logic core_rst_n, // PCLK: trn_bridge and the SOC, follows dll_up
+    output logic          dll_up,      // PCLK: data link up (DL_Active)
+    output logic          core_rst_n,  // PCLK: trn_bridge and the SOC, follows dll_up
 
-    axis_if.slave  s_axis_tx,  // TLPs from the SOC (tuser: tx_tuser_t)
-    axis_if.master m_axis_rx,  // TLPs to the SOC   (tuser: rx_tuser_t)
+           axis_if.slave  s_axis_tx,   // TLPs from the SOC (tuser: tx_tuser_t)
+           axis_if.master m_axis_rx,   // TLPs to the SOC   (tuser: rx_tuser_t)
 
-    cfg_if.core cfg  // status sideband to the SOC
+           cfg_if.core    cfg          // status sideband to the SOC
 );
 
 
@@ -91,21 +91,21 @@ module pcie_core
   assign pipe.reset_n = rst_pipe_n;
 
   ccfpga_mac_top u_mac (
-      .i_reset_n(mac_rst_n),
-      .pipe     (pipe),
-      .mac      (mac)
+      .i_reset_n (mac_rst_n),
+      .pipe      (pipe),
+      .mac       (mac)
   );
 
-  logic dll_reset;  // the DLL resets active high
+  logic  dll_reset;  // the DLL resets active high
   assign dll_reset = ~mac_rst_n;
 
   dll_top #(
-      .NUMBER_OF_VIRTUAL_CHANNELS(1)
+      .NUMBER_OF_VIRTUAL_CHANNELS (1)
   ) u_dll (
-      .phy_clk  (pipe.pclk),
-      .phy_reset(dll_reset),
-      .mac      (mac),
-      .tl       (dll)
+      .phy_clk   (pipe.pclk),
+      .phy_reset (dll_reset),
+      .mac       (mac),
+      .tl        (dll)
   );
 
   assign dll_up = (dll.dl_state == DL_ACTIVE);
@@ -121,21 +121,21 @@ module pcie_core
   end
 
   tl_top u_tl (
-      .clk   (pipe.pclk),
-      .rst_n (mac_rst_n),
-      .dll   (dll),
-      .trn_tx(trn_tx),
-      .trn_rx(trn_rx),
-      .cfg   (cfg)
+      .clk    (pipe.pclk),
+      .rst_n  (mac_rst_n),
+      .dll    (dll),
+      .trn_tx (trn_tx),
+      .trn_rx (trn_rx),
+      .cfg    (cfg)
   );
 
-  trn_bridge u_trn_bridge (
-      .s_axis_tx (s_axis_tx),
-      .m_axis_rx (m_axis_rx),
-      .trn_tx    (trn_tx),
-      .trn_rx    (trn_rx),
-      .clk       (pipe.pclk),
-      .core_rst_n(core_rst_n)
+  trn_top u_trn_bridge (
+      .s_axis_tx  (s_axis_tx),
+      .m_axis_rx  (m_axis_rx),
+      .trn_tx     (trn_tx),
+      .trn_rx     (trn_rx),
+      .clk        (pipe.pclk),
+      .core_rst_n (core_rst_n)
   );
 
 endmodule

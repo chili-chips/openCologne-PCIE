@@ -36,9 +36,10 @@ The versions this repo has been run with so far. "Runs" means the step completes
 | GCC | 15.2 | co-sim C/C++: VProc, pcieVHost, the RC model; `-O0`/`-O2`, UBSan, ASan | builds |
 | Yosys | 0.70, with `read_slang` | 8b/10b proofs, standalone SerDes test synthesis, `run-synth.sh`, `run-lint.sh`, `run-leq.sh` | runs |
 | Verible | v0.0-4296-g0f262651 | `run-lint.sh`, `run-format.sh` | runs |
-| Icarus Verilog | 14.0 (devel, OSS CAD Suite 2026-11-02) | PHY and DLL-over-PHY simulations, co-sim (`make SIM=icarus run`); 14 or later for the PIPE, MAC and DLL interface ports | runs |
-| Verilator | 5.052 | co-sim (`make run`, default), SOC lint; its FST writer needs `liblz4-dev` | runs, checks |
-| OSS CAD Suite | 2026-11-02 | Cologne Chip's toolchain package ([UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf)): nextpnr-himbaechel `nextpnr-0.11.1-85-ga2c64799`, GateMate, for `run-pnr.sh` (`NEXTPNR=`); its Yosys is a development build, not used | places and routes; timing fails |
+| Icarus Verilog | 14.0 (devel, master `7025c6613`, 2026-11-13) | PHY and DLL-over-PHY simulations, co-sim (`make SIM=icarus run`); 14 or later for the PIPE, MAC and DLL interface ports | runs |
+| Verilator | 5.055 (devel, `v5.054-219-g12ce8608`) | co-sim (`make run`, default), SOC lint; its FST writer needs `liblz4-dev` | runs, checks |
+| JanusHDL | 0.17.0 (preview) | co-sim (`make SIM=janushdl run`), EP model only: it has no assertions yet, which the EP RTL uses; free, closed source | runs |
+| OSS CAD Suite | 2026-11-12 | Cologne Chip's toolchain package ([UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf)): nextpnr-himbaechel `nextpnr-0.11.1-91-gf934534a`, GateMate, for `run-pnr.sh` (`NEXTPNR=`); its Yosys is a development build, not used | places and routes; timing fails |
 | gmpack | OSS CAD Suite, or Project Peppercorn v1.14 | bitstream (`run-pnr.sh`) | not yet run: P&R stops on timing |
 | openFPGALoader | 1.1.1 | loading the bitstream over JTAG | not yet used on the board |
 | WaveCrux Pro | 1.1.1 | waveforms; PIPE, DLL and serial-line decoding (wcx-pcie 0.3.0), TLP decoding (Pro, and [our plugin](https://github.com/Ferrite-Engineering/wavecrux-decoders/tree/main/decoders/pcie-tlp), pcie-tlp 0.1.1), RISC-V (Windows) | runs |
@@ -50,9 +51,10 @@ The versions this repo has been run with so far. "Runs" means the step completes
 
 | Date | Design | CPE_LT | CPE_FF | RAM_HALF | PCLK | Result |
 |---|---|---|---|---|---|---|
-| 2026-11-02 | retry buffer in flip-flops ([#33](https://github.com/chili-chips-ba/openCologne-PCIE/issues/33)) | 80,093 (195%) | 39,808 (97%) | 20 / 64 | – | does not place |
-| 2026-11-02 | retry buffer in block RAM ([gatemate-pipe#20](https://github.com/colognechip/gatemate-pipe/pull/20)) | 22,076 (53%) | 7,261 (17%) | 22 / 64 | 12.2 MHz, 3 hold violations | routes; fails timing ([#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
-| 2026-11-02 | no latch in the MAC scrambler ([gatemate-pipe#21](https://github.com/colognechip/gatemate-pipe/pull/21)) | 22,181 (54%) | 7,147 (17%) | 22 / 64 | 12.75 MHz, no hold violation | routes; fails setup ([#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
+| 2026-11-02 | retry buffer in flip-flops ([BA#33](https://github.com/chili-chips-ba/openCologne-PCIE/issues/33)) | 80,093 (195%) | 39,808 (97%) | 20 / 64 | – | does not place |
+| 2026-11-02 | retry buffer in block RAM ([gatemate-pipe#20](https://github.com/colognechip/gatemate-pipe/pull/20)) | 22,076 (53%) | 7,261 (17%) | 22 / 64 | 12.2 MHz, 3 hold violations | routes; fails timing ([BA#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
+| 2026-11-02 | no latch in the MAC scrambler ([gatemate-pipe#21](https://github.com/colognechip/gatemate-pipe/pull/21)) | 22,181 (54%) | 7,147 (17%) | 22 / 64 | 12.75 MHz, no hold violation | routes; fails setup ([BA#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
+| 2026-11-13 | the same RTL (renames and formatting only), OSS CAD Suite 2026-11-12 | 21,536 (52%) | 7,076 (17%) | 22 / 64 | 13.07 MHz | routes; fails setup ([BA#46](https://github.com/chili-chips-ba/openCologne-PCIE/issues/46)) |
 
 Out of 40,960 CPE_LT and CPE_FF, and 64 RAM_HALF.
 
@@ -60,7 +62,7 @@ Out of 40,960 CPE_LT and CPE_FF, and 64 RAM_HALF.
 
 | Block | CPE_LT | CPE_FF | RAM_HALF |
 |---|---|---|---|
-| SOC (`riscv_pcie_soc`: eduBOS5, RAM, CSR) | 5,999 (27%) | 2,091 (30%) | 12 |
+| SOC (`soc_top`: eduBOS5, RAM, CSR) | 5,999 (27%) | 2,091 (30%) | 12 |
 | TL (`tl_top`) | 4,588 (20%) | 1,789 (26%) | 6 |
 | DLL (`dll_top`) | 7,286 (32%) | 1,695 (24%) | 4 |
 | Other (MAC, PHY, `trn_bridge`, clocks and resets) | 4,597 (20%) | 1,365 (20%) | 0 |

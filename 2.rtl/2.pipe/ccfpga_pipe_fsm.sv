@@ -37,28 +37,28 @@ module ccfpga_pipe_fsm
 (
     input  logic            i_clk,
     input  logic            i_reset,
-    output pipe_fsm_state_e o_fsm_state, // fsm status (CSS)
+    output pipe_fsm_state_e o_fsm_state,       // fsm status (CSS)
 
-    input  power_state_e i_power_down,    // Powerstate
+    input  power_state_e    i_power_down,      // Powerstate
     //input  logic        i_rx_polarity,        // Rx Polarity
-    input  logic         i_tx_elec_idle,  // Tx Elec Idle
-    input  logic         i_tx_detect_rx,  // Tx Receiver Detection/ Loopmode
-    output logic         o_phy_status,
+    input  logic            i_tx_elec_idle,    // Tx Elec Idle
+    input  logic            i_tx_detect_rx,    // Tx Receiver Detection/ Loopmode
+    output logic            o_phy_status,
     //output logic        o_rx_elec_idle,
-    output rx_status_e   o_rx_status,
+    output rx_status_e      o_rx_status,
 
-    input  logic i_reset_done,      // Reset Done Indicator (SerDes)
-    input  logic i_rx_detect_done,  // Receiver detection done
-    input  logic i_rx_present,      // Receiver status, 1 if receiver present
-    output logic o_tx_detect_rx,    // Start rceiver detection
-    output logic o_sel_rx_status,
-    output logic o_pcs_loopback,    // Loopback Enable
-    output logic o_tx_elec_idle,
+    input  logic            i_reset_done,      // Reset Done Indicator (SerDes)
+    input  logic            i_rx_detect_done,  // Receiver detection done
+    input  logic            i_rx_present,      // Receiver status, 1 if receiver present
+    output logic            o_tx_detect_rx,    // Start rceiver detection
+    output logic            o_sel_rx_status,
+    output logic            o_pcs_loopback,    // Loopback Enable
+    output logic            o_tx_elec_idle,
 
-    output logic o_cnt_reset,  // Reset Clock Counter
-    input  logic i_cnt_flag,   // Flag for Count Indication
+    output logic            o_cnt_reset,       // Reset Clock Counter
+    input  logic            i_cnt_flag,        // Flag for Count Indication
 
-    output logic o_enable_align  // Activate Word Alignment (FSM)
+    output logic            o_enable_align     // Activate Word Alignment (FSM)
 );
 
 

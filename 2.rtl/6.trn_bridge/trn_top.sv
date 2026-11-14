@@ -37,39 +37,39 @@
 //              https://opensource.org/license/bsd-3-clause
 //--------------------------------------------------------------------------
 
-module trn_bridge (
-    axis_if.slave  s_axis_tx,
-    axis_if.master m_axis_rx,
+module trn_top (
+           axis_if.slave  s_axis_tx,
+           axis_if.master m_axis_rx,
 
-    trn_tx_if.src trn_tx,  // TLPs to the TL
-    trn_rx_if.dst trn_rx,  // TLPs from the TL
+           trn_tx_if.src  trn_tx,     // TLPs to the TL
+           trn_rx_if.dst  trn_rx,     // TLPs from the TL
 
-    input logic clk,
-    input logic core_rst_n
+    input  logic          clk,
+    input  logic          core_rst_n
 );
 
   trn_rx u_trn_rx (
-      .m_axis_rx (m_axis_rx),
-      .trn_rx    (trn_rx),
-      .clk       (clk),
-      .core_rst_n(core_rst_n)
+      .m_axis_rx  (m_axis_rx),
+      .trn_rx     (trn_rx),
+      .clk        (clk),
+      .core_rst_n (core_rst_n)
   );
 
 
   trn_tx u_trn_tx (
-      .s_axis_tx (s_axis_tx),
-      .trn_tx    (trn_tx),
-      .clk       (clk),
-      .core_rst_n(core_rst_n)
+      .s_axis_tx  (s_axis_tx),
+      .trn_tx     (trn_tx),
+      .clk        (clk),
+      .core_rst_n (core_rst_n)
   );
 
   trn_tx_throttle u_trn_tx_throttle (
-      .s_axis_tx_tvalid(s_axis_tx.tvalid),
-      .s_axis_tx_tlast (s_axis_tx.tlast),
-      .s_axis_tx_tready(s_axis_tx.tready),
-      .trn_tx          (trn_tx),
-      .clk             (clk),
-      .core_rst_n      (core_rst_n)
+      .s_axis_tx_tvalid (s_axis_tx.tvalid),
+      .s_axis_tx_tlast  (s_axis_tx.tlast),
+      .s_axis_tx_tready (s_axis_tx.tready),
+      .trn_tx           (trn_tx),
+      .clk              (clk),
+      .core_rst_n       (core_rst_n)
   );
 
 endmodule

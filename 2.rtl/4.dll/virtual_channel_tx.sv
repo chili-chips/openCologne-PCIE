@@ -44,41 +44,41 @@ module virtual_channel_tx
 #(
     parameter int RETRY_ADDR_WIDTH = 9
 ) (
-    input logic clk,
-    input logic reset,
-    input logic link_inactive,
+    input  logic             clk,
+    input  logic             reset,
+    input  logic             link_inactive,
 
-    input logic     [2:0] virtual_channel,
-    input fc_dllp_t       tl_dllp,          // from the TL; valid is a pulse
-    input logic           updatefc_req,     // Periodic UpdateFC schedule (pulse)
+    input  logic       [2:0] virtual_channel,
+    input  fc_dllp_t         tl_dllp,              // from the TL; valid is a pulse
+    input  logic             updatefc_req,         // Periodic UpdateFC schedule (pulse)
 
-    input logic initfc1_en,   // Sending InitFC1 sequence
-    input logic initfc2_en,   // Sending InitFC2 sequence
-    input logic initfc1_req,  // Request one InitFC1 set (pulse)
-    input logic initfc2_req,  // Request one InitFC2 set (pulse)
+    input  logic             initfc1_en,           // Sending InitFC1 sequence
+    input  logic             initfc2_en,           // Sending InitFC2 sequence
+    input  logic             initfc1_req,          // Request one InitFC1 set (pulse)
+    input  logic             initfc2_req,          // Request one InitFC2 set (pulse)
     //input  seq_num_t  nack_sequence_number, // Sequence number for NAK/ACK DLLP
 
-    input logic       tlp_valid,
-    input logic       tlp_first,
-    input logic       tlp_last,
-    input logic       tlp_last_half,  // only for DATA_BYTES=8
-    input pipe_data_t tlp_data,
+    input  logic             tlp_valid,
+    input  logic             tlp_first,
+    input  logic             tlp_last,
+    input  logic             tlp_last_half,        // only for DATA_BYTES=8
+    input  pipe_data_t       tlp_data,
 
-    input logic release_flag,
-    input logic retransmit_flag,
+    input  logic             release_flag,
+    input  logic             retransmit_flag,
 
-    input logic     nak_trigger,          //pulse
-    input logic     ack_trigger,          //pulse
-    input seq_num_t nak_sequence_number,
-    input seq_num_t ack_sequence_number,
+    input  logic             nak_trigger,          //pulse
+    input  logic             ack_trigger,          //pulse
+    input  seq_num_t         nak_sequence_number,
+    input  seq_num_t         ack_sequence_number,
 
-    output logic dllp_initfc1_sent,
-    output logic dllp_initfc2_sent,
+    output logic             dllp_initfc1_sent,
+    output logic             dllp_initfc2_sent,
 
-    output logic      retry_buffer_empty,
+    output logic             retry_buffer_empty,
     //output logic                          dllp_sent,
     //output logic                          tlp_sent,
-    output pipe_sym_t tx_sym
+    output pipe_sym_t        tx_sym
 );
 
 
@@ -303,30 +303,30 @@ module virtual_channel_tx
   end
 
   send_dllp u_send_dllp (
-      .clk  (clk),
-      .reset(reset),
+      .clk   (clk),
+      .reset (reset),
 
-      .virtual_channel(virtual_channel),
-      .hdr_credit     (send_hdr_credit),
-      .data_credit    (send_data_credit),
-      .update_type    (send_update_type),
-      .packet_type    (send_packet_type),
+      .virtual_channel (virtual_channel),
+      .hdr_credit      (send_hdr_credit),
+      .data_credit     (send_data_credit),
+      .update_type     (send_update_type),
+      .packet_type     (send_packet_type),
 
-      .nack_sequence_number(nack_sequence_number),
-      .ack_trigger         (ack_sending),
-      .nak_trigger         (nak_sending),
+      .nack_sequence_number (nack_sequence_number),
+      .ack_trigger          (ack_sending),
+      .nak_trigger          (nak_sending),
 
-      .packet_avail(dllp_sending),
+      .packet_avail (dllp_sending),
 
-      .initfc1_en (initfc1_en),
-      .initfc2_en (initfc2_en),
-      .initfc1_req(initfc1_req),
-      .initfc2_req(initfc2_req),
+      .initfc1_en  (initfc1_en),
+      .initfc2_en  (initfc2_en),
+      .initfc1_req (initfc1_req),
+      .initfc2_req (initfc2_req),
 
-      .dllp_initfc1_sent(initfc1_sent),
-      .dllp_initfc2_sent(initfc2_sent),
-      .dllp_sent        (dllp_sent),
-      .tx_sym           (dllp_sym)
+      .dllp_initfc1_sent (initfc1_sent),
+      .dllp_initfc2_sent (initfc2_sent),
+      .dllp_sent         (dllp_sent),
+      .tx_sym            (dllp_sym)
   );
 
   logic release_flag_d;
@@ -371,29 +371,29 @@ module virtual_channel_tx
   end
 
   retry_buffer #(
-      .BRAM_ADDR_WIDTH(RETRY_ADDR_WIDTH)
+      .BRAM_ADDR_WIDTH (RETRY_ADDR_WIDTH)
   ) u_retry_buffer (
-      .clk  (clk),
-      .reset(reset),
+      .clk   (clk),
+      .reset (reset),
 
-      .tlp_valid    (tlp_valid),
-      .tlp_first    (tlp_first),
-      .tlp_last     (tlp_last),
-      .tlp_last_half(tlp_last_half),
-      .tlp_in_data  (tlp_data),
+      .tlp_valid     (tlp_valid),
+      .tlp_first     (tlp_first),
+      .tlp_last      (tlp_last),
+      .tlp_last_half (tlp_last_half),
+      .tlp_in_data   (tlp_data),
 
-      .current_seq_num(current_seq_num),
+      .current_seq_num (current_seq_num),
 
-      .empty(empty),
+      .empty (empty),
 
-      .release_flag   (release_flag_d),
-      .retransmit_flag(retransmit_flag_d),
+      .release_flag    (release_flag_d),
+      .retransmit_flag (retransmit_flag_d),
 
       // First word of TLP is sent, stay asserting until the last word is sent
-      .tlp_sending  (tlp_sending),
+      .tlp_sending   (tlp_sending),
       // TLP is scheduled to be sent, stay asserting until the last word is sent
-      .tlp_scheduled(tlp_scheduled),
-      .tlp_out      (tlp_sym)
+      .tlp_scheduled (tlp_scheduled),
+      .tlp_out       (tlp_sym)
   );
 
   always_ff @(posedge clk or posedge reset) begin

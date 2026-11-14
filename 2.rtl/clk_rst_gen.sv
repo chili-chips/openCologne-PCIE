@@ -57,11 +57,11 @@
 //==========================================================================
 
 module clk_rst_gen (
-    input logic clk_brd,  // board oscillator, on a dedicated clock pin
-    input logic perst_n,  // PERST# from the connector, active low
+    input  logic clk_brd,     // board oscillator, on a dedicated clock pin
+    input  logic perst_n,     // PERST# from the connector, active low
 
-    input logic pclk,    // PCLK, from the PHY
-    input logic phy_rdy, // PCLK: SerDes TX out of reset
+    input  logic pclk,        // PCLK, from the PHY
+    input  logic phy_rdy,     // PCLK: SerDes TX out of reset
 
     output logic rst_pipe_n,
     output logic mac_rst_n
@@ -71,12 +71,12 @@ module clk_rst_gen (
   logic usr_rstn;
   logic perst_por_n;
 
-  CC_USR_RSTN u_usr_rstn (.USR_RSTN(usr_rstn));
+  CC_USR_RSTN u_usr_rstn (.USR_RSTN (usr_rstn));
 
   // The board clock reaches the fabric through a global buffer (UG1001)
   CC_BUFG u_clk_aon (
-      .I(clk_brd),
-      .O(clk_aon)
+      .I (clk_brd),
+      .O (clk_aon)
   );
 
   assign perst_por_n = usr_rstn & perst_n;

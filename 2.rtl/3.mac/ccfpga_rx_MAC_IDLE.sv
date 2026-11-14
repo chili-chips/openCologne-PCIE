@@ -15,12 +15,12 @@ module ccfpga_rx_MAC_IDLE
   import pipe_pkg::*;
   import mac_pkg::*;
 (
-    input logic i_clk,               // Clock
-    input logic i_rx_idle_flag_rst,  // IDLE count reset flag
-    input logic i_com_detected,      // COM detected signal
+    input  logic i_clk,               // Clock
+    input  logic i_rx_idle_flag_rst,  // IDLE count reset flag
+    input  logic i_com_detected,      // COM detected signal
 
-    output logic o_idle_detected,  // IDLE detected signal
-    output logic o_rx_idle_flag    // IDLE count maxed signal
+    output logic o_idle_detected,     // IDLE detected signal
+    output logic o_rx_idle_flag       // IDLE count maxed signal
 );
 
   logic [3:0] rx_count_idle;  // IDLE count

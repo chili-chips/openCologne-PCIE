@@ -187,10 +187,10 @@ module send_dllp
   end
 
   crc_gen u_crc (
-      .crc_en (1'b1),
-      .data_in({body, dtype}),
+      .crc_en  (1'b1),
+      .data_in ({body, dtype}),
 
-      .calc_crc(calc_crc)
+      .calc_crc (calc_crc)
   );
 
   // Ack and Nak: Type 0000_0000 and 0001_0000, the sequence number in bytes

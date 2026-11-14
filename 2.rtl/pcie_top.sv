@@ -44,7 +44,7 @@
 //     trn_bridge. It meets the PHY at pipe_mac and the SOC at two AXI-Stream
 //     TLP streams and the cfg sideband, the same user interface as the AMD
 //     PCIE_2_1 hard block in EP mode (UG477).
-//   - riscv_pcie_soc: eduBOS5 and its CSRs, the firmware that answers the
+//   - soc_top: eduBOS5 and its CSRs, the firmware that answers the
 //     host's requests.
 //   - clk_rst_gen: clocks and resets.
 //
@@ -56,16 +56,16 @@ module pcie_top
   import axis_pkg::*;
   import trn_pkg::*;
 (
-    input logic clk_brd,  // board oscillator
-    input logic perst_n,  // PERST# from the connector, active low
+    input  logic       clk_brd,     // board oscillator
+    input  logic       perst_n,     // PERST# from the connector, active low
 
-          pipe_if.mac pipe_mac,  // to phy_top
-    input logic       phy_rdy,   // from phy_top: SerDes TX out of reset
+           pipe_if.mac pipe_mac,    // to phy_top
+    input  logic       phy_rdy,     // from phy_top: SerDes TX out of reset
 
-    output logic rst_pipe_n,  // to phy_top: PIPE Reset#, the SerDes reset
+    output logic       rst_pipe_n,  // to phy_top: PIPE Reset#, the SerDes reset
 
-    output logic dll_up,  // data link up
-    output logic fw_pass  // the firmware has reported PASS
+    output logic       dll_up,      // data link up
+    output logic       fw_pass      // the firmware has reported PASS
 );
 
   logic mac_rst_n;
@@ -73,43 +73,43 @@ module pcie_top
 
   // TLP streams between the SOC and the PCIE stack
   axis_if #(
-      .DATA_W(TRN_DATA_W),
-      .USER_W($bits(tx_tuser_t))
+      .DATA_W (TRN_DATA_W),
+      .USER_W ($bits(tx_tuser_t))
   ) s_axis_tx ();
   axis_if #(
-      .DATA_W(TRN_DATA_W),
-      .USER_W($bits(rx_tuser_t))
+      .DATA_W (TRN_DATA_W),
+      .USER_W ($bits(rx_tuser_t))
   ) m_axis_rx ();
 
   cfg_if cfg ();
 
   clk_rst_gen u_clk_rst_gen (
-      .clk_brd   (clk_brd),
-      .perst_n   (perst_n),
-      .pclk      (pipe_mac.pclk),
-      .phy_rdy   (phy_rdy),
-      .rst_pipe_n(rst_pipe_n),
-      .mac_rst_n (mac_rst_n)
+      .clk_brd    (clk_brd),
+      .perst_n    (perst_n),
+      .pclk       (pipe_mac.pclk),
+      .phy_rdy    (phy_rdy),
+      .rst_pipe_n (rst_pipe_n),
+      .mac_rst_n  (mac_rst_n)
   );
 
   pcie_core u_core (
-      .rst_pipe_n(rst_pipe_n),
-      .mac_rst_n (mac_rst_n),
-      .core_rst_n(core_rst_n),
-      .pipe      (pipe_mac),
-      .dll_up    (dll_up),
-      .s_axis_tx (s_axis_tx),
-      .m_axis_rx (m_axis_rx),
-      .cfg       (cfg)
+      .rst_pipe_n (rst_pipe_n),
+      .mac_rst_n  (mac_rst_n),
+      .core_rst_n (core_rst_n),
+      .pipe       (pipe_mac),
+      .dll_up     (dll_up),
+      .s_axis_tx  (s_axis_tx),
+      .m_axis_rx  (m_axis_rx),
+      .cfg        (cfg)
   );
 
-  riscv_pcie_soc u_soc (
-      .clk      (pipe_mac.pclk),
-      .resetn   (core_rst_n),
-      .s_axis_tx(s_axis_tx),
-      .m_axis_rx(m_axis_rx),
-      .cfg      (cfg),
-      .fw_pass  (fw_pass)
+  soc_top u_soc (
+      .clk       (pipe_mac.pclk),
+      .resetn    (core_rst_n),
+      .s_axis_tx (s_axis_tx),
+      .m_axis_rx (m_axis_rx),
+      .cfg       (cfg),
+      .fw_pass   (fw_pass)
   );
 
 endmodule

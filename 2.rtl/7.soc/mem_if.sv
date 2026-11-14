@@ -38,7 +38,7 @@
 //--------------------------------------------------------------------------
 
 interface mem_if;
-  // CPU memory bus inside riscv_pcie_soc: the CPU (eduBOS5 or the VProc
+  // CPU memory bus inside soc_top: the CPU (eduBOS5 or the VProc
   // model) issues a request, the RAM or the CSR block answers it.
   logic        valid;
   logic [31:0] addr;

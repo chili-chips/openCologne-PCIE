@@ -34,19 +34,19 @@
 module ccfpga_pipe_fsm_word_align
   import pipe_pkg::*;
 (
-    input logic i_clk,
-    input logic i_reset,
-    input logic i_enable,
+    input  logic         i_clk,
+    input  logic         i_reset,
+    input  logic         i_enable,
 
-    output align_state_e o_fsm_state,  // fsm status (CSS)
+    output align_state_e o_fsm_state,          // fsm status (CSS)
     output logic         o_rx_valid,
 
-    output logic o_cnt_reset,  // Reset Clock Counter
-    input  logic i_cnt_flag,   // Flag for Count Indication
+    output logic         o_cnt_reset,          // Reset Clock Counter
+    input  logic         i_cnt_flag,           // Flag for Count Indication
 
-    output logic o_mcomma_align,       // Byte Lock negative disparity
-    output logic o_pcomma_align,       // Byte Lock positive disparity
-    input  logic i_rx_byte_is_aligned  // Byte lock established
+    output logic         o_mcomma_align,       // Byte Lock negative disparity
+    output logic         o_pcomma_align,       // Byte Lock positive disparity
+    input  logic         i_rx_byte_is_aligned  // Byte lock established
 );
 
 

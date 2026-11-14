@@ -81,15 +81,15 @@ module tl_top
     parameter logic  [ 2:0] L1_ACCEPT_LAT    = 3'd7,
     parameter logic         SLOT_CLOCK       = 1'b1
 ) (
-    input logic clk,   // PCLK
-    input logic rst_n, // mac_rst_n: the TL resets its parts on DL_Down
+    input  logic         clk,     // PCLK
+    input  logic         rst_n,   // mac_rst_n: the TL resets its parts on DL_Down
 
-    dll_if.tl dll,
+           dll_if.tl     dll,
 
-    trn_tx_if.dst trn_tx,  // TLPs from trn_bridge
-    trn_rx_if.src trn_rx,  // TLPs to trn_bridge
+           trn_tx_if.dst trn_tx,  // TLPs from trn_bridge
+           trn_rx_if.src trn_rx,  // TLPs to trn_bridge
 
-    cfg_if.core cfg  // status sideband to the SOC
+           cfg_if.core   cfg      // status sideband to the SOC
 );
 
 
@@ -217,169 +217,169 @@ module tl_top
   assign cfg.id.func       = 3'd0;
 
   tlp_rx_handler u_rx_handler (
-      .clk             (clk),
-      .rst_n           (dl_up),
-      .rx              (rx),
-      .max_payload_size(tl_cfg.max_payload_size),
-      .p_alloc         (p_alloc),
-      .np_alloc        (np_alloc),
-      .p_wr            (p_wr),
-      .p_full          (p_full),
-      .np_wr           (np_wr),
-      .np_full         (np_full),
-      .rel             (rx_rel),
-      .err_malformed   (err.malformed),
-      .err_overflow    (err.overflow)
+      .clk              (clk),
+      .rst_n            (dl_up),
+      .rx               (rx),
+      .max_payload_size (tl_cfg.max_payload_size),
+      .p_alloc          (p_alloc),
+      .np_alloc         (np_alloc),
+      .p_wr             (p_wr),
+      .p_full           (p_full),
+      .np_wr            (np_wr),
+      .np_full          (np_full),
+      .rel              (rx_rel),
+      .err_malformed    (err.malformed),
+      .err_overflow     (err.overflow)
   );
 
   tlp_queue #(
-      .ADDR_W(P_ADDR_W)
+      .ADDR_W (P_ADDR_W)
   ) u_p_queue (
-      .clk    (clk),
-      .rst_n  (dl_up),
-      .wr     (p_wr),
-      .wr_full(p_full),
-      .free   (  /*LINT:OK*/),
-      .commit (p_commit),
-      .pop    (p_pop),
-      .rd     (p_rd),
-      .done   (p_done)
+      .clk     (clk),
+      .rst_n   (dl_up),
+      .wr      (p_wr),
+      .wr_full (p_full),
+      .free    (  /*LINT:OK*/),
+      .commit  (p_commit),
+      .pop     (p_pop),
+      .rd      (p_rd),
+      .done    (p_done)
   );
 
   tlp_queue #(
-      .ADDR_W(NP_ADDR_W)
+      .ADDR_W (NP_ADDR_W)
   ) u_np_queue (
-      .clk    (clk),
-      .rst_n  (dl_up),
-      .wr     (np_wr),
-      .wr_full(np_full),
-      .free   (  /*LINT:OK*/),
-      .commit (np_commit),
-      .pop    (np_pop),
-      .rd     (np_rd),
-      .done   (np_done)
+      .clk     (clk),
+      .rst_n   (dl_up),
+      .wr      (np_wr),
+      .wr_full (np_full),
+      .free    (  /*LINT:OK*/),
+      .commit  (np_commit),
+      .pop     (np_pop),
+      .rd      (np_rd),
+      .done    (np_done)
   );
 
   tlp_queue #(
-      .ADDR_W(TRN_TX_ADDR_W)
+      .ADDR_W (TRN_TX_ADDR_W)
   ) u_app_queue (
-      .clk    (clk),
-      .rst_n  (dl_up),
-      .wr     (app_q_wr),
-      .wr_full(  /*LINT:OK*/),
-      .free   (app_q_free),
-      .commit (  /*LINT:OK*/),
-      .pop    (app_tx_ready),
-      .rd     (app_q_rd),
-      .done   (  /*LINT:OK*/)
+      .clk     (clk),
+      .rst_n   (dl_up),
+      .wr      (app_q_wr),
+      .wr_full (  /*LINT:OK*/),
+      .free    (app_q_free),
+      .commit  (  /*LINT:OK*/),
+      .pop     (app_tx_ready),
+      .rd      (app_q_rd),
+      .done    (  /*LINT:OK*/)
   );
 
   tlp_order u_order (
-      .clk      (clk),
-      .rst_n    (dl_up),
-      .p_commit (p_commit),
-      .p_done   (p_done),
-      .np_commit(np_commit),
-      .np_done  (np_done),
-      .np_ready (np_ready)
+      .clk       (clk),
+      .rst_n     (dl_up),
+      .p_commit  (p_commit),
+      .p_done    (p_done),
+      .np_commit (np_commit),
+      .np_done   (np_done),
+      .np_ready  (np_ready)
   );
 
   tlp_rx_dispatch #(
-      .BAR0_SIZE_BITS(BAR0_SIZE_BITS)
+      .BAR0_SIZE_BITS (BAR0_SIZE_BITS)
   ) u_rx_dispatch (
-      .clk          (clk),
-      .rst_n        (dl_up),
-      .p_rd         (p_rd),
-      .p_pop        (p_pop),
-      .np_rd        (np_rd),
-      .np_ready     (np_ready),
-      .np_pop       (np_pop),
-      .app_rx       (app_rx),
-      .app_rx_ready (trn_rx.rdy),
-      .memory_enable(tl_cfg.memory_enable),
-      .bar0_base    (tl_cfg.bar0_base),
-      .cfg_acc      (cfg_acc),
-      .cfg_rdata    (cfg_rdata),
-      .id           (id),
-      .sspl         (sspl),
-      .cpl_ready    (cpl_ready),
-      .cpl_hold     (cpl_hold),
-      .cpl_req      (cpl_req),
-      .cpl          (cpl),
-      .rel          (dp_rel),
-      .ev_ur        (err.ur),
-      .ev_poisoned  (err.poisoned)
+      .clk           (clk),
+      .rst_n         (dl_up),
+      .p_rd          (p_rd),
+      .p_pop         (p_pop),
+      .np_rd         (np_rd),
+      .np_ready      (np_ready),
+      .np_pop        (np_pop),
+      .app_rx        (app_rx),
+      .app_rx_ready  (trn_rx.rdy),
+      .memory_enable (tl_cfg.memory_enable),
+      .bar0_base     (tl_cfg.bar0_base),
+      .cfg_acc       (cfg_acc),
+      .cfg_rdata     (cfg_rdata),
+      .id            (id),
+      .sspl          (sspl),
+      .cpl_ready     (cpl_ready),
+      .cpl_hold      (cpl_hold),
+      .cpl_req       (cpl_req),
+      .cpl           (cpl),
+      .rel           (dp_rel),
+      .ev_ur         (err.ur),
+      .ev_poisoned   (err.poisoned)
   );
 
   config_space #(
-      .VENDOR_ID       (VENDOR_ID),
-      .DEVICE_ID       (DEVICE_ID),
-      .REVISION_ID     (REVISION_ID),
-      .CLASS_CODE      (CLASS_CODE),
-      .SUBSYS_VENDOR_ID(SUBSYS_VENDOR_ID),
-      .SUBSYS_ID       (SUBSYS_ID),
-      .BAR0_SIZE_BITS  (BAR0_SIZE_BITS),
-      .ASPM_SUPPORT    (ASPM_SUPPORT),
-      .L0S_EXIT_LATENCY(L0S_EXIT_LATENCY),
-      .L1_EXIT_LATENCY (L1_EXIT_LATENCY),
-      .L0S_ACCEPT_LAT  (L0S_ACCEPT_LAT),
-      .L1_ACCEPT_LAT   (L1_ACCEPT_LAT),
-      .SLOT_CLOCK      (SLOT_CLOCK)
+      .VENDOR_ID        (VENDOR_ID),
+      .DEVICE_ID        (DEVICE_ID),
+      .REVISION_ID      (REVISION_ID),
+      .CLASS_CODE       (CLASS_CODE),
+      .SUBSYS_VENDOR_ID (SUBSYS_VENDOR_ID),
+      .SUBSYS_ID        (SUBSYS_ID),
+      .BAR0_SIZE_BITS   (BAR0_SIZE_BITS),
+      .ASPM_SUPPORT     (ASPM_SUPPORT),
+      .L0S_EXIT_LATENCY (L0S_EXIT_LATENCY),
+      .L1_EXIT_LATENCY  (L1_EXIT_LATENCY),
+      .L0S_ACCEPT_LAT   (L0S_ACCEPT_LAT),
+      .L1_ACCEPT_LAT    (L1_ACCEPT_LAT),
+      .SLOT_CLOCK       (SLOT_CLOCK)
   ) u_cfg_space (
-      .clk         (clk),
-      .rst_n       (dl_up),
-      .acc         (cfg_acc),
-      .rdata       (cfg_rdata),
-      .id          (id),
-      .sspl        (sspl),
-      .err         (err),
-      .msg_nonfatal(msg_nonfatal),
-      .msg_fatal   (msg_fatal),
-      .cfg         (tl_cfg)
+      .clk          (clk),
+      .rst_n        (dl_up),
+      .acc          (cfg_acc),
+      .rdata        (cfg_rdata),
+      .id           (id),
+      .sspl         (sspl),
+      .err          (err),
+      .msg_nonfatal (msg_nonfatal),
+      .msg_fatal    (msg_fatal),
+      .cfg          (tl_cfg)
   );
 
   cpl_gen u_cpl_gen (
-      .clk         (clk),
-      .rst_n       (dl_up),
-      .own_id      (cfg.id),
-      .cpl_req     (cpl_req),
-      .cpl         (cpl),
-      .cpl_hold    (cpl_hold),
-      .cpl_ready   (cpl_ready),
-      .msg_nonfatal(msg_nonfatal),
-      .msg_fatal   (msg_fatal),
-      .src         (int_src),
-      .src_ready   (int_ready)
+      .clk          (clk),
+      .rst_n        (dl_up),
+      .own_id       (cfg.id),
+      .cpl_req      (cpl_req),
+      .cpl          (cpl),
+      .cpl_hold     (cpl_hold),
+      .cpl_ready    (cpl_ready),
+      .msg_nonfatal (msg_nonfatal),
+      .msg_fatal    (msg_fatal),
+      .src          (int_src),
+      .src_ready    (int_ready)
   );
 
   fc_credit u_fc_credit (
-      .clk        (clk),
-      .rst_n      (rst_n),
-      .rx_rst_n   (dl_up),
-      .dl_inactive(dl_inactive),
-      .rx_dllp    (dll.rx_dllp),
-      .tx_fc      (tx_fc),
-      .consume    (consume),
-      .p_alloc    (p_alloc),
-      .np_alloc   (np_alloc),
-      .rel_a      (rx_rel),
-      .rel_b      (dp_rel),
-      .tx_dllp    (dll.tx_dllp)
+      .clk         (clk),
+      .rst_n       (rst_n),
+      .rx_rst_n    (dl_up),
+      .dl_inactive (dl_inactive),
+      .rx_dllp     (dll.rx_dllp),
+      .tx_fc       (tx_fc),
+      .consume     (consume),
+      .p_alloc     (p_alloc),
+      .np_alloc    (np_alloc),
+      .rel_a       (rx_rel),
+      .rel_b       (dp_rel),
+      .tx_dllp     (dll.tx_dllp)
   );
 
   tlp_tx_arbiter u_tx_arbiter (
-      .clk              (clk),
-      .rst_n            (dl_up),
-      .int_src          (int_src),
-      .int_ready        (int_ready),
-      .app_tx           (app_tx),
-      .app_tx_ready     (app_tx_ready),
-      .bus_master_enable(tl_cfg.bus_master_enable),
-      .tx_fc            (tx_fc),
-      .consume          (consume),
-      .tx               (tx),
-      .tx_half          (dll.tx_tlp.half),
-      .tx_ready         (dll.tx_tlp_ready)
+      .clk               (clk),
+      .rst_n             (dl_up),
+      .int_src           (int_src),
+      .int_ready         (int_ready),
+      .app_tx            (app_tx),
+      .app_tx_ready      (app_tx_ready),
+      .bus_master_enable (tl_cfg.bus_master_enable),
+      .tx_fc             (tx_fc),
+      .consume           (consume),
+      .tx                (tx),
+      .tx_half           (dll.tx_tlp.half),
+      .tx_ready          (dll.tx_tlp_ready)
   );
 
 endmodule

@@ -39,11 +39,11 @@
 module ccfpga_pipe_rx_mux
   import pipe_pkg::*;
 (
-    input logic i_clk,
-    input logic i_reset,
-    input logic i_enable,
+    input  logic        i_clk,
+    input  logic        i_reset,
+    input  logic        i_enable,
 
-    input serdes_rx_t i_rx,  // SerDes: symbols and their flags
+    input  serdes_rx_t  i_rx,        // SerDes: symbols and their flags
 
     output pipe_data_t  o_data,      // PIPE: data
     output pipe_flags_t o_kcode,     // PIPE: K symbol

@@ -82,7 +82,7 @@ W=${LINT_WORK:-$(mktemp -d)}
 mkdir -p "$W"
 
 # ---- work copy ----------------------------------------------------------------
-(cd "$REPO" && cp -r --parents 2.rtl/*.sv 2.rtl/1.phy/phy_top.sv 2.rtl/1.phy/2.serdes-model \
+(cd "$REPO" && cp -r --parents 2.rtl/*.sv 2.rtl/1.phy/phy_top.sv 2.rtl/1.phy/2.opensource-serdes-model \
    2.rtl/2.pipe/*.sv 2.rtl/3.mac/*.sv 2.rtl/4.dll/*.sv 2.rtl/5.tlp 2.rtl/6.trn_bridge 2.rtl/7.soc \
    "$W/")
 mkdir -p "$W/csr"
@@ -144,7 +144,7 @@ exit_check() {  # $1 phase, $2 exit status
 
 run_tags() {
   bb || { skip tags "no GateMate stubs (yosys-config)"; return; }
-  "$PYTHON" - 2.rtl/1.phy/2.serdes-model/ccfpga_serdes.BFM.sv -- bb.v $SV > tags.log <<'EOF'
+  "$PYTHON" - 2.rtl/1.phy/2.opensource-serdes-model/ccfpga_serdes.BFM.sv -- bb.v $SV > tags.log <<'EOF'
 import re, sys
 ports_only = sys.argv[1:sys.argv.index('--')]
 files = sys.argv[sys.argv.index('--') + 1:]
@@ -197,11 +197,11 @@ run_verilator() {
   cat > waive.vlt <<'VLT'
 `verilator_config
 lint_off -file "*bb.v"
-lint_off -file "*/2.serdes-model/ccfpga_serdes.BFM.sv"
-lint_off -file "*/2.serdes-model/ccfpga_serdes_pkg.sv"
+lint_off -file "*/2.opensource-serdes-model/ccfpga_serdes.BFM.sv"
+lint_off -file "*/2.opensource-serdes-model/ccfpga_serdes_pkg.sv"
 // the synthesis wrapper's serial and termination outputs: CC_SERDES has no such
 // pin (the chip drives its own pads), so they stay unconnected
-lint_off -rule UNDRIVEN -file "*/2.serdes-model/ccfpga_serdes.SYNTH.sv" -match "*SERIO*"
+lint_off -rule UNDRIVEN -file "*/2.opensource-serdes-model/ccfpga_serdes.SYNTH.sv" -match "*SERIO*"
 // top's SerDes nets: no chip pin; the test bench drives and reads them by hierarchy
 lint_off -rule UNDRIVEN -file "*2.rtl/top.sv" -match "*'refclk'*"
 lint_off -rule UNDRIVEN -file "*2.rtl/top.sv" -match "*'ser_rx?'*"
@@ -249,7 +249,7 @@ run_slang() {
   found slang < <(sed -E 's#^(\.\./)+[^ ]*/(2\.rtl|csr)/#\2/#;
                           s/^([^ :]+:[0-9]+): Warning:/\1:0: warning:/;
                           s/^([^ :]+:[0-9]+): Error:/\1:0: error:/' slang.log |
-                  grep -E 'warning:|error:' | grep -v -E '^(bb\.v|2\.rtl/1\.phy/2\.serdes-model/ccfpga_serdes(\.BFM|_pkg)\.sv)')
+                  grep -E 'warning:|error:' | grep -v -E '^(bb\.v|2\.rtl/1\.phy/2\.opensource-serdes-model/ccfpga_serdes(\.BFM|_pkg)\.sv)')
   exit_check slang $rc
 }
 

@@ -25,7 +25,7 @@ set -e
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
-MODEL_DIR="${REPO_ROOT}/2.rtl/1.phy/2.serdes-model"
+MODEL_DIR="${REPO_ROOT}/2.rtl/1.phy/2.opensource-serdes-model"
 PIPE_DIR="${REPO_ROOT}/2.rtl/2.pipe"
 
 . "${HERE}/serdes_nda_env.sh"

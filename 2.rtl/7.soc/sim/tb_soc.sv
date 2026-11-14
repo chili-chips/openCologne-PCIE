@@ -10,7 +10,7 @@
 //   RISC-V views (tb_soc.RISCV-ISA.wavecrux). The PCIE side is idle: no TLP
 //   arrives, and the SOC's own TLPs are taken and dropped, so the firmware
 //   starts up and then waits for a request from the host. cpu_view shows
-//   the CPU's retired instructions (riscv_pcie_soc's rvfi) under the RVFI
+//   the CPU's retired instructions (soc_top's rvfi) under the RVFI
 //   names. Run: bash run-soc.sh
 //==========================================================================
 
@@ -56,7 +56,7 @@ module tb_soc
 
   logic fw_pass;
 
-  riscv_pcie_soc dut (
+  soc_top dut (
       .clk      (clk),
       .resetn   (resetn),
       .s_axis_tx(s_axis_tx),

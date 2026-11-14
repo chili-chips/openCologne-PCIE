@@ -15,7 +15,7 @@
   * [Transaction taps: a test platform at every layer](#transaction-taps-a-test-platform-at-every-layer)
   * [Viewing the EP in WaveCrux](#viewing-the-ep-in-wavecrux)
   * [Choosing the user code](#choosing-the-user-code)
-  * [Verilator and Icarus, side by side](#verilator-and-icarus-side-by-side)
+  * [Verilator, Icarus and JanusHDL, side by side](#verilator-icarus-and-janushdl-side-by-side)
   * [Build defines](#build-defines)
   * [From XSIM to Verilator, via Icarus](#from-xsim-to-verilator-via-icarus)
   * [VIP versions and local changes](#vip-versions-and-local-changes)
@@ -62,14 +62,14 @@ Every layer is covered twice, on purpose: block-level test benches debug each un
 |---|---|---|---|
 | Top | `5.sim` (here) | validates the units together: MAC + DLL + TL RTL and firmware (enumeration, configuration, PIO); with `IFACE=serial`, also Cologne Chip's PIPE and SerDes | openPCIE's Artix-7 RC model, in `RCPIPEx1__pcieVHost` |
 | DLL over PIPE + PHY | [`2.rtl/4.dll/sim`](../2.rtl/4.dll/sim) | unit debug: DLL, MAC/LTSSM, PIPE and SerDes BFM on the serial line | a second copy of the same stack |
-| PIPE + PHY | [`2.rtl/1.phy/3.sim`](../2.rtl/1.phy/3.sim) | unit debug: Cologne Chip's PIPE logic over the GateMate SerDes; the [SerDes BFM](../2.rtl/1.phy/2.serdes-model) against the vendor model | the vendor's PIPE test case; the BFM, looped back |
+| PIPE + PHY | [`2.rtl/1.phy/3.sim`](../2.rtl/1.phy/3.sim) | unit debug: Cologne Chip's PIPE logic over the GateMate SerDes; the [SerDes BFM](../2.rtl/1.phy/2.opensource-serdes-model) against the vendor model | the vendor's PIPE test case; the BFM, looped back |
 
 How to run each, and today's status: [Simulation, layer by layer](../2.rtl/README.md#simulation-layer-by-layer).
 
 `IFACE` sets the top level's depth:
 
 - **`pipe`**: the host sits at the PIPE. Fast (eight symbols per 31.25 MHz clock), and a failure points at MAC, DLL, TL or firmware.
-- **`serial`**, `EP=rtl`: the real PHY is in; the host drives the serial line. Slower (2.5 Gb/s bit rate), but covers the whole stack, on the open-source [SerDes BFM](../2.rtl/1.phy/2.serdes-model), so anyone can run it.
+- **`serial`**, `EP=rtl`: the real PHY is in; the host drives the serial line. Slower (2.5 Gb/s bit rate), but covers the whole stack, on the open-source [SerDes BFM](../2.rtl/1.phy/2.opensource-serdes-model), so anyone can run it.
 - **`serial`**, `EP=model`: the serial line without the GateMate PHY; EP model and host are both upstream's `PcieVhostSerial`. Checks the host and its spec checker on the line (8b/10b, scrambling, the speed change), on Verilator and Icarus, while our EP RTL is not ready.
 
 ### A host already proven against real silicon
@@ -97,11 +97,12 @@ The layers below have their own Icarus Verilog flows, next to their RTL: the PHY
 
 ## Running the co-simulation
 
-Open-source simulators only: Verilator (default) or Icarus Verilog. From `5.sim`, on Linux or WSL:
+Open-source simulators: Verilator (default) or Icarus Verilog. [JanusHDL](https://que.no/janushdl/), free but closed source, is an option. From `5.sim`, on Linux or WSL:
 
 ```sh
 make run                     # Verilator
 make SIM=icarus run          # Icarus Verilog
+make SIM=janushdl run        # JanusHDL (jhdl 0.17 or later), EP model only
 make DUMP=1 run              # also write tb.fst
 make IFACE=serial run        # the EP model and the host on the serial line
 make EP=rtl run              # our EP RTL + firmware, the host at the PIPE
@@ -109,12 +110,12 @@ make EP=rtl IFACE=serial run # the same with the real PHY, the host on the seria
 make EP=rtl DUMP=1 run       # also write tb_rtl.fst: every layer of the EP, for WaveCrux
 ```
 
-`DUMP=1` writes the FST natively (Verilator `--trace-fst`, Icarus `vvp -fst`):
+`DUMP=1` writes the FST natively (Verilator `--trace-fst`, Icarus `vvp -fst`, JanusHDL `--fst`: every signal):
 
 - **`EP=model`: `tb.fst`.** The PIPE link both ways, its clock and reset, and one decoder page per pcieVHost (`tb.u_rc`, `tb.dut.bfm_pcie`): every decoder input (PIPE, DLL, TLPs), under the names WaveCrux auto-binds. `IFACE=serial`: `tb_serial.fst`, the serial line (`tb.ser_dn_line`, `tb.ser_up_line`); on Icarus also the ports of both models (Verilator: `tb.vlt` keeps the upstream models out).
 - **`EP=rtl`: `tb_rtl.fst`** (`IFACE=serial`: `tb_rtl_serial.fst`). A decoder page at every layer boundary of our EP ([below](#viewing-the-ep-in-wavecrux)).
 - **Session.** [`tb.DLL-PIPE.wavecrux`](tb.DLL-PIPE.wavecrux) opens the tracked [`tb.fst`](tb.fst) (Verilator run) with Ferrite's PIPE and DLL decoders on both directions. It binds signals by number: after a change to the dumped signals, run [`tools/wavecrux-rebind.py`](tools/wavecrux-rebind.py) on it.
-- **lz4.** Verilator 5.052 has its own FST writer, which needs the lz4 headers (`liblz4-dev`).
+- **lz4.** Verilator 5.055 has its own FST writer, which needs the lz4 headers (`liblz4-dev`).
 
 **VIP.** VProc, the pcieVHost PCIE model and mem_model are copied from upstream into [`vip`](vip/README.md); our own wrappers are in `models/`. The first build compiles the VIP once into `~/.cache/opencologne-pcie/vip`, the Makefile's `$VIP_DIR` ([`tools/build-vip.sh`](tools/build-vip.sh)). VProc is built with openPCIE's `vproc-coroutine.patch`: the user code runs as a coroutine on the simulator's thread, not in a thread per node. That is about 22 times faster and deterministic, with no operating system scheduler in the handover (the prime suspect of the intermittent slow mode), so every run takes the same time: an `EP=model` run took 0.8 s instead of 17.7 s, same results (2026-10-31); with today's longer tester, about 1 s, and 100 seeds, 8 at a time, in about 19 s, all PASS ([details](https://github.com/chili-chips/openPCIE/tree/main/5.sim#our-local-vip-improvements)).
 
@@ -149,8 +150,8 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
 | | Upstream pcieVHost 1.9.3 RC | Artix-7 RC model |
 |---|---|---|
 | Link training | to L0, shortened (`LTSSM_ABBREVIATED`: 16 TS1 in Polling.Active) | to L0 as the lab RC: full length, its TS counts and timeouts; Gen2 if the EP offers it |
-| FC init against our one InitFC1 and one InitFC2 set ([#25](https://github.com/chili-chips-ba/openCologne-PCIE/issues/25)) | hangs: after FC_INIT1 it waits for all three InitFC types again | completes on our first InitFC2 or UpdateFC, as the spec has it |
-| Requests | as fast as the model can send them; a TLP right after another is dropped ([#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26)) | the RC firmware's, with its think times, as on the lab RC; then, in the default tester mode, the tester's stages, below (`A7RC=1`: the lab RC's requests only) |
+| FC init against our one InitFC1 and one InitFC2 set ([BA#25](https://github.com/chili-chips-ba/openCologne-PCIE/issues/25)) | hangs: after FC_INIT1 it waits for all three InitFC types again | completes on our first InitFC2 or UpdateFC, as the spec has it |
+| Requests | as fast as the model can send them; a TLP right after another is dropped ([BA#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26)) | the RC firmware's, with its think times, as on the lab RC; then, in the default tester mode, the tester's stages, below (`A7RC=1`: the lab RC's requests only) |
 | Spec checks | none | every TLP and DLLP, against PCIe Base 2.1 rules ([drive and check](https://github.com/chili-chips/openPCIE/tree/main/5.sim#drive-and-check)) |
 | Result | stops in FC init, no TLP sent | `A7RC=1`: `RC MODEL RESULT: PASS`, `fw_pass` set, no violation. Tester (default): FAIL, below |
 
@@ -163,10 +164,10 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
   - requests the EP must not support;
   - odd requests: ECRC, poisoned, traffic classes;
   - Data Link faults;
-  - EP DMA under credit starvation ([`models/a7rc-model/ep_dma.h`](models/a7rc-model/ep_dma.h)), only with `DMA=1`: our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41));
+  - EP DMA under credit starvation ([`models/a7rc-model/ep_dma.h`](models/a7rc-model/ep_dma.h)), only with `DMA=1`: our EP has no DMA yet ([BA#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41));
   - speed changes and retrains; speed changes only when both sides do Gen2 (the EP model and our RTL are Gen1).
 - **Literal** (`A7RC=1`): only what the lab RC sends, with its timing.
-- **Against our EP** (2026-11-02) the tester run fails. The checker flags Naks for back-to-back TLPs ([#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26); on an error-free line any Nak is a violation, `DL.NAK`), no replay after held Acks or across a Recovery (`DL.REPLAY`, `TL.CPL-ALL`, [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)) and the SKP interval (`PL.SKP`, [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38)). The InitFC after every Recovery (`FC.INIT-ORDER`, [#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)), Unsupported Request for reads longer than 1 DW (`TL.UR`, [#36](https://github.com/chili-chips-ba/openCologne-PCIE/issues/36)) and reads that return data older than an earlier write (`TL.ORDER`, [#37](https://github.com/chili-chips-ba/openCologne-PCIE/issues/37)) are fixed.
+- **Against our EP** (2026-11-02) the tester run fails. The checker flags Naks for back-to-back TLPs ([BA#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26); on an error-free line any Nak is a violation, `DL.NAK`), no replay after held Acks or across a Recovery (`DL.REPLAY`, `TL.CPL-ALL`, [BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24)) and the SKP interval (`PL.SKP`, [BA#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38)). The InitFC after every Recovery (`FC.INIT-ORDER`, [BA#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)), Unsupported Request for reads longer than 1 DW (`TL.UR`, [BA#36](https://github.com/chili-chips-ba/openCologne-PCIE/issues/36)) and reads that return data older than an earlier write (`TL.ORDER`, [BA#37](https://github.com/chili-chips-ba/openCologne-PCIE/issues/37)) are fixed.
 
 **Spec checker.** Every TLP and DLLP on the link is checked against PCIe Base Specification 2.1 rules, each with an ID and section number; a table of checks and violations prints at the end, and any violation fails the run.
 
@@ -174,7 +175,7 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
 - The tester's random mix is seeded (`make SEED=N`, `make regress`).
 - The EP model passes all of them, at the PIPE and on the serial line, over 100 seeds. Our EP passes with `A7RC=1` and fails the tester, above.
 
-The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22): our DLL's InitFC advertised P 32/1008 and NP 32/1, while the TL has 8/32 and 8/8, so its first UpdateFC-NP (9 after 32) looked to the host like a jump of 233 header credits. Fixed on our fork of gatemate-pipe (`send_dllp.sv` builds the InitFC DLLPs from `INIT_*`); `pcie_core.sv` gives the TL and DLL the same credits.
+The model also found [BA#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22): our DLL's InitFC advertised P 32/1008 and NP 32/1, while the TL has 8/32 and 8/8, so its first UpdateFC-NP (9 after 32) looked to the host like a jump of 233 header credits. Fixed on our fork of gatemate-pipe (`send_dllp.sv` builds the InitFC DLLPs from `INIT_*`); `pcie_core.sv` gives the TL and DLL the same credits.
 
 ### Make options
 
@@ -182,12 +183,12 @@ The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/is
 
 | Switch | Values | Selects | Today |
 |---|---|---|---|
-| `SIM` | `verilator` (default), `icarus` | the simulator; the C/C++ models talk DPI-C to Verilator, VPI to Icarus | both, with `EP=model`; `EP=rtl` on Verilator only |
+| `SIM` | `verilator` (default), `icarus`, `janushdl` | the simulator; the C/C++ models talk DPI-C to Verilator, VPI to Icarus and JanusHDL (the Icarus build of the models, so JanusHDL needs Icarus installed) | all three, with `EP=model`; `EP=rtl` on Verilator only |
 | `EP` | `model` (default), `rtl` | the EP: a second pcieVHost in EP mode (`EPPIPEx1__pcieVHost_DUT`, node 1), or our MAC + DLL + TL RTL with firmware | `model` passes; `rtl` passes with `A7RC=1`, fails the default tester mode, [above](#the-host-openpcies-artix-7-rc-model); `rtl` on Verilator only: Icarus does not parse the generated `csr_pkg.sv` (unpacked structs) |
 | `IFACE` | `pipe` (default), `serial` | where the host meets the EP: the PIPE (`RCPIPEx1__pcieVHost`, node 2; with `EP=rtl` in the `phy_top` socket), or the serial line (`PcieVhostSerial`), which adds the PHY: the real one with `EP=rtl`, the EP model's own with `EP=model` | all four `EP` x `IFACE` work; `EP=rtl` gives the same results on both, [above](#running-the-co-simulation) |
 | `CPU` | `rtl`, `vproc`, `iss` | the SOC CPU, with `EP=rtl`: eduBOS5 RTL, a native C/C++ program at node 0, or the rv32 ISS ([below](#the-cpu-node-three-ways-to-run-the-socs-software)) | all three, with `EP=rtl` |
 | `A7RC` | `0` (default), `1` | the host's mode: the tester (the lab RC's sequence, then a config space sweep and back-to-back requests), or literal, only what the lab RC sends ([above](#the-host-openpcies-artix-7-rc-model)) | both pass with `EP=model` |
-| `DMA` | `0` (default), `1` | the tester's EP DMA stage: off, or on | off until our EP has DMA ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)); the EP model passes it |
+| `DMA` | `0` (default), `1` | the tester's EP DMA stage: off, or on | off until our EP has DMA ([BA#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)); the EP model passes it |
 | `SEED` | `1` (default), any | the seed of the tester's random stimulus, read at run time (no rebuild) | |
 | `SEEDS` | `10` (default) | `make regress`: seeds 1 to `SEEDS` | 100 seeds pass with `EP=model`; at about 1 s a seed, 1000 seeds per regression are practical (about 3 minutes with `REGRESS_JOBS=8`) |
 | `REGRESS_JOBS` | `1` (default), any | seeds run side by side, each in `obj/regress/<seed>/` ([`tools/regress.sh`](tools/regress.sh)) | a seed takes about 1 s with the EP model (coroutine VProc, below) |
@@ -198,13 +199,13 @@ The model also found [#22](https://github.com/chili-chips-ba/openCologne-PCIE/is
 | `WCX_OPEN` | `1` (default), `0` | `make wavecrux SEED=N`: that seed with its waveform, opened in WaveCrux at the checker's first violation ([`tools/wavecrux.py`](tools/wavecrux.py); WaveCrux started with `--wcp-port 54321`); `0`: the waveform only | cursor and view set over WCP |
 | `OPTFLAG` | `-O2 -g` (default) | the C/C++ of the models and our user code; the VIP libraries are built `-O2 -g` too | `-O0` and `-O2` give the same result |
 | `DUMP` | `0` (default), `1` | write the FST: `tb.fst`, `tb_serial.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst`, by `EP` and `IFACE` | |
-| `USRSIMFLAGS` | none (default) | extra Verilator or Icarus flags, such as defines | |
+| `USRSIMFLAGS` | none (default) | extra simulator flags, such as defines | |
 
 ### Sanity and regression
 
-Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh SIM=icarus`). The EP DMA stage runs only in the regression's seeds (`DMA=1`, on the EP model): our EP has no DMA yet ([#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)).
+Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh SIM=icarus`). The EP DMA stage runs only in the regression's seeds (`DMA=1`, on the EP model): our EP has no DMA yet ([BA#41](https://github.com/chili-chips-ba/openCologne-PCIE/issues/41)).
 
-**Sanity**, after every change: `bash run-sanity.sh`, six runs, about 2 minutes. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines. Our EP drops an SKP ([#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38)), so its three runs go on past the SVA and pass as "known #38" if PL.SKP holds every checker violation and the firmware still ends `0x0000face`.
+**Sanity**, after every change: `bash run-sanity.sh`, six runs, about 2 minutes. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines. Our EP drops an SKP ([BA#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38)), so its three runs go on past the SVA and pass as "known #38" if PL.SKP holds every checker violation and the firmware still ends `0x0000face`.
 
 ```sh
 make run                          # EP model at the PIPE, Verilator
@@ -232,11 +233,11 @@ make EP=rtl IFACE=serial A7RC=1 run                   # our EP with the real PHY
 |---|---|---|
 | `make regress SEEDS=100 REGRESS_JOBS=8 DMA=1` | 20 s | 0 of 100 failed; every rule checked in some seed (the EP model answers CRS in one seed in four), but `PL.SPEED` and `PL.EIOS`: not applicable, our EP and the EP model are Gen1 |
 | Verilator against Icarus | 3 min (Icarus serial) | the same `===>` lines, PIPE and serial |
-| `make EP=rtl run` | 90 s | FAIL: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), [#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26), [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38), [#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40), [#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42); `SVA #38` from 139 µs, a dropped SKP; `SVA #24` at 2.86 ms, a TLP neither Acked nor replayed; the regression lets it go on (`SIM_ARGS=+verilator+error+limit+100`), through the TL issues, until the first Recovery at 3.07 ms: the EP stays in L0 (#42) to the 10 ms limit |
-| `make EP=rtl IFACE=serial A7RC=1 run` | 35 s | FAIL: [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38), stops at 216.0 µs on `SVA #38`: the MAC drops an SKP Ordered Set |
+| `make EP=rtl run` | 90 s | FAIL: [BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), [BA#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26), [BA#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38), [BA#40](https://github.com/chili-chips-ba/openCologne-PCIE/issues/40), [BA#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42); `SVA #38` from 139 µs, a dropped SKP; `SVA #24` at 2.86 ms, a TLP neither Acked nor replayed; the regression lets it go on (`SIM_ARGS=+verilator+error+limit+100`), through the TL issues, until the first Recovery at 3.07 ms: the EP stays in L0 (BA#42) to the 10 ms limit |
+| `make EP=rtl IFACE=serial A7RC=1 run` | 35 s | FAIL: [BA#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38), stops at 216.0 µs on `SVA #38`: the MAC drops an SKP Ordered Set |
 | `run-phy.sh pipe64`, `equiv` | 5 s | PASS |
 | `run-dll-phy.sh` | 6 s | PASS: a corrupted sequence number, TLP byte or LCRC is Naked and replayed, a DLLP with a bad CRC dropped |
-| `run-dll-phy.sh --inject=stp`, `--inject=end` | 10 s each | FAIL: [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), a TLP with its STP or END hit is never replayed |
+| `run-dll-phy.sh --inject=stp`, `--inject=end` | 10 s each | FAIL: [BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24), a TLP with its STP or END hit is never replayed |
 | `run-tl.sh` | 20 s | PASS |
 
 `make DMA=1 run` adds the DMA stage: the EP model passes it.
@@ -245,9 +246,9 @@ make EP=rtl IFACE=serial A7RC=1 run                   # our EP with the real PHY
 
 | Assertion | Fails when | Issue |
 |---|---|---|
-| `a_skp` | in L0, no SKP Ordered Set on the PIPE for 1538 + 128 + 28 Symbol Times (4.2.7.1) | [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
-| `a_skp_mux` | the MAC's SKP generator sends its SKP word in a cycle its output mux gives to data, an OS or IDLE: the SKP is lost | [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
-| `a_replay` | a TLP in the retry buffer is neither Acked nor replayed within the REPLAY_TIMER limit, 2 × 711 Symbol Times (3.5.2.1), in L0 | [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
+| `a_skp` | in L0, no SKP Ordered Set on the PIPE for 1538 + 128 + 28 Symbol Times (4.2.7.1) | [BA#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
+| `a_skp_mux` | the MAC's SKP generator sends its SKP word in a cycle its output mux gives to data, an OS or IDLE: the SKP is lost | [BA#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
+| `a_replay` | a TLP in the retry buffer is neither Acked nor replayed within the REPLAY_TIMER limit, 2 × 711 Symbol Times (3.5.2.1), in L0 | [BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
 | `a_fc_init` | the DLL enters DL_Active, but the TL does not hold the InitFC credit limits of P, NP and Cpl (3.2.1) | none: fixed, the TL runs on `mac_rst_n` |
 
 ### WaveCrux decoders
@@ -298,7 +299,7 @@ What it gives us:
 With `EP=rtl`, `DUMP=1` gives our EP a decoder page at every layer boundary:
 
 - [`models/ep_wavecrux_view.sv`](models/ep_wavecrux_view.sv), bound into `pcie_core` as `wavecrux` (`tb.dut.u_core.wavecrux`; with `IFACE=serial` `tb.dut.u_pcie_top.u_core.wavecrux`);
-- the CPU's retired instructions, `riscv_pcie_soc.cpu_view` (`DUMP=1` builds eduBOS5 with `RISCV_FORMAL`).
+- the CPU's retired instructions, `soc_top.cpu_view` (`DUMP=1` builds eduBOS5 with `RISCV_FORMAL`).
 
 [`wavecrux.f`](wavecrux.f) lists the view files. Verilator does not limit the trace to the `$dumpvars` scopes, so the FST also holds all of `pcie_top`, six levels deep: the RTL behind every decoded packet is in the same file.
 
@@ -323,10 +324,10 @@ The sessions open the FST from this directory: [`tb_rtl.EP-layers.wavecrux`](tb_
 - a Pro licence, for the Pro rows;
 - after an RTL change, [`tools/wavecrux-rebind.py`](tools/wavecrux-rebind.py): a session binds its decoders by signal number (the FST handle), and the RTL can renumber them.
 
-The pictures are WaveCrux Pro 1.1.0 with wcx-pcie 0.2.0. They predate the Artix-7 RC host: the host is upstream's, with its abbreviated LTSSM, and #25 shows as a hang.
+The pictures are WaveCrux Pro 1.1.0 with wcx-pcie 0.2.0. They predate the Artix-7 RC host: the host is upstream's, with its abbreviated LTSSM, and BA#25 shows as a hang.
 
 - **Layer column.** The column on the far left, with the layer of every row, is ours, added to the screenshots: WaveCrux names a decoder row only by its decoder (`PCIe TLP #1`, in its own name column next to ours).
-- **Which run.** Link training, flow-control init and the MAC findings: the repo as it is. The rest: a run with the three DLL issues [above](#the-host-openpcies-artix-7-rc-model) worked around locally, as without them no TLP gets through: InitFC repeated every 0.1 µs ([#25](https://github.com/chili-chips-ba/openCologne-PCIE/issues/25)), the TL given the DLL's fixed InitFC credits ([#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)) and a gap after every host write ([#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26)).
+- **Which run.** Link training, flow-control init and the MAC findings: the repo as it is. The rest: a run with the three DLL issues [above](#the-host-openpcies-artix-7-rc-model) worked around locally, as without them no TLP gets through: InitFC repeated every 0.1 µs ([BA#25](https://github.com/chili-chips-ba/openCologne-PCIE/issues/25)), the TL given the DLL's fixed InitFC credits ([BA#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22)) and a gap after every host write ([BA#26](https://github.com/chili-chips-ba/openCologne-PCIE/issues/26)).
 - **Zoom.** A stretch too long for the decoders' labels is followed by a zoomed picture. WaveCrux rounds its time-ruler labels, so several ticks can carry the same label; the text gives exact times.
 
 **The whole run.** Host on top, then the request path down to the CPU, then the answer path back up:
@@ -350,25 +351,25 @@ Zoomed in on 68.85 to 70.45 µs, through Configuration: the host's `TS1 link=0 l
 
 <img alt="WaveCrux, the TS1 of Config.Linkwidth and Config.Lanenum, both sides" src="../0.doc/5.sim/wavecrux-ep-link-zoom.png" width=900 />
 
-The flow-control init is [#25](https://github.com/chili-chips-ba/openCologne-PCIE/issues/25) as it happens: the EP sends one InitFC1 set on entering DL_Init FC1, one InitFC2 set in FC2, and goes to DL_Active at 73.55 µs on the host's InitFC2 (0.2 µs later than in the run above, where #25 is worked around). The host repeats its InitFC2 set every 0.18 µs, waiting for one more EP set that never comes; for the rest of the run the EP sends only an UpdateFC every 30 µs, and no TLP crosses `dll_if`:
+The flow-control init is [BA#25](https://github.com/chili-chips-ba/openCologne-PCIE/issues/25) as it happens: the EP sends one InitFC1 set on entering DL_Init FC1, one InitFC2 set in FC2, and goes to DL_Active at 73.55 µs on the host's InitFC2 (0.2 µs later than in the run above, where BA#25 is worked around). The host repeats its InitFC2 set every 0.18 µs, waiting for one more EP set that never comes; for the rest of the run the EP sends only an UpdateFC every 30 µs, and no TLP crosses `dll_if`:
 
 <img alt="WaveCrux, flow-control init: one InitFC1 set and one InitFC2 set from the EP, the host repeating its InitFC2" src="../0.doc/5.sim/wavecrux-ep-fc-init.png" width=900 />
 
-Zoomed in on the two sets of the EP, with the fixed credits of [#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22) (H=32 for P and NP, Cpl infinite): `InitFC1-P`, `-NP`, `-Cpl` in DL_Init FC1 (top), `InitFC2-*` in FC2 (bottom), on DLL -> MAC and on the PIPE. The host is still sending InitFC1 then. On the PIPE TX row of the top half, the decoder's `Scrambling: on (detected)` notice is drawn over the first DLLP ([wavecrux#52](https://github.com/Ferrite-Engineering/wavecrux/issues/52)):
+Zoomed in on the two sets of the EP, with the fixed credits of [BA#22](https://github.com/chili-chips-ba/openCologne-PCIE/issues/22) (H=32 for P and NP, Cpl infinite): `InitFC1-P`, `-NP`, `-Cpl` in DL_Init FC1 (top), `InitFC2-*` in FC2 (bottom), on DLL -> MAC and on the PIPE. The host is still sending InitFC1 then. On the PIPE TX row of the top half, the decoder's `Scrambling: on (detected)` notice is drawn over the first DLLP ([wavecrux#52](https://github.com/Ferrite-Engineering/wavecrux/issues/52)):
 
 <img alt="WaveCrux, the InitFC1 and InitFC2 sets of the EP" src="../0.doc/5.sim/wavecrux-ep-fc-init-zoom.png" width=900 />
 
 **Found with the decoders.** Red rows are the decoders' error flags. Two point at our MAC, transmit and receive side; the first also shows a gap in the decoder.
 
-Every SKP the EP sends in Polling cuts a TS1 short ([#31](https://github.com/chili-chips-ba/openCologne-PCIE/issues/31)): its first 8 symbols, 16 data symbols (`f527f4ec622438c8`, `e2d32ce6a740be8d`), the SKP ordered set with 4 data symbols behind it (`14c017ff1c1c1cbc`, K `0f`), 8 zero symbols, then the next TS1. The same every 4.77 µs, 14 times before L0:
+Every SKP the EP sends in Polling cuts a TS1 short ([BA#31](https://github.com/chili-chips-ba/openCologne-PCIE/issues/31)): its first 8 symbols, 16 data symbols (`f527f4ec622438c8`, `e2d32ce6a740be8d`), the SKP ordered set with 4 data symbols behind it (`14c017ff1c1c1cbc`, K `0f`), 8 zero symbols, then the next TS1. The same every 4.77 µs, 14 times before L0:
 
 <img alt="WaveCrux, a TS1 cut short at an SKP in Polling.Active: data symbols outside a packet" src="../0.doc/5.sim/wavecrux-ep-skp.png" width=900 />
 
-Once more with a TS2 ([#31](https://github.com/chili-chips-ba/openCologne-PCIE/issues/31)), on the step from Polling.Configuration to Config.Linkwidth.Start (68.88 µs): its first half (`4545000200f7f7bc`), then data (`fa28fbe36d2b37c7`) and 8 zero symbols instead of its second half, then TS1. Only ordered sets may be sent in Polling and Configuration. pcieVHost does not mind; a link partner that counts consecutive TS1 or TS2 may:
+Once more with a TS2 ([BA#31](https://github.com/chili-chips-ba/openCologne-PCIE/issues/31)), on the step from Polling.Configuration to Config.Linkwidth.Start (68.88 µs): its first half (`4545000200f7f7bc`), then data (`fa28fbe36d2b37c7`) and 8 zero symbols instead of its second half, then TS1. Only ordered sets may be sent in Polling and Configuration. pcieVHost does not mind; a link partner that counts consecutive TS1 or TS2 may:
 
 <img alt="WaveCrux, a TS2 cut short on the step to Configuration" src="../0.doc/5.sim/wavecrux-ep-ts2.png" width=900 />
 
-The MAC's receive side passes the SKP ordered sets the host sends on to the DLL, as data ([#32](https://github.com/chili-chips-ba/openCologne-PCIE/issues/32)): at 80.3 µs MAC -> DLL carries `f00308c05c1c1c1c` with K `08`, so `1c 1c 1c` as data before the SDP of the next DLLP (the COM is in the word before, which does not reach the DLL), and the decoder flags `Data outside a packet`. It happens every 80 µs, the host's SKP interval, at 160.3 µs with the COM too (`001c1c1cbcfdeda2`, K `04`); the DLL ignores them:
+The MAC's receive side passes the SKP ordered sets the host sends on to the DLL, as data ([BA#32](https://github.com/chili-chips-ba/openCologne-PCIE/issues/32)): at 80.3 µs MAC -> DLL carries `f00308c05c1c1c1c` with K `08`, so `1c 1c 1c` as data before the SDP of the next DLLP (the COM is in the word before, which does not reach the DLL), and the decoder flags `Data outside a packet`. It happens every 80 µs, the host's SKP interval, at 160.3 µs with the COM too (`001c1c1cbcfdeda2`, K `04`); the DLL ignores them:
 
 <img alt="WaveCrux, the SKP symbols of a received SKP ordered set reaching the DLL as data" src="../0.doc/5.sim/wavecrux-ep-macrx-skp.png" width=900 />
 
@@ -441,7 +442,7 @@ Each VProc node runs a C/C++ program with entry point `VUserMain<n>()`, `n` the 
 | `USER_C` | `VUserMain1.cpp` (`EP=model`), none (`EP=rtl`) | our programs: one `VUserMain<n>` per node (1 = EP model, 0 = native CPU), plus any helper files they need; the host, openPCIE's `VUserMain2.cpp`, `a7rc_check.cpp` and `ltssm.c`, is always added |
 | `USRCODEDIR` | `5.sim/usercode` | the directory all of `USER_C` is read from; it is also on the include path |
 | `OPTFLAG` | `-O2 -g` | compiler flags for the user code; `-O0` and `-O2` must give the same result |
-| `USRSIMFLAGS` | empty | extra simulator flags, e.g. a define: `+define+X` for Verilator, `-DX` for Icarus |
+| `USRSIMFLAGS` | empty | extra simulator flags, e.g. a define: `+define+X` for Verilator and JanusHDL, `-DX` for Icarus |
 
 ```sh
 make USER_C="VUserMain1.cpp my_checks.cpp" run   # add a helper file
@@ -450,23 +451,27 @@ make USRCODEDIR=$HOME/tests/ep run                # another EP model program, sa
 
 A different test is a different `USER_C` or `USRCODEDIR`, with no make file change. Run `make clean` after changing `OPTFLAG`: built object files are not recompiled.
 
-### Verilator and Icarus, side by side
+### Verilator, Icarus and JanusHDL, side by side
 
-The same test bench on both simulators, `EP=model` (2026-10-31, WSL2, Verilator 5.052, Icarus Verilog 13.0):
+The same test bench on the three simulators, `EP=model`, tester (2026-11-13, WSL2, Verilator 5.055, Icarus Verilog 14.0 devel, JanusHDL 0.17.0):
 
-| | Verilator | Icarus |
-|---|---|---|
-| Host results (`===>` lines), tester | 138, all rules pass | identical, line for line |
-| Every TLP, DLLP and ordered set, with its time | | the same |
-| `IFACE=serial` | 138, all rules pass | identical, line for line |
-| Wall-clock time, `make run`, tester (PIPE, serial), 2026-11-01 | 1 s, 14 s | 10 s, about 4 min |
-| C models reached via | DPI-C | VPI |
-| Electrical idle on the line | `NOSIG` (the K flag and `0xFF`) per symbol on the PIPE; constant 0 on the serial line | the same |
+| | Verilator | Icarus | JanusHDL |
+|---|---|---|---|
+| Host results (`===>` lines) | 135, all rules pass | identical, line for line | the same 135; its own end-of-run line lands inside one of them when the output is redirected |
+| Packet display (every TLP, DLLP and ordered set) | 6257 lines | identical | identical |
+| `IFACE=serial` | 135, all rules pass; 6249 display lines | identical | identical, but for that one line |
+| Wall-clock time, `make run` (PIPE, serial), other simulations running on the PC | 1.3 s, 6 s | 4 s, 175 s | 23 s, 740 s |
+| Simulation built | once, to a native executable | once, to `vvp` code | at every run (analysis and elaboration: 30 ms) |
+| C models reached via | DPI-C | VPI | VPI, the Icarus build of the models |
+| Waveform, `DUMP=1` | `--trace-fst`, the signals `tb.sv` picks | `vvp -fst`, the same | `--fst`, every signal (its `$dumpfile` writes a VCD) |
+| `EP=rtl` | yes | no: Icarus 13 parsed neither our interface ports nor `csr_pkg.sv`; not retried on 14 | no: 0.17.0 has no assertions yet, [#1](https://github.com/chili-chips/openCologne-PCIE/issues/1) |
+| Electrical idle on the line | `NOSIG` (the K flag and `0xFF`) per symbol on the PIPE; constant 0 on the serial line | the same | the same |
+| Open source | yes | yes | no: free of charge, closed source |
 
 Four fixes got there, all in openPCIE's `pcievhost-speed.patch`:
 
 1. upstream's PIPE wrapper hid `Z` from the model (openPCIE issue 53);
-2. electrical idle is now a driven value, `NOSIG`, with no `Z` and no Verilator side-band ([#34](https://github.com/chili-chips-ba/openCologne-PCIE/issues/34));
+2. electrical idle is now a driven value, `NOSIG`, with no `Z` and no Verilator side-band ([BA#34](https://github.com/chili-chips-ba/openCologne-PCIE/issues/34));
 3. the wrapper put X and Z on the line at time 0 (issue 55);
 4. its RX sample changed on the edge the model reads it on, so the read landed one symbol apart depending on each simulator's scheduling (issue 56).
 
@@ -489,7 +494,7 @@ Four fixes got there, all in openPCIE's `pcievhost-speed.patch`:
 | `EP_RTL` | `Makefile` (`EP=rtl`) | `tb.sv` instantiates the EP RTL instead of the EP model | ours |
 | `IFACE_SERIAL` | `Makefile` (`IFACE=serial`) | `tb.sv` connects the host on the serial line | ours |
 | `CDR_MODEL=FAST` | `Makefile` (`EP=rtl IFACE=serial`) | the SerDes BFM's CDR model | ours |
-| `SOC_CPU_VPROC` | `Makefile` (`CPU=vproc`, `iss`) | `riscv_pcie_soc.sv` puts `soc_cpu.VPROC.sv` in the CPU socket | ours |
+| `SOC_CPU_VPROC` | `Makefile` (`CPU=vproc`, `iss`) | `soc_top.sv` puts `soc_cpu.VPROC.sv` in the CPU socket | ours |
 | `RISCV_FORMAL` | `Makefile` (`EP=rtl DUMP=1`) | eduBOS5 drives its RVFI outputs, for the CPU's WaveCrux page | ours |
 | `DUMP` | `Makefile` (`DUMP=1`) | `tb.sv` writes `tb.fst`, `tb_serial.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst` | ours |
 
@@ -499,7 +504,7 @@ openPCIE runs its co-simulation on AMD's XSIM, as the encrypted Artix-7 hard mac
 
 1. **Libraries built from source, per simulator.** XSIM loaded prebuilt `libcosimlnx.a` / `libpcielnx.a`. Verilator reaches the C models through DPI-C, Icarus through VPI, each needing its own build of the same sources, so [`tools/build-vip.sh`](tools/build-vip.sh) builds both: `libcosimlnx.a` / `libpcielnx.a` for DPI-C, `libcosimica.a` / `libpcieica.a` for VPI. The VPI library also carries pcieVHost's `veriuser.c`, the table that registers the models' system tasks with Icarus.
 2. **Every referenced module must exist.** The pcieVHost wrappers instantiate `clkmux` and `Serialiser` (from pcieVHost's `verilog/lib`), never compiled by the XSIM file list. Verilator wants every referenced module, so the VIP build now collects them.
-3. **Electrical idle: `NOSIG`.** An electrically idle PCIE line carries no signal. Upstream models it as `Z` on a 4-state simulator, and under Verilator (2-state) as zeros plus a side-band, `ElecIdleOut` and `ElecIdleIn`. openPCIE's patch drops both: each idle symbol on the PIPE is `NOSIG`, the K flag and `0xFF` (no 8b/10b code), on Verilator and Icarus alike. Verilator can't be trusted with `Z` here: its `=== 'z` reads a driven 0 as `Z` ([#34](https://github.com/chili-chips-ba/openCologne-PCIE/issues/34)).
+3. **Electrical idle: `NOSIG`.** An electrically idle PCIE line carries no signal. Upstream models it as `Z` on a 4-state simulator, and under Verilator (2-state) as zeros plus a side-band, `ElecIdleOut` and `ElecIdleIn`. openPCIE's patch drops both: each idle symbol on the PIPE is `NOSIG`, the K flag and `0xFF` (no 8b/10b code), on Verilator and Icarus alike. Verilator can't be trusted with `Z` here: its `=== 'z` reads a driven 0 as `Z` ([BA#34](https://github.com/chili-chips-ba/openCologne-PCIE/issues/34)).
 4. **One LTSSM on both sides.** On openPCIE the model plays the EP, an upstream port, against a real `PCIE_2_1` downstream port; the patch makes it spec-correct: an upstream port keeps sending Link/Lane = PAD in its TS1 until the downstream port assigns the numbers. Upstream's model takes a shortcut that only works against a copy of itself, so the patched EP would deadlock in Configuration.Start against pcieVHost's own RC, on both simulators. With upstream's RC as our host, we used upstream's `ltssm.c`. The host is now openPCIE's Artix-7 RC model, which assigns Link and Lane numbers as the hard macro does, so both sides use openPCIE's `ltssm.c`, patch included.
 5. **Macros before models.** The pcieVHost models use macros (`WsTimeScale`, `RegDel`, the comma symbols, the register map) from its headers. Under Verilator the first file in the list happened to pull them in for all others; not under Icarus. [`tb.f`](tb.f) now names `allheaders.svh` first, for both.
 6. **Portable delays.** Icarus rejected the test bench's `#(N * 1ps)` delays. The file's timescale is 1 ps, so plain numbers mean the same everywhere; the run limit is a 64-bit constant, as 10 ms in picoseconds overflows 32 bits.

@@ -8,7 +8,7 @@
 // Description:
 //   VProc virtual processor in the CPU socket of the SOC.
 //
-//   Drop-in replacement for the eduBOS5 instance in riscv_pcie_soc.sv, so
+//   Drop-in replacement for the eduBOS5 instance in soc_top.sv, so
 //   that the CPU of the SOC can be a native C/C++ program (or the rv32 ISS)
 //   instead of the RTL core. Everything else in the design -- the CSR, the
 //   PCIe stack, the top level -- is untouched and runs exactly as it does
@@ -16,7 +16,7 @@
 //
 //   Selected with `define SOC_CPU_VPROC; see 5.sim/Makefile CPU=... .
 //
-//   It drives the SOC's CPU memory bus (mem_if), the one riscv_pcie_soc.sv
+//   It drives the SOC's CPU memory bus (mem_if), the one soc_top.sv
 //   decodes for the RAM and the CSR.
 //
 //   Protocol note. VProc holds WE/RD asserted until it samples WRAck/RDAck at

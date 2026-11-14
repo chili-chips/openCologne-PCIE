@@ -45,7 +45,7 @@ done
   printf '(* blackbox *)\nmodule CC_BUFG (input I, output O);\nendmodule\n'
 } > "$W/bb.v"
 
-# the firmware is the RAM's initial content ($readmemh in riscv_pcie_soc)
+# the firmware is the RAM's initial content ($readmemh in soc_top)
 cp "$REPO/4.build/sw_build/firmware.hex" "$W/"
 SV=$(design_rtl "$REPO/2.rtl" "$REPO/4.build/csr_build/generated-files" | tr '\n' ' ')
 

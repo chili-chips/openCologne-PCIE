@@ -55,22 +55,22 @@ module ccfpga_tx_MAC
 
   // Transmitter counter
   ccfpga_tx_count #(
-      .COUNT_WIDTH(5)
+      .COUNT_WIDTH (5)
   ) u_tx_count (
-      .i_clk                (i_clk),
-      .i_tx_os_flag_rst     (i_tx_os_flag_rst),
-      .i_tx_idle_flag_rst   (i_tx_idle_flag_rst),
-      .i_tx_poll_flag_rst   (i_tx_poll_flag_rst),
-      .i_os_sent            (os_sent),
-      .i_os_valid           (i_os_valid),
-      .i_os_rec_cfg_detected(i_os_rec_cfg_detected),
-      .i_idle_sent          (idle_sent),
-      .i_idle_detected      (i_idle_detected),
-      .i_max_count          (i_max_count),
+      .i_clk                 (i_clk),
+      .i_tx_os_flag_rst      (i_tx_os_flag_rst),
+      .i_tx_idle_flag_rst    (i_tx_idle_flag_rst),
+      .i_tx_poll_flag_rst    (i_tx_poll_flag_rst),
+      .i_os_sent             (os_sent),
+      .i_os_valid            (i_os_valid),
+      .i_os_rec_cfg_detected (i_os_rec_cfg_detected),
+      .i_idle_sent           (idle_sent),
+      .i_idle_detected       (i_idle_detected),
+      .i_max_count           (i_max_count),
 
-      .o_tx_os_flag  (o_tx_os_flag),
-      .o_tx_idle_flag(o_tx_idle_flag),
-      .o_tx_poll_flag(o_tx_poll_flag)
+      .o_tx_os_flag   (o_tx_os_flag),
+      .o_tx_idle_flag (o_tx_idle_flag),
+      .o_tx_poll_flag (o_tx_poll_flag)
   );
 
   // Sending modules
@@ -78,18 +78,18 @@ module ccfpga_tx_MAC
   pipe_sym_t tx_sym_os;
 
   ccfpga_send_OS u_send_os (
-      .i_clk            (i_clk),
-      .i_send_os_trigger(i_send_os_trigger),
-      .i_reset          (i_reset),
-      .i_link_num       (i_link_num),
-      .i_lane_num       (i_lane_num),
-      .i_ts_ctrl        (i_ts_ctrl),
-      .i_os_type        (i_os_type),
-      .i_skp_in_queue   (skp_in_queue),
+      .i_clk             (i_clk),
+      .i_send_os_trigger (i_send_os_trigger),
+      .i_reset           (i_reset),
+      .i_link_num        (i_link_num),
+      .i_lane_num        (i_lane_num),
+      .i_ts_ctrl         (i_ts_ctrl),
+      .i_os_type         (i_os_type),
+      .i_skp_in_queue    (skp_in_queue),
 
-      .o_tx_sym    (tx_sym_os),
-      .o_os_sent   (os_sent),
-      .o_sending_os(o_sending_os)
+      .o_tx_sym     (tx_sym_os),
+      .o_os_sent    (os_sent),
+      .o_sending_os (o_sending_os)
   );
 
   logic      sending_data;  // Sending Data indication
@@ -99,44 +99,44 @@ module ccfpga_tx_MAC
   pipe_sym_t tx_sym_idle;
 
   ccfpga_send_IDLE u_send_idle (
-      .i_clk              (i_clk),
-      .i_send_idle_trigger(i_send_idle_trigger),
-      .i_reset            (i_reset),
-      .i_skp_in_queue     (skp_in_queue),
+      .i_clk               (i_clk),
+      .i_send_idle_trigger (i_send_idle_trigger),
+      .i_reset             (i_reset),
+      .i_skp_in_queue      (skp_in_queue),
 
-      .o_tx_sym      (tx_sym_idle),
-      .o_idle_sent   (idle_sent),
-      .o_sending_idle(sending_idle)
+      .o_tx_sym       (tx_sym_idle),
+      .o_idle_sent    (idle_sent),
+      .o_sending_idle (sending_idle)
   );
 
   // Send Data
   pipe_sym_t tx_sym_data;
 
   ccfpga_send_data u_send_data (
-      .i_clk       (i_clk),
-      .i_reset     (i_reset),
-      .i_l0_enabled(i_l0_enabled),
-      .i_tx_sym_dll(i_tx_sym_dll),
+      .i_clk        (i_clk),
+      .i_reset      (i_reset),
+      .i_l0_enabled (i_l0_enabled),
+      .i_tx_sym_dll (i_tx_sym_dll),
 
-      .o_tx_sym      (tx_sym_data),
-      .o_sending_data(sending_data)
+      .o_tx_sym       (tx_sym_data),
+      .o_sending_data (sending_data)
   );
 
   // SKP Generator
   pipe_sym_t tx_sym_skp;
 
   ccfpga_SKP_generator #(
-      .SKP_WIDTH(32)
+      .SKP_WIDTH (32)
   ) u_skp_generator (
-      .i_clk         (i_clk),
-      .i_reset       (i_reset),
-      .i_sending_data(sending_data),
-      .i_sending_os  (o_sending_os),
-      .i_sending_idle(sending_idle),
+      .i_clk          (i_clk),
+      .i_reset        (i_reset),
+      .i_sending_data (sending_data),
+      .i_sending_os   (o_sending_os),
+      .i_sending_idle (sending_idle),
 
-      .o_tx_sym      (tx_sym_skp),
-      .o_skp_in_queue(skp_in_queue),
-      .o_sending_skp (sending_skp)
+      .o_tx_sym       (tx_sym_skp),
+      .o_skp_in_queue (skp_in_queue),
+      .o_sending_skp  (sending_skp)
   );
 
   // Transmitted data multiplexer: the first source sending wins

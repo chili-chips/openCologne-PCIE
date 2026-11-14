@@ -16,11 +16,11 @@ module ccfpga_SKP_generator
 #(
     parameter int SKP_WIDTH = 32
 ) (
-    input logic i_clk,
-    input logic i_reset,
-    input logic i_sending_data,
-    input logic i_sending_os,
-    input logic i_sending_idle,
+    input  logic      i_clk,
+    input  logic      i_reset,
+    input  logic      i_sending_data,
+    input  logic      i_sending_os,
+    input  logic      i_sending_idle,
 
     output pipe_sym_t o_tx_sym,
     output logic      o_skp_in_queue,
@@ -38,8 +38,8 @@ module ccfpga_SKP_generator
   logic                   skp_count_inc;
   logic                   skp_send_enable;
 
-  logic [           31:0] skp_os;
-  assign skp_os = {K_SKP, K_SKP, K_SKP, K_COM};  // SKP Ordered Set
+  logic [ 31:0] skp_os;
+  assign        skp_os = {K_SKP, K_SKP, K_SKP, K_COM};  // SKP Ordered Set
 
   always_ff @(posedge i_clk or posedge i_reset) begin
     if (i_reset) begin

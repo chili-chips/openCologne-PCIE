@@ -13,7 +13,7 @@ The **PHY Interface for the PCI Express Architecture (PIPE)** is part of the phy
 ## The Interface
 The schematic shows the **64-Bit datapath**, where `pipe.pclk` runs at the **SERDES TX_clock** frequency. Narrower datapaths run `pipe.pclk` at a multiple of **TX_clock**, by the datapath ratio, to keep MAC and PHY synchronized: a **32-Bit datapath** (half the **64-Bit SERDES datapath**) runs `pipe.pclk` at twice **TX_clock**.
 
-The width is `DATA_BYTES` in `pipe_pkg`: the PIPE takes 8-, 16-, 32- or 64-Bit datapaths (1, 2, 4, 8). 64-Bit works, 16-Bit fails ([#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18)), 32-Bit is untested.
+The width is `DATA_BYTES` in `pipe_pkg`: the PIPE takes 8-, 16-, 32- or 64-Bit datapaths (1, 2, 4, 8). 64-Bit works, 16-Bit fails ([BA#18](https://github.com/chili-chips-ba/openCologne-PCIE/issues/18)), 32-Bit is untested.
 
 <div align="center"><img alt="PIPE as built, 64 bits: the MAC-side pipe_if signals; ccfpga_pipe_top with the PIPE FSM, the word-align FSM and the TX and RX paths; CC_SERDES with its PLL, PLL_CLK_O as PCLK through a CC_BUFG, and its dedicated serial and REFCLK pins" src="./0.doc/PIPE_Interface.drawio.png" width="90%"></div>
 

@@ -42,11 +42,11 @@ models/pipe_sym_pkg.sv
 ../2.rtl/5.tlp/cpl_gen.sv
 ../2.rtl/5.tlp/fc_credit.sv
 ../2.rtl/5.tlp/tlp_tx_arbiter.sv
-../2.rtl/6.trn_bridge/trn_bridge.sv
+../2.rtl/6.trn_bridge/trn_top.sv
 ../2.rtl/6.trn_bridge/trn_rx.sv
 ../2.rtl/6.trn_bridge/trn_tx.sv
 ../2.rtl/6.trn_bridge/trn_tx_throttle.sv
-../2.rtl/7.soc/riscv_pcie_soc.sv
+../2.rtl/7.soc/soc_top.sv
 ../2.rtl/7.soc/soc_csr.sv
 ../4.build/csr_build/generated-files/csr.sv
 ../2.rtl/7.soc/CPU.eduBOS5/edubos5.sv

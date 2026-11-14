@@ -9,7 +9,7 @@
 
 | File | What it is |
 |---|---|
-| [`trn_bridge.sv`](trn_bridge.sv) | the top: `trn_rx`, `trn_tx` and `trn_tx_throttle` |
+| [`trn_top.sv`](trn_top.sv) | the top: `trn_rx`, `trn_tx` and `trn_tx_throttle` |
 | [`trn_rx.sv`](trn_rx.sv) | TRN RX to `m_axis_rx`: DW order; `tkeep` all ones, `tuser` 0 |
 | [`trn_tx.sv`](trn_tx.sv) | `s_axis_tx` to TRN TX |
 | [`trn_tx_throttle.sv`](trn_tx_throttle.sv) | holds the SOC back between TLPs while the TL's TX buffer is short of room for a largest TLP (`free_words`) |

@@ -34,7 +34,7 @@ A transmit datapath, a receive datapath, and the control plane binding them.
 | `mac.tx.kcode`    | in  | Control flags of the byte stream to transmit. |
 | `mac.rx.data`     | out | Descrambled byte stream from PHY, in L0 only: whole words, from the one holding STP or SDP to the one holding END; zero otherwise. |
 | `mac.rx.kcode`    | out | Control flags of the received byte stream. |
-| `mac.link_up`     | out | LTSSM in L0 or Recovery. `pcie_core` raises the DLL's link up in L0 and holds it through Recovery, until `mac.link_up` drops ([#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)). |
+| `mac.link_up`     | out | LTSSM in L0 or Recovery. `pcie_core` raises the DLL's link up in L0 and holds it through Recovery, until `mac.link_up` drops ([BA#35](https://github.com/chili-chips-ba/openCologne-PCIE/issues/35)). |
 | `mac.ltssm_state` | out | LTSSM state (`ccfpga_LTSSM_fsm` encoding); `pcie_core` raises the DLL's link up when it reaches L0. |
 
 ### Downstream — PIPE / PHY
@@ -95,23 +95,23 @@ Ordered sets generated/detected by the MAC: **TS1/TS2** (Polling, Configuration,
 Data (D) symbols are scrambled with the standard PCIe LFSR, **G(x) = x¹⁶ + x⁵ + x⁴ + x³ + 1**, seeded FFFFh by COM and advanced once per symbol but SKP (Base 2.1, 4.2.3). Not scrambled: K symbols, and on TX the TS1/TS2 data symbols. RX descrambles with the identical LFSR.
 
 - **Disable Scrambling:** Training Control bit 3 turns both off. In Configuration.Complete the MAC copies the Training Control of the TS received in each PCLK, and 0 in a PCLK without one; the value of the last PCLK there stays. Detect and a new Configuration clear it. The EP's own TS echo the received Training Control.
-- **RX, TS1/TS2:** the RX mask is per LTSSM state, not per symbol: in L0, Configuration.Idle and PRE_L0 (the cycle before L0) it descrambles every data symbol, a received TS1/TS2 too (the spec leaves those unscrambled), so the EP never follows the partner into Recovery ([#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42)).
+- **RX, TS1/TS2:** the RX mask is per LTSSM state, not per symbol: in L0, Configuration.Idle and PRE_L0 (the cycle before L0) it descrambles every data symbol, a received TS1/TS2 too (the spec leaves those unscrambled), so the EP never follows the partner into Recovery ([BA#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42)).
 
 ## Where it departs from PCIe 2.1
 
 | What | Base 2.1 | Issue |
 |---|---|---|
 | Framing (STP, SDP, END, EDB) is done in the DLL, not the Physical Layer | 4.2.2 | |
-| RX descrambles a TS1/TS2 received in L0 | 4.2.3 | [#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42) |
-| Disable Scrambling taken from the last PCLK of Configuration.Complete, not from two consecutive TS2 | 4.2.6.3.5 | [#48](https://github.com/chili-chips-ba/openCologne-PCIE/issues/48) |
-| SKP ordered sets every 2360-2384 symbol times, not 1180-1538 | 4.2.7.1 | [#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
-| A TS1 is cut short at every SKP in Polling.Active, a TS2 on the step to Configuration | 4.2.7.1 | [#31](https://github.com/chili-chips-ba/openCologne-PCIE/issues/31) |
-| COM and SKP of a received SKP ordered set reach the DLL as data when their word holds STP, SDP or END | 4.2.7.2 | [#32](https://github.com/chili-chips-ba/openCologne-PCIE/issues/32) |
+| RX descrambles a TS1/TS2 received in L0 | 4.2.3 | [BA#42](https://github.com/chili-chips-ba/openCologne-PCIE/issues/42) |
+| Disable Scrambling taken from the last PCLK of Configuration.Complete, not from two consecutive TS2 | 4.2.6.3.5 | [BA#48](https://github.com/chili-chips-ba/openCologne-PCIE/issues/48) |
+| SKP ordered sets every 2360-2384 symbol times, not 1180-1538 | 4.2.7.1 | [BA#38](https://github.com/chili-chips-ba/openCologne-PCIE/issues/38) |
+| A TS1 is cut short at every SKP in Polling.Active, a TS2 on the step to Configuration | 4.2.7.1 | [BA#31](https://github.com/chili-chips-ba/openCologne-PCIE/issues/31) |
+| COM and SKP of a received SKP ordered set reach the DLL as data when their word holds STP, SDP or END | 4.2.7.2 | [BA#32](https://github.com/chili-chips-ba/openCologne-PCIE/issues/32) |
 | No clock tolerance compensation: SerDes clock correction off; common REFCLK only | 4.2.7 | |
-| 8b/10b and disparity errors are not acted on: `RxStatus` is read only for receiver detection, no Receiver Error to the DLL | 4.2.4.6 | [#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
+| 8b/10b and disparity errors are not acted on: `RxStatus` is read only for receiver detection, no Receiver Error to the DLL | 4.2.4.6 | [BA#24](https://github.com/chili-chips-ba/openCologne-PCIE/issues/24) |
 | L0 goes to Recovery only on two received TS1; a TS2 or electrical idle does not take it there | 4.2.6.5 | |
 | Configuration.Idle and Recovery.Idle count any PCLK without a COM as Idle data; the symbols are not checked | 4.2.6.3.6 | |
-| No L0s, L1, L2, Disabled, Loopback, Hot Reset or Polling.Compliance; no EIOS, FTS. TS advertise N_FTS 0. L0s is required of all components; hosts that check the TL's 64 ns L0s Acceptable Latency (e.g. Linux) keep it off | 4.2.6, 5.4.1 | [#47](https://github.com/chili-chips-ba/openCologne-PCIE/issues/47) |
+| No L0s, L1, L2, Disabled, Loopback, Hot Reset or Polling.Compliance; no EIOS, FTS. TS advertise N_FTS 0. L0s is required of all components; hosts that check the TL's 64 ns L0s Acceptable Latency (e.g. Linux) keep it off | 4.2.6, 5.4.1 | [BA#47](https://github.com/chili-chips-ba/openCologne-PCIE/issues/47) |
 | Gen1 only: TS advertise 2.5 GT/s, no Recovery.Speed | 4.2.6.4 | |
 | x1 only: Configuration.Lanenum.Wait is never entered | 4.2.6.3 | |
 | Polling.Active and Recovery.RcvrLock time out straight to Detect | 4.2.6.2.1, 4.2.6.4.1 | |

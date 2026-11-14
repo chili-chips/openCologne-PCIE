@@ -45,29 +45,29 @@ module tlp_rx_buffer
     localparam int DEPTH           = 1 << BRAM_ADDR_WIDTH,
     localparam int LFSR_WIDTH      = LCRC_W
 ) (
-    input logic clk,
-    input logic reset,
-    input logic link_active,
+    input  logic              clk,
+    input  logic              reset,
+    input  logic              link_active,
 
-    input logic              stp_detected,
-    input logic              end_detected,
-    input pipe_data_t        data_tl_in,
-    input tlp_seq_t          sequence_number,
-    input logic       [31:0] lcrc,
-    input logic              tlp_valid,
-    input logic              tlp_half,
+    input  logic              stp_detected,
+    input  logic              end_detected,
+    input  pipe_data_t        data_tl_in,
+    input  tlp_seq_t          sequence_number,
+    input  logic       [31:0] lcrc,
+    input  logic              tlp_valid,
+    input  logic              tlp_half,
 
-    input seq_num_t next_rcv_seq,
+    input  seq_num_t          next_rcv_seq,
 
-    output logic       nak_scheduled,
-    output seq_num_t   nak_seq_num,
-    output logic       ack_scheduled,
-    output seq_num_t   ack_seq_num,
-    output logic       new_tlp_accepted,
-    output pipe_data_t rx_data_tl,
-    output logic       rx_tlp_valid,
-    output logic       rx_tlp_first,
-    output logic       rx_tlp_last
+    output logic              nak_scheduled,
+    output seq_num_t          nak_seq_num,
+    output logic              ack_scheduled,
+    output seq_num_t          ack_seq_num,
+    output logic              new_tlp_accepted,
+    output pipe_data_t        rx_data_tl,
+    output logic              rx_tlp_valid,
+    output logic              rx_tlp_first,
+    output logic              rx_tlp_last
 );
 
   typedef logic [BRAM_ADDR_WIDTH-1:0] bram_addr_t;
@@ -101,36 +101,36 @@ module tlp_rx_buffer
 
   // CRC also takes sequence number into account
   // Feed sequence number first
-  logic   [LFSR_WIDTH-1:0] crc_seq_0;
-  logic   [LFSR_WIDTH-1:0] crc_seq_1;
-  logic                    crc_en;
+  logic [LFSR_WIDTH-1:0] crc_seq_0;
+  logic [LFSR_WIDTH-1:0] crc_seq_1;
+  logic                  crc_en;
   // enabled when sequence number and TLP available
-  assign crc_en = tlp_valid & (stp_detected | state == STORE_TLP);
+  assign                 crc_en = tlp_valid & (stp_detected | state == STORE_TLP);
 
   logic     [LFSR_WIDTH-1:0] crc_state;  // store current CRC state;
   logic     [LFSR_WIDTH-1:0] rx_lcrc;  // store received LCRC for comparison
   seq_num_t                  rx_seq_num;  // store sequence number for comparison
 
-  logic                      seq_crc_en;  // the sequence number enters the LCRC at STP
+  logic  seq_crc_en;  // the sequence number enters the LCRC at STP
   assign seq_crc_en = stp_detected & tlp_valid;
 
   lcrc_byte u_seq_crc_0 (
-      .data_in({sequence_number.rsvd, sequence_number.num[11:8]}),
-      .crc_en (seq_crc_en),
-      .crc_in (crc_state),
-      .crc_out(crc_seq_0)
+      .data_in ({sequence_number.rsvd, sequence_number.num[11:8]}),
+      .crc_en  (seq_crc_en),
+      .crc_in  (crc_state),
+      .crc_out (crc_seq_0)
   );
 
   lcrc_byte u_seq_crc_1 (
-      .data_in(sequence_number.num[7:0]),
-      .crc_en (seq_crc_en),
-      .crc_in (crc_seq_0),
-      .crc_out(crc_seq_1)
+      .data_in (sequence_number.num[7:0]),
+      .crc_en  (seq_crc_en),
+      .crc_in  (crc_seq_0),
+      .crc_out (crc_seq_1)
   );
 
-  logic [LFSR_WIDTH-1:0] crc_tlp_in;
+  logic [LFSR_WIDTH-1:0]            crc_tlp_in;
   // crc after sequence number as crc_in for first tlp word
-  assign crc_tlp_in = stp_detected ? crc_seq_1 : crc_state;
+  assign                            crc_tlp_in = stp_detected ? crc_seq_1 : crc_state;
   logic [DATA_BYTES*LFSR_WIDTH-1:0] lfsr_in;
   logic [DATA_BYTES*LFSR_WIDTH-1:0] lfsr_out;
 
@@ -144,20 +144,20 @@ module tlp_rx_buffer
   endgenerate
 
   logic [LFSR_WIDTH-1:0] crc_next;
-  assign crc_next = lfsr_out[DATA_BYTES*LFSR_WIDTH-1-:LFSR_WIDTH];
+  assign                 crc_next = lfsr_out[DATA_BYTES*LFSR_WIDTH-1-:LFSR_WIDTH];
 
   genvar i;
   generate
     for (i = 0; i < DATA_BYTES; i = i + 1) begin : g_crc_bytes
       // the half-word end of a TLP: the upper DW is no part of the CRC
-      logic byte_en;
+      logic  byte_en;
       assign byte_en = crc_en & (i < DATA_BYTES / 2 | !tlp_half);
 
       lcrc_byte u_crc_byte (
-          .data_in(data_tl_in[i*8+:8]),
-          .crc_en (byte_en),
-          .crc_in (lfsr_in[i*LFSR_WIDTH+:LFSR_WIDTH]),
-          .crc_out(lfsr_out[i*LFSR_WIDTH+:LFSR_WIDTH])
+          .data_in (data_tl_in[i*8+:8]),
+          .crc_en  (byte_en),
+          .crc_in  (lfsr_in[i*LFSR_WIDTH+:LFSR_WIDTH]),
+          .crc_out (lfsr_out[i*LFSR_WIDTH+:LFSR_WIDTH])
       );
     end
   endgenerate

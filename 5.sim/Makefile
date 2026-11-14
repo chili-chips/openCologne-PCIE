@@ -3,14 +3,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 # =============================================================================
-# Co-simulation of the openCologne-PCIE test bench, in Verilator or Icarus
+# Co-simulation of the openCologne-PCIE test bench, in Verilator, Icarus or JanusHDL
 #
 # Run FROM THIS FOLDER, on Linux or WSL:
 #   make          build the C/C++ models and the simulation
 #   make run      build and run
 #   make clean
 #
-# Open-source simulators only: Verilator (default) or Icarus (SIM). The VIP is the same as on openPCIE: VProc, the
+# Open-source simulators: Verilator (default) or Icarus (SIM); JanusHDL, free but
+# closed source, is an option. The VIP is the same as on openPCIE: VProc, the
 # pcieVHost PCIE model, mem_model: upstream copies in vip/, built by
 # tools/build-vip.sh into ~/.cache. models/ holds our own wrappers.
 #
@@ -26,6 +27,8 @@
 # ---- simulator ------------------------------------------------------------------
 #   verilator  (default) compiled to a native executable; the models talk DPI-C
 #   icarus     Icarus Verilog; the same C/C++ models talk VPI
+#   janushdl   JanusHDL (jhdl, 0.17 or later); it loads the Icarus build of the
+#              VPI models, so it needs Icarus too (vpi_user.h). EP=model only
 SIM           ?= verilator
 
 # ---- EP and IFACE: what the endpoint is, and where the host meets it ---------
@@ -52,7 +55,7 @@ ifeq ($(EP),model)
   USER_C      ?= VUserMain1.cpp
 else ifeq ($(EP),rtl)
   ifneq ($(SIM),verilator)
-    $(error EP=rtl needs SIM=verilator: Icarus 13 parsed neither our interface ports nor the generated csr_pkg.sv; not retried on 14)
+    $(error EP=rtl needs SIM=verilator: Icarus 13 parsed neither our interface ports nor the generated csr_pkg.sv; not retried on 14. JanusHDL 0.17 has no assertions yet)
   endif
   A7RC_EXPECT  = -DA7RC_EP_EXPECT='"a7rc_ep.h"' -DA7RC_PIPE_SCRAMBLE  # our EP scrambles at the PIPE too
   EP_FILES     = rtl.f
@@ -125,7 +128,7 @@ VIP_ENV        = VIP_PATCH=$(A7RC_DIR)/pcievhost-speed.patch \
 #          compiled for the host (usercode/VUserMain0.cpp calls its main)
 #   iss    VProc at node 0, running the rv32 ISS on firmware.elf, with
 #          eduBOS5's 2-stage timing (vusermain.cfg)
-# Only the module in the riscv_pcie_soc CPU socket changes (SOC_CPU_VPROC).
+# Only the module in the soc_top CPU socket changes (SOC_CPU_VPROC).
 CPU           ?= rtl
 ifneq ($(CPU),rtl)
   ifneq ($(EP),rtl)
@@ -170,6 +173,7 @@ HOST_AR       ?= ar
 VERILATOR     ?= verilator
 IVERILOG      ?= iverilog
 VVP           ?= vvp
+JHDL          ?= jhdl
 
 CPPSTD         = -std=c++20
 INCLPATHS      = -I$(USRCODEDIR) -I$(A7RC_DIR) -I$(VIP_DIR)/include
@@ -181,14 +185,18 @@ USER_ALL       = $(USER_C) VUserMain2.cpp a7rc_check.cpp ltssm.c
 ifeq ($(SIM),verilator)
   DEFS         = -DVPROC_SV -DVPROC -DEXCLUDE_LTSSM
   SIMEXE       = $(OBJDIR)/Vtb
-else ifeq ($(SIM),icarus)
+else ifneq ($(filter icarus janushdl,$(SIM)),)
   ICA_INC      = $(dir $(shell command -v $(IVERILOG)))../include/iverilog
   ICA_LIB      = $(dir $(shell command -v $(IVERILOG)))../lib
   DEFS         = -DICARUS -DVPROC -DEXCLUDE_LTSSM -I$(ICA_INC)
-  SIMEXE       = $(OBJDIR)/sim
   VPROC_SO     = $(OBJDIR)/VProc.vpi
+  ifeq ($(SIM),icarus)
+    SIMEXE     = $(OBJDIR)/sim
+  else
+    SIMEXE     = $(VPROC_SO) $(ICA_FILES)   # JanusHDL compiles the sources at each run
+  endif
 else
-  $(error SIM must be verilator or icarus (got "$(SIM)"))
+  $(error SIM must be verilator, icarus or janushdl (got "$(SIM)"))
 endif
 DEFS          += $(HOST_DEFS)
 
@@ -316,19 +324,27 @@ $(VPROC_SO): $(USERLIB) $(RV32LIB)
 	    -Wl,-whole-archive $(USERLIB) -Wl,-no-whole-archive $(RV32LIB) -Wl,-whole-archive -L$(VIP_DIR)/lib -lpcieica -lcosimica -Wl,-no-whole-archive \
 	    -L$(ICA_LIB) -lvpi -lrt -ldl
 
+# JanusHDL reads the list at each run, also from obj/regress/<seed>/: full paths
 $(ICA_FILES): tb.f $(EP_FILES) FORCE | $(OBJDIR)
-	@sed -e 's#$$VIP_DIR#$(VIP_DIR)#g' -e '/mem_model\.sv/d' $(EP_FILES) tb.f > $@
+	@sed -e 's#$$VIP_DIR#$(VIP_DIR)#g' -e '/mem_model\.sv/d' \
+	    $(if $(filter janushdl,$(SIM)),-e 's#^[A-Za-z0-9_.]#$(CURDIR)/&#') $(EP_FILES) tb.f > $@
 
+ifeq ($(SIM),icarus)
 $(SIMEXE): $(VPROC_SO) $(ICA_FILES) FORCE
 	@$(IVERILOG) -o $@ $(ICAFLAGS)
+endif
 endif
 
 FORCE:
 
 ifeq ($(SIM),verilator)
 SIM_CMD        = $(SIMEXE) $(SIM_ARGS)
-else
+else ifeq ($(SIM),icarus)
 SIM_CMD        = $(VVP) -n -M $(OBJDIR) -m VProc $(SIMEXE) $(VVPDUMP)
+else
+# DUMP=1: JanusHDL's own --fst, every signal ($dumpfile would write a VCD)
+SIM_CMD        = $(JHDL) --top tb $(patsubst -D%,+define+%,-DVPROC_BYTE_ENABLE $(ICA_IFACE)) -f $(ICA_FILES) \
+                 --vpi $(VPROC_SO) $(if $(filter 1,$(DUMP)),--fst $(WCX_FST)) $(USRSIMFLAGS)
 endif
 
 run: all
@@ -355,7 +371,7 @@ wavecrux_run: all
 	$(if $(filter 1,$(WCX_OPEN)),python3 $(CURDIR)/tools/wavecrux.py $$d/$(WCX_FST) $$d/run.log $(WCX_SIGNALS),echo "  open it: make wavecrux SEED=$(SEED)")
 
 help:
-	@echo "make [SIM=verilator|icarus] [EP=model|rtl] [IFACE=pipe|serial]   build the models and the simulation (EP=rtl: Verilator only)"
+	@echo "make [SIM=verilator|icarus|janushdl] [EP=model|rtl] [IFACE=pipe|serial]   build the models and the simulation (EP=rtl: Verilator only)"
 	@echo "make A7RC=1 run                    literal host: only what the lab RC sends (default: the tester, also back to back)"
 	@echo "make DMA=1 run                     the tester also runs its EP DMA stage (off by default: our EP has no DMA, #41)"
 	@echo "make SEED=N run                    the tester's random stimulus with seed N (default 1), no rebuild"
@@ -364,7 +380,7 @@ help:
 	@echo "    REGRESS_DUMP=fail              dump every failing seed (obj/wavecrux/<seed>/)"
 	@echo "make wavecrux SEED=N               seed N with its waveform, in WaveCrux at the first violation (--wcp-port 54321)"
 	@echo "make EP=rtl CPU=vproc|iss run      the SOC CPU: native firmware or the rv32 ISS (default CPU=rtl, eduBOS5)"
-	@echo "make [SIM=verilator|icarus] run    build and run"
+	@echo "make [SIM=verilator|icarus|janushdl] run   build and run"
 	@echo "make DUMP=1 run                    also write tb.fst (WaveCrux: tb.DLL-PIPE.wavecrux)"
 	@echo "make EP=rtl DUMP=1 run             also write tb_rtl.fst, the EP's layers (WaveCrux: tb_rtl.*.wavecrux)"
 	@echo "make clean                         remove obj/"

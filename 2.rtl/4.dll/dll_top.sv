@@ -44,11 +44,11 @@ module dll_top
     parameter int NUMBER_OF_VIRTUAL_CHANNELS = 1,
     parameter int RETRY_ADDR_WIDTH           = 9
 ) (
-    input logic phy_clk,   // Clock from Physical layer
-    input logic phy_reset, // Async reset from Physical layer
+    input  logic      phy_clk,    // Clock from Physical layer
+    input  logic      phy_reset,  // Async reset from Physical layer
 
-    mac_if.dll mac,  // to and from the MAC
-    dll_if.dll tl    // to and from the Transaction Layer
+           mac_if.dll mac,        // to and from the MAC
+           dll_if.dll tl          // to and from the Transaction Layer
 );
 
   // The DLL's link up: set on reaching L0, held through Recovery, cleared
@@ -70,26 +70,26 @@ module dll_top
     genvar i;
     for (i = 0; i < NUMBER_OF_VIRTUAL_CHANNELS; i = i + 1) begin : g_vc
       virtual_channel #(
-          .RETRY_ADDR_WIDTH(RETRY_ADDR_WIDTH)
+          .RETRY_ADDR_WIDTH (RETRY_ADDR_WIDTH)
       ) u_vc (
-          .clk                   (phy_clk),
-          .reset                 (phy_reset),
-          .linkup                (phy_linkup),
-          .virtual_channel_number(i[2:0]),
+          .clk                    (phy_clk),
+          .reset                  (phy_reset),
+          .linkup                 (phy_linkup),
+          .virtual_channel_number (i[2:0]),
 
-          .tx_dllp(tl.tx_dllp),
+          .tx_dllp (tl.tx_dllp),
 
-          .rx_sym(mac.rx),
+          .rx_sym (mac.rx),
 
-          .tx_tlp      (tl.tx_tlp),
-          .tx_tlp_ready(tl.tx_tlp_ready),
+          .tx_tlp       (tl.tx_tlp),
+          .tx_tlp_ready (tl.tx_tlp_ready),
 
-          .tx_sym(mac.tx),
+          .tx_sym (mac.tx),
 
-          .rx_dllp(tl.rx_dllp),
+          .rx_dllp (tl.rx_dllp),
 
-          .rx_tlp     (tl.rx_tlp),
-          .o_fsm_state(vc_state[i])
+          .rx_tlp      (tl.rx_tlp),
+          .o_fsm_state (vc_state[i])
       );
     end
   endgenerate
