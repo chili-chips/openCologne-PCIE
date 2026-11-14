@@ -1,6 +1,6 @@
 # SW Architecture
 
-This is where the developers of **PIO TestApp** (the software part of) describe their work.
+This is where the developers of **PIO TestApp** (the software part of) document their work.
 
 <div align="center"><img src="../0.doc/3.sw/sw-structure.drawio.png" width="100%" alt="Firmware layers: application, PCIE driver, HAL, register map and startup, talking to the CSR block over the CPU memory bus, then through pcie_top to the PCIE link"></div>
 
