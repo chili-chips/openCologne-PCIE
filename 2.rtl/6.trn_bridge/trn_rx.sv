@@ -41,11 +41,11 @@ module trn_rx
   import axis_pkg::*;
   import trn_pkg::*;
 (
-           axis_if.master m_axis_rx,
-           trn_rx_if.dst  trn_rx,     // TLPs from the TL
+    axis_if.master m_axis_rx,
+    trn_rx_if.dst  trn_rx,     // TLPs from the TL
 
-    input  logic          clk,
-    input  logic          core_rst_n
+    input  logic   clk,
+    input  logic   core_rst_n
 );
 
   logic     rx_tlast;

@@ -38,14 +38,14 @@
 //--------------------------------------------------------------------------
 
 module trn_top (
-           axis_if.slave  s_axis_tx,
-           axis_if.master m_axis_rx,
+    axis_if.slave  s_axis_tx,
+    axis_if.master m_axis_rx,
 
-           trn_tx_if.src  trn_tx,     // TLPs to the TL
-           trn_rx_if.dst  trn_rx,     // TLPs from the TL
+    trn_tx_if.src  trn_tx,     // TLPs to the TL
+    trn_rx_if.dst  trn_rx,     // TLPs from the TL
 
-    input  logic          clk,
-    input  logic          core_rst_n
+    input  logic   clk,
+    input  logic   core_rst_n
 );
 
   trn_rx u_trn_rx (

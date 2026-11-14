@@ -66,18 +66,18 @@ module pcie_core
   import trn_pkg::*;
   import dll_pkg::*;
 (
-    input  logic          rst_pipe_n,  // PIPE Reset#
-    input  logic          mac_rst_n,   // PCLK: MAC and DLL
+    input  logic   rst_pipe_n,  // PIPE Reset#
+    input  logic   mac_rst_n,   // PCLK: MAC and DLL
 
-           pipe_if.mac    pipe,
+    pipe_if.mac    pipe,
 
-    output logic          dll_up,      // PCLK: data link up (DL_Active)
-    output logic          core_rst_n,  // PCLK: trn_bridge and the SOC, follows dll_up
+    output logic   dll_up,      // PCLK: data link up (DL_Active)
+    output logic   core_rst_n,  // PCLK: trn_bridge and the SOC, follows dll_up
 
-           axis_if.slave  s_axis_tx,   // TLPs from the SOC (tuser: tx_tuser_t)
-           axis_if.master m_axis_rx,   // TLPs to the SOC   (tuser: rx_tuser_t)
+    axis_if.slave  s_axis_tx,   // TLPs from the SOC (tuser: tx_tuser_t)
+    axis_if.master m_axis_rx,   // TLPs to the SOC   (tuser: rx_tuser_t)
 
-           cfg_if.core    cfg          // status sideband to the SOC
+    cfg_if.core    cfg          // status sideband to the SOC
 );
 
 

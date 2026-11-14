@@ -34,7 +34,7 @@ verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/7\.soc/rvfi_if\.sv:[0-9]+:[0-9]+: Signa
 
 # PhyStatus is a PIPE signal the PIPE drives, but Cologne Chip's MAC does not
 # read it (no wait for the PHY after a power-state change or receiver detect),
-# issue #54
+# issue BA#54
 verilator ^%Warning-UNUSEDSIGNAL: 2\.rtl/2\.pipe/pipe_if\.sv:[0-9]+:[0-9]+: Signal is not used: 'phy_status'$
 
 # The SerDes BFM is a behavioural model, not RTL: its # delays are computed

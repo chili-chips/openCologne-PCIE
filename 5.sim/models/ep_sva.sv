@@ -13,7 +13,7 @@
 //
 //     SKP     in L0, the MAC sends an SKP Ordered Set on the PIPE at least
 //             every 1538 + Max_Payload_Size (128) + 28 Symbol Times, 8 a
-//             PCLK (4.2.7.1; #38)
+//             PCLK (4.2.7.1; BA#38)
 //     SKP-MUX the SKP word the MAC's SKP generator sends (and took off its
 //             queue) reaches the PIPE: no data, OS or IDLE in that cycle,
 //             which ccfpga_tx_MAC's output mux puts first (#38)
@@ -53,18 +53,18 @@ module ep_sva (
   a_skp :
   assert property (@(posedge pclk) disable iff (!rst_n || !l0)
       (skp || $rose(l0)) |-> ##[1:SKP_MAX] skp)
-  else $error("**** SVA #38: no SKP Ordered Set from the EP's MAC on the PIPE for %0d PCLK (%0d Symbol Times) in L0",
+  else $error("**** SVA BA#38: no SKP Ordered Set from the EP's MAC on the PIPE for %0d PCLK (%0d Symbol Times) in L0",
               SKP_MAX, 8 * SKP_MAX);
 
   a_skp_mux :
   assert property (@(posedge pclk) disable iff (!rst_n) skp_gen |-> !tx_other)
-  else $error("**** SVA #38: the MAC dropped an SKP Ordered Set: data, OS or IDLE in its cycle");
+  else $error("**** SVA BA#38: the MAC dropped an SKP Ordered Set: data, OS or IDLE in its cycle");
 
   a_replay :
   assert property (@(posedge pclk) disable iff (!rst_n || !l0 || !dl_active)
       ($fell(buf_empty) || $rose(replay) || ($rose(l0) && !buf_empty)) |->
       ##[1:REPLAY_MAX] (buf_empty || $rose(replay)))
-  else $error("**** SVA #24: a TLP in the EP's retry buffer neither Acked nor replayed in %0d PCLK in L0",
+  else $error("**** SVA BA#24: a TLP in the EP's retry buffer neither Acked nor replayed in %0d PCLK in L0",
               REPLAY_MAX);
 
   a_fc_init :

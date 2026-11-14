@@ -5,11 +5,11 @@
 #
 # Sanity, after every change (README.md, Sanity and regression): six runs,
 # about 2 minutes. Each must end RC MODEL RESULT: PASS; Verilator and Icarus must
-# print the same ===> lines. The EP DMA stage is off (DMA=0, #41).
+# print the same ===> lines. The EP DMA stage is off (DMA=0, BA#41).
 # rtl-serial is the one run through top (its SerDes nets, by hierarchy).
 # Our EP (rtl, rtl-vproc, rtl-serial) drops an SKP (#38): those run on past the SVA
-# and pass as "known #38" while SVA #38 fired, PL.SKP holds every checker
-# violation and the firmware still ends 0x0000face. Drop KNOWN when #38 closes.
+# and pass as "known BA#38" while SVA BA#38 fired, PL.SKP holds every checker
+# violation and the firmware still ends 0x0000face. Drop KNOWN when BA#38 closes.
 # Prints one line per run, logs in obj/sanity/; exits 1 if any run fails.
 #
 # Usage: bash run-sanity.sh [make variables, e.g. OPTFLAG=-O0]
@@ -19,15 +19,15 @@ cd "$(dirname "$0")"
 LOG=obj/sanity
 mkdir -p $LOG
 fails=0
-KNOWN="#38"   # the runs marked known38 below; empty once #38 closes
+KNOWN="BA#38"   # the runs marked known38 below; empty once BA#38 closes
 
-known38() {  # log, result line: only SVA #38 fired (no other assertion either),
+known38() {  # log, result line: only SVA BA#38 fired (no other assertion either),
              # PL.SKP holds every error, the firmware done
     local e s
     e=$(echo "$2" | sed -n 's/.*FAIL, \([0-9]*\) errors.*/\1/p')
     s=$(grep -a '===>   PL.SKP ' $1 | awk '{print $5}')
-    grep -a -q 'SVA #38' $1 && ! grep -a '\*\*\*\* SVA ' $1 | grep -q -v 'SVA #38' &&
-        ! grep -a 'Assertion failed in tb\.dut' $1 | grep -q -v '\*\*\*\* SVA #38' &&
+    grep -a -q 'SVA BA#38' $1 && ! grep -a '\*\*\*\* SVA ' $1 | grep -q -v 'SVA BA#38' &&
+        ! grep -a 'Assertion failed in tb\.dut' $1 | grep -q -v '\*\*\*\* SVA BA#38' &&
         grep -a -q 'firmware result 0x0000face' $1 &&
         [ -n "$e" ] && [ "$e" -gt 0 ] && [ "$e" = "$s" ]
 }
@@ -48,7 +48,7 @@ run() {  # name, [known38], make variables
     printf '%-16s %4d s  %-36s %s\n' "$n" $((SECONDS - t0)) "$*" "${r:-no result, see $LOG/$n.log}"
 }
 
-# #38: the runs of our EP go on past the SVA (the error limit)
+# BA#38: the runs of our EP go on past the SVA (the error limit)
 run model         "$@"
 run model-icarus  SIM=icarus "$@"
 run model-serial  IFACE=serial "$@"

@@ -44,11 +44,11 @@ module dll_top
     parameter int NUMBER_OF_VIRTUAL_CHANNELS = 1,
     parameter int RETRY_ADDR_WIDTH           = 9
 ) (
-    input  logic      phy_clk,    // Clock from Physical layer
-    input  logic      phy_reset,  // Async reset from Physical layer
+    input  logic phy_clk,    // Clock from Physical layer
+    input  logic phy_reset,  // Async reset from Physical layer
 
-           mac_if.dll mac,        // to and from the MAC
-           dll_if.dll tl          // to and from the Transaction Layer
+    mac_if.dll   mac,        // to and from the MAC
+    dll_if.dll   tl          // to and from the Transaction Layer
 );
 
   // The DLL's link up: set on reaching L0, held through Recovery, cleared

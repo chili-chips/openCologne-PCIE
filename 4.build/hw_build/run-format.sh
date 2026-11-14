@@ -23,6 +23,7 @@
 #   2e. a module's port list is one alignment: the direction, type,
 #      dimension, name and comment columns are the same in every group of
 #      ports (run-format-align.py; Verible aligns each group on its own);
+#      an interface port, which has no direction, starts in the direction column;
 #   3. no ?: in a port connection (reported, not fixed), PIPE/MAC/DLL included;
 #   4. && and || only in an if/while/for condition, & and | for bits elsewhere
 #      (reported, not fixed: run-format-ops.py --fix, then prove it with LEQ).

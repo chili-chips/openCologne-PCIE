@@ -55,16 +55,16 @@
 module phy_top
   import pipe_pkg::*;
 (
-    input  logic       clk_ref,     // 100 MHz PCIE REFCLK, the model's reference
-    input  logic       rst_pipe_n,  // PIPE Reset#, released on clk_aon
-    input  logic       ser_rxp,
-    input  logic       ser_rxn,
-    output logic       ser_txp,
-    output logic       ser_txn,
+    input  logic clk_ref,     // 100 MHz PCIE REFCLK, the model's reference
+    input  logic rst_pipe_n,  // PIPE Reset#, released on clk_aon
+    input  logic ser_rxp,
+    input  logic ser_rxn,
+    output logic ser_txp,
+    output logic ser_txn,
 
-           pipe_if.phy pipe,
+    pipe_if.phy  pipe,
 
-    output logic       phy_rdy      // high once the SerDes TX is out of reset
+    output logic phy_rdy      // high once the SerDes TX is out of reset
 );
 
   // SerDes settings, shared by both SerDes: as in Cologne Chip's

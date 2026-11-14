@@ -56,16 +56,16 @@ module pcie_top
   import axis_pkg::*;
   import trn_pkg::*;
 (
-    input  logic       clk_brd,     // board oscillator
-    input  logic       perst_n,     // PERST# from the connector, active low
+    input  logic clk_brd,     // board oscillator
+    input  logic perst_n,     // PERST# from the connector, active low
 
-           pipe_if.mac pipe_mac,    // to phy_top
-    input  logic       phy_rdy,     // from phy_top: SerDes TX out of reset
+    pipe_if.mac  pipe_mac,    // to phy_top
+    input  logic phy_rdy,     // from phy_top: SerDes TX out of reset
 
-    output logic       rst_pipe_n,  // to phy_top: PIPE Reset#, the SerDes reset
+    output logic rst_pipe_n,  // to phy_top: PIPE Reset#, the SerDes reset
 
-    output logic       dll_up,      // data link up
-    output logic       fw_pass      // the firmware has reported PASS
+    output logic dll_up,      // data link up
+    output logic fw_pass      // the firmware has reported PASS
 );
 
   logic mac_rst_n;

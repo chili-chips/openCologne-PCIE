@@ -81,15 +81,15 @@ module tl_top
     parameter logic  [ 2:0] L1_ACCEPT_LAT    = 3'd7,
     parameter logic         SLOT_CLOCK       = 1'b1
 ) (
-    input  logic         clk,     // PCLK
-    input  logic         rst_n,   // mac_rst_n: the TL resets its parts on DL_Down
+    input  logic  clk,     // PCLK
+    input  logic  rst_n,   // mac_rst_n: the TL resets its parts on DL_Down
 
-           dll_if.tl     dll,
+    dll_if.tl     dll,
 
-           trn_tx_if.dst trn_tx,  // TLPs from trn_bridge
-           trn_rx_if.src trn_rx,  // TLPs to trn_bridge
+    trn_tx_if.dst trn_tx,  // TLPs from trn_bridge
+    trn_rx_if.src trn_rx,  // TLPs to trn_bridge
 
-           cfg_if.core   cfg      // status sideband to the SOC
+    cfg_if.core   cfg      // status sideband to the SOC
 );
 
 

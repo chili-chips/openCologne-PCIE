@@ -15,10 +15,10 @@ module ccfpga_mac_top
   import pipe_pkg::*;
   import mac_pkg::*;
 (
-    input  logic       i_reset_n,  // Asynchronous Reset
+    input  logic i_reset_n,  // Asynchronous Reset
 
-           pipe_if.mac pipe,       // PIPE, MAC side (Reset# comes from the parent)
-           mac_if.mac  mac         // to and from the DLL, and the link state
+    pipe_if.mac  pipe,       // PIPE, MAC side (Reset# comes from the parent)
+    mac_if.mac   mac         // to and from the DLL, and the link state
 );
 
   // The interface ports, mapped onto the internal names

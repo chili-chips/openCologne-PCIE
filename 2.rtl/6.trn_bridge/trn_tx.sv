@@ -40,11 +40,11 @@
 module trn_tx
   import trn_pkg::*;
 (
-           axis_if.slave s_axis_tx,
-           trn_tx_if.src trn_tx,     // TLPs to the TL
+    axis_if.slave s_axis_tx,
+    trn_tx_if.src trn_tx,     // TLPs to the TL
 
-    input  logic         clk,
-    input  logic         core_rst_n
+    input  logic  clk,
+    input  logic  core_rst_n
 );
 
 

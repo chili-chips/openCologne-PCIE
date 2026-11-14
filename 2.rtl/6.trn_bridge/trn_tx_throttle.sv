@@ -40,13 +40,13 @@
 module trn_tx_throttle
   import trn_pkg::*;
 (
-    input  logic         s_axis_tx_tvalid,  // the SOC's AXIS TX handshake
-    input  logic         s_axis_tx_tlast,
-    output logic         s_axis_tx_tready,  // low while paused
-           trn_tx_if.src trn_tx,            // rdy, free_words
+    input  logic  s_axis_tx_tvalid,  // the SOC's AXIS TX handshake
+    input  logic  s_axis_tx_tlast,
+    output logic  s_axis_tx_tready,  // low while paused
+    trn_tx_if.src trn_tx,            // rdy, free_words
 
-    input  logic         clk,
-    input  logic         core_rst_n
+    input  logic  clk,
+    input  logic  core_rst_n
 );
 
   // pause between TLPs while a largest TLP might not fit: TRN_TLP_MAX_BEATS,
