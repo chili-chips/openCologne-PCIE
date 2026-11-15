@@ -78,15 +78,7 @@ How to run each, and today's status: [Simulation, layer by layer](../2.rtl/READM
 
 ### An Artix-7 RC profile for the host
 
-Speaking the same PCIE is not behaving the same: as the RC, pcieVHost runs its own LTSSM, timers and credits. To test our EP against the RC it meets in the lab, the model gets an Artix-7 RC profile, the way the [rv32 ISS](#the-cpu-node-three-ways-to-run-the-socs-software) has timing models for PicoRV32 and eduBOS5:
-
-1. **Measure.** On openPCIE, the `PCIE_2_1` RC drives the pcieVHost EP. Its PIPE, taps and LTSSM state show what the RC puts on the wire: training sequence counts and fields per LTSSM state, timeouts, speed change, InitFC credits, ACK and UpdateFC timing. Cases: direct, Gen1 x1 and Gen2 x1.
-2. **Profile.** One table: behaviour, Artix-7 value, pcieVHost value.
-3. **Model.** RC-only changes to pcieVHost (`ltssm.c` and the user code), picked by a profile switch. `ltssm.c` has one Configuration path for both roles, so an unguarded change moves the RC too.
-4. **Check.** The same pcieVHost EP, against the profiled RC here and against the hard macro on openPCIE, must log the same link training and DLLP sequence.
-5. **Use.** The profiled RC is the host of every run here, with full-length training ([below](#the-host-openpcies-artix-7-rc-model)).
-
-Limits: the hard macro's simulation model is not silicon (analog effects, CDR lock time), and a profile covers only what the openPCIE runs exercise.
+Speaking the same PCIE is not behaving the same: as the RC, pcieVHost runs its own LTSSM, timers and credits. On openPCIE the model was measured against the `PCIE_2_1` hard macro, profiled and checked against it, so our EP meets the RC it meets in the lab: [openPCIE_BFM, calibrated against the hard macro](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/rc-model.md#calibrated-against-the-hard-macro).
 
 ## Block-level flows
 
@@ -128,13 +120,13 @@ make EP=rtl DUMP=1 run       # also write tb_rtl.fst: every layer of the EP, for
 **Serial line.**
 
 - `EP=rtl IFACE=serial`: `tb.sv` puts `top` under the host: `phy_top` with Cologne Chip's PIPE logic and the open-source SerDes BFM ([`phy.f`](phy.f)), on a 2.5 Gb/s serial line. The host is then upstream's `PcieVhostSerial`, at node 2 with the same model, without our PIPE wrapper's transaction taps.
-- It runs with `Gen2Clk = 1` and twice the Gen1 clocks (500 MHz, 5 GHz), divided by 2 at Gen1. With `Gen2Clk = 0` its `generate` block drives the bit clock twice, once straight and once halved (the `else` has no `begin`/`end`), and under Verilator the line ran at 1.25 Gb/s.
+- It runs with `Gen2Clk = 1` and twice the Gen1 clocks (500 MHz, 5 GHz), divided by 2 at Gen1 (upstream's `Gen2Clk = 0` drove the bit clock twice: [issue 58](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/model-changes.md#simulation-issues)).
 - `EP=model IFACE=serial`: the same host; the EP model is a second `PcieVhostSerial` (`EndPoint = 1`, node 1), as in openPCIE's `IFACE=serial` run.
 - `IFACE=phy`: the same host; under it [`models/ep_model_phy.sv`](models/ep_model_phy.sv) ([`ep_phy.f`](ep_phy.f)): `phy_top` as in `top`, with the EP model (`PIPEx1__pcieVHost`, node 1, `VUserMain1.cpp`) on its PIPE through openPCIE_BFM's `pipe_mac_adapter.sv`, the MAC side of a PIPE ([Layout](https://github.com/chili-chips/openPCIE_BFM#layout)). The PHY does 8b/10b, the EP model scrambles (`IFACE_PHY`). The resets are those of `clk_rst_gen`: PIPE Reset# here is also the SerDes PLL reset (`ccfpga_pipe_top`), so PCLK runs only after it, and the adapter's own PIPE reset stays open. Measured (2026-11-14, `tb_phy.fst`): PCLK from 0.56 µs, PhyStatus low 1.17 µs, receiver found 1.52 µs, P0 granted 1.62 µs, RxValid from 12.05 µs to the end of the run. RxElecIdle stays 0 throughout: the PIPE logic leaves the SerDes idle detector off (`ccfpga_pipe_top.sv`, `o_rx_ei_detect_en`).
 
 ### The host: openPCIE's Artix-7 RC model
 
-The host is openPCIE's [Artix-7 RC model](https://github.com/chili-chips/openPCIE/tree/main/5.sim#the-rc-model): what the lab RC sends, from link training to the RC firmware's requests and their pacing. It runs at the PIPE or, with `IFACE=serial`, on the serial line, with 8b/10b and scrambling on. At the PIPE it scrambles too against our EP RTL (`A7RC_PIPE_SCRAMBLE`, as the lab RC); against the EP model it sets Disable Scrambling. [`usercode/a7rc_ep.h`](usercode/a7rc_ep.h) says what it expects of our EP RTL; the EP model matches the RC model's own EP.
+The host is openPCIE's [Artix-7 RC model](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/rc-model.md): what the lab RC sends, from link training to the RC firmware's requests and their pacing. It runs at the PIPE or, with `IFACE=serial`, on the serial line, with 8b/10b and scrambling on. At the PIPE it scrambles too against our EP RTL (`A7RC_PIPE_SCRAMBLE`, as the lab RC); against the EP model it sets Disable Scrambling. [`usercode/a7rc_ep.h`](usercode/a7rc_ep.h) says what it expects of our EP RTL; the EP model matches the RC model's own EP.
 
 **From the submodule.** The host, its checker, `ltssm.c` and the two build patches are openPCIE_BFM's (`3.sw/a7rc`, `3.sw/ltssm`, `1.upstream/patches`; [Layout](https://github.com/chili-chips/openPCIE_BFM#layout)). To update: `git submodule update --remote 5.sim/vip/openPCIE_BFM`, then `bash run-sanity.sh`.
 
@@ -145,28 +137,14 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
 | Link training | to L0, shortened (`LTSSM_ABBREVIATED`: 16 TS1 in Polling.Active) | to L0 as the lab RC: full length, its TS counts and timeouts; Gen2 if the EP offers it |
 | FC init against our one InitFC1 and one InitFC2 set ([#5](https://github.com/chili-chips/openCologne-PCIE/issues/5)) | hangs: after FC_INIT1 it waits for all three InitFC types again | completes on our first InitFC2 or UpdateFC, as the spec has it |
 | Requests | as fast as the model can send them; a TLP right after another is dropped ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4)) | the RC firmware's, with its think times, as on the lab RC; then, in the default tester mode, the tester's stages, below (`A7RC=1`: the lab RC's requests only) |
-| Spec checks | none | every TLP and DLLP, against PCIe Base 2.1 rules ([drive and check](https://github.com/chili-chips/openPCIE/tree/main/5.sim#drive-and-check)) |
+| Spec checks | none | every TLP and DLLP, against PCIe Base 2.1 rules ([drive and check](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/rc-model.md#drive-and-check)) |
 | Result | stops in FC init, no TLP sent | `A7RC=1`: `RC MODEL RESULT: PASS`, `fw_pass` set, no violation. Tester (default): FAIL, below |
 
-**Tester and literal.**
+**Tester and literal.** The default tester runs the lab RC's sequence, then what the spec allows but its firmware never sends; `A7RC=1` is literal, only what the lab RC sends. Its stages and its spec checker: [openPCIE_BFM, drive and check](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/rc-model.md#drive-and-check). EP DMA under credit starvation runs only with `DMA=1`: our EP has no DMA yet ([#14](https://github.com/chili-chips/openCologne-PCIE/issues/14)).
 
-- **Tester** (default): the lab RC's sequence, then what its firmware never sends but the spec allows. The spec sets no gap between TLPs; only flow control limits the sender. The lab RC's firmware leaves microseconds between requests. Afterwards the tester runs, in order:
-  - a config space sweep;
-  - 8 writes and 8 reads to BAR0 back to back, the data checked;
-  - a seeded random mix of reads and writes;
-  - requests the EP must not support;
-  - odd requests: ECRC, poisoned, traffic classes;
-  - Data Link faults;
-  - EP DMA under credit starvation (openPCIE_BFM's `3.sw/a7rc/ep_dma.h`), only with `DMA=1`: our EP has no DMA yet ([#14](https://github.com/chili-chips/openCologne-PCIE/issues/14));
-  - speed changes and retrains; speed changes only when both sides do Gen2 (the EP model and our RTL are Gen1).
-- **Literal** (`A7RC=1`): only what the lab RC sends, with its timing.
 - **Against our EP** (2026-11-02) the tester run fails. The checker flags Naks for back-to-back TLPs ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4); on an error-free line any Nak is a violation, `DL.NAK`), no replay after held Acks or across a Recovery (`DL.REPLAY`, `TL.CPL-ALL`, [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3)) and the SKP interval (`PL.SKP`, [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6)). The InitFC after every Recovery (`FC.INIT-ORDER`), Unsupported Request for reads longer than 1 DW (`TL.UR`) and reads that return data older than an earlier write (`TL.ORDER`) are fixed.
 
-**Spec checker.** Every TLP and DLLP on the link is checked against PCIe Base Specification 2.1 rules, each with an ID and section number; a table of checks and violations prints at the end, and any violation fails the run.
-
-- Today: 59 rules: Transaction Layer (`TL.`, 19), Data Link Layer (`DL.`, 12), flow control (`FC.`, 11), configuration space (`CFG.`, 11), Physical Layer (`PL.`, 6), listed in [drive and check](https://github.com/chili-chips/openPCIE/tree/main/5.sim#drive-and-check).
-- The tester's random mix is seeded (`make SEED=N`, `make regress`).
-- The EP model passes all of them, at the PIPE and on the serial line, over 100 seeds. Our EP passes with `A7RC=1` and fails the tester, above.
+**Spec checker.** Every TLP and DLLP is checked against 59 PCIe Base 2.1 rules; any violation fails the run. The tester's random mix is seeded (`make SEED=N`, `make regress`). The EP model passes all 59, at the PIPE and on the serial line, over 100 seeds; our EP passes with `A7RC=1` and fails the tester, above.
 
 The model also found that our DLL's InitFC advertised P 32/1008 and NP 32/1, while the TL has 8/32 and 8/8, so its first UpdateFC-NP (9 after 32) looked to the host like a jump of 233 header credits. Fixed in the DLL (`send_dllp.sv` builds the InitFC DLLPs from `INIT_*`); `pcie_core.sv` gives the TL and DLL the same credits.
 
@@ -263,35 +241,7 @@ Three complementary sets, one per layer:
 
 ### Transaction taps: a test platform at every layer
 
-Each pcieVHost reports every TLP and DLLP it sends and receives on ports of its own: transaction taps we added to the model (openPCIE_BFM's `1.upstream/patches/pcievhost-taps.patch`).
-
-- **C side** (`src/displink.c`): `TapTl()` / `TapDll()`, called from `DispTl()` / `DispDll()`, write each TLP DW and each DLLP word to new addresses in `src/pcie_vhost_map.h`, with VProc delta writes, so no simulation time passes.
-- **HDL side** (`pcieVHost.sv`): SystemVerilog queues play those words out one per clock on `TlpTx*` / `TlpRx*` (`Data`, `Sop`, `Eop`, `Valid`) and `DllpTx*` / `DllpRx*` (`Data`, `Valid`). `pcieVHostPipex1.sv` passes them through.
-- **TLP format:** byte 0 in bits 31:24, no framing, sequence number or LCRC. Nullified TLPs (EDB) are left out. DLLPs carry their 4 bytes, no CRC.
-- openPCIE_BFM's wrapper `PIPEx1__pcieVHost` offers each packet at three layers, from one run, all always present.
-- Both sides use it: the host `RCPIPEx1__pcieVHost` (`EndPoint=0`) and the EP model `EPPIPEx1__pcieVHost_DUT` (`EndPoint=1`).
-- Each side has its decoder page, `tb.u_rc` and `tb.dut.bfm_pcie`, with the same names by link direction (dn = RC -> EP, up = EP -> RC). A packet shows on both, a link latency apart.
-
-<div align="center">
-<img alt="Inside PIPEx1__pcieVHost, used by both sides: the pcieVHost C model writes each TLP and DLLP through VProc, in zero time, into four SV queues in pcieVHost.sv, which play them out one per clock on TlpTx/TlpRx/DllpTx/DllpRx ports; our wrapper turns them into dll_rx beats for a TL under test and into the names WaveCrux decoders auto-bind, next to the PIPE link" width="100%" src="../0.doc/5.sim/pcievhost-taps.drawio.png">
-</div>
-
-| Layer | Ports of `tb.u_rc`, `tb.dut.bfm_pcie` | For |
-|---|---|---|
-| PIPE | `pipe_dn_*`, `pipe_up_*` (`pclk`, `data`, `datak`) | the link; PIPE and DLL decoders |
-| Data Link | `dll_rx_*`, on `dll_clk`: TLPs (`data`, `tlp_valid`, `tlp_first`, `tlp_last`) and DLLPs (`hdr_credit`, `data_credit`, `update_type`, `packet_type`, `dllp_valid`) | RC -> EP traffic as an EP's DLL hands it to its TL (`dll_if` RX side): drives a TL under test |
-| Data Link | `dllp_dn_*`, `dllp_up_*` | every DLLP, one word each |
-| Transaction | `tx_*` (RC -> EP), `rx_*` (EP -> RC) | the TLP decoder |
-
-The `dll_rx_*` fields follow the DLL ([DLL draft v2](../2.rtl/0.doc/260711-DLL_draft_v2.pdf), slides 7 and 9): TLP byte 0 in `data[7:0]`, the first byte on the wire; DLLP Type = {`packet_type`, `update_type`, 0, VC}, so `packet_type` 01 InitFC1, 11 InitFC2, 10 UpdateFC, and `update_type` 00 P, 01 NP, 10 Cpl. Like the DLL, every DLLP raises `dllp_valid`.
-
-What it gives us:
-
-- **RTL driven from the model.** `dll_rx_*` has the shape of `dll_if`'s RX side, so a TL can be tested without the MAC and DLL below it, on its own clock.
-- **A reference for the DUT.** What the host sent and received, packet by packet, to compare against the DUT's own TL and DLL interfaces with `EP=rtl`.
-- **Self-checking tests.** A checker reads the taps, not the console log.
-- **Decoder fixtures from an open simulator.** Verilator and Icarus give the same TLPs at the same times (50 each way in the enumeration run), with expected values from the model, not from a decoder.
-- **Any link partner.** The host's taps work with the EP model and the EP RTL alike; with the EP model, both ends of the link are tapped.
+Each pcieVHost reports every TLP and DLLP it sends and receives on ports of its own, offered at the PIPE, Data Link and Transaction layers ([how it works](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/integration.md#transaction-taps)). Both sides use it: the host `RCPIPEx1__pcieVHost` and the EP model `EPPIPEx1__pcieVHost_DUT`, each with its decoder page, `tb.u_rc` and `tb.dut.bfm_pcie`, with the same names by link direction (dn = RC -> EP, up = EP -> RC). With `EP=rtl`, the host's `dll_rx_*` can drive a TL under test, and its taps are the reference for the DUT's own TL and DLL.
 
 ### Viewing the EP in WaveCrux
 
@@ -482,9 +432,6 @@ Four fixes got there, all in openPCIE's `pcievhost-speed.patch`:
 | `A7RC_EP_EXPECT` | `Makefile` (`EP=rtl`) | the host's expectations of our EP: `usercode/a7rc_ep.h` | openPCIE |
 | `SIM_SERIAL` | `Makefile` (`IFACE=serial`, `phy`) | the host does 8b/10b and scrambling itself, on the serial line | openPCIE |
 | `A7RC_LITERAL` | `Makefile` (`A7RC`) | `1`: the host sends only what the lab RC sends; `0`: the tester | openPCIE |
-| `EXCLUDE_LTSSM` | `Makefile` | leaves the LTSSM out of the pcieVHost model; the user code links `ltssm.c` instead | VIP |
-| `VPROC_SV`, `ICARUS` | `Makefile` | VProc over SystemVerilog DPI-C (Verilator), or over VPI (Icarus, JanusHDL) | VIP |
-| `VPROC_BYTE_ENABLE` | `Makefile` | byte enables on the VProc bus, in VProc and pcieVHost | VIP |
 | `VPROC` | `Makefile` | the HAL's VProc back end (`csr_regs.h`, `pcie.c`), compiled with `CPU=vproc` | ours |
 | `EP_RTL` | `Makefile` (`EP=rtl`) | `tb.sv` instantiates the EP RTL instead of the EP model | ours |
 | `IFACE_SERIAL` | `Makefile` (`IFACE=serial`, `phy`) | `tb.sv` connects the host on the serial line | ours |
@@ -494,16 +441,11 @@ Four fixes got there, all in openPCIE's `pcievhost-speed.patch`:
 | `RISCV_FORMAL` | `Makefile` (`EP=rtl DUMP=1`) | eduBOS5 drives its RVFI outputs, for the CPU's WaveCrux page | ours |
 | `DUMP` | `Makefile` (`DUMP=1`) | `tb.sv` writes `tb.fst`, `tb_serial.fst`, `tb_phy.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst` | ours |
 
+The model's own defines (`EXCLUDE_LTSSM`, `VPROC_SV`, `ICARUS`, `VPROC_BYTE_ENABLE`, ...): [openPCIE_BFM, build defines](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/integration.md#build-defines).
+
 ### From XSIM to Verilator, via Icarus
 
-openPCIE runs its co-simulation on AMD's XSIM, as the encrypted Artix-7 hard macros left no other choice. **The pcieVHost setup we took from openPCIE did not run on Verilator.** Upstream has supported Verilator since `VERSION_1_0_0` (2024-08-27), with its own Verilator make flow since `VERSION_1_0_1` (2024-09-29); openPCIE and this repo both use `VESRSION_1_9_3` (sic, 2026-06-13). But the openPCIE integration (libraries, file list, wiring) was XSIM-only. Here all RTL is open, so the co-simulation moved to Verilator, the fast one, and Icarus. Lessons on the way:
-
-1. **Libraries built from source, per simulator.** XSIM loaded prebuilt `libcosimlnx.a` / `libpcielnx.a`. Verilator reaches the C models through DPI-C, Icarus through VPI, each needing its own build of the same sources, so openPCIE_BFM's `4.build/build-vip.sh` builds both: `libcosimlnx.a` / `libpcielnx.a` for DPI-C, `libcosimica.a` / `libpcieica.a` for VPI. The VPI library also carries pcieVHost's `veriuser.c`, the table that registers the models' system tasks with Icarus.
-2. **Every referenced module must exist.** The pcieVHost wrappers instantiate `clkmux` and `Serialiser` (from pcieVHost's `verilog/lib`), never compiled by the XSIM file list. Verilator wants every referenced module, so the VIP build now collects them.
-3. **Electrical idle: `NOSIG`.** An electrically idle PCIE line carries no signal. Upstream models it as `Z` on a 4-state simulator, and under Verilator (2-state) as zeros plus a side-band, `ElecIdleOut` and `ElecIdleIn`. openPCIE's patch drops both: each idle symbol on the PIPE is `NOSIG`, the K flag and `0xFF` (no 8b/10b code), on Verilator and Icarus alike. Verilator can't be trusted with `Z` here: its `=== 'z` reads a driven 0 as `Z` ([#17](https://github.com/chili-chips/openCologne-PCIE/issues/17)).
-4. **One LTSSM on both sides.** On openPCIE the model plays the EP, an upstream port, against a real `PCIE_2_1` downstream port; the patch makes it spec-correct: an upstream port keeps sending Link/Lane = PAD in its TS1 until the downstream port assigns the numbers. Upstream's model takes a shortcut that only works against a copy of itself, so the patched EP would deadlock in Configuration.Start against pcieVHost's own RC, on both simulators. With upstream's RC as our host, we used upstream's `ltssm.c`. The host is now openPCIE's Artix-7 RC model, which assigns Link and Lane numbers as the hard macro does, so both sides use openPCIE's `ltssm.c`, patch included.
-5. **Macros before models.** The pcieVHost models use macros (`WsTimeScale`, `RegDel`, the comma symbols, the register map) from its headers. Under Verilator the first file in the list happened to pull them in for all others; not under Icarus. [`tb.f`](tb.f) now names `allheaders.svh` first, for both.
-6. **Portable delays.** Icarus rejected the test bench's `#(N * 1ps)` delays. The file's timescale is 1 ps, so plain numbers mean the same everywhere; the run limit is a 64-bit constant, as 10 ms in picoseconds overflows 32 bits.
+openPCIE runs its co-simulation on XSIM, for the encrypted Artix-7 hard macros; here all RTL is open, so it moved to Verilator and Icarus. What that took (libraries per simulator, every module present, `NOSIG`, one LTSSM on both sides, macro order, portable delays): [openPCIE_BFM](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/integration.md#from-xsim-to-verilator-via-icarus).
 
 ### VIP versions and local changes
 
@@ -524,30 +466,7 @@ The rv32 integration code in `models/rv32/usercode` is openPCIE's, without its `
 
 ## VProc Software
 
-A VProc program is ordinary C or C++, except its entry point is `VUserMain<n>()`, with C linkage, instead of `main()`: the simulator already has a `main()`, and each node has its own program. VProc's scheduler talks to the simulator over DPI-C (Verilator) or VPI (Icarus), invisibly to the program. VProc offers a low-level C API and a C++ one, the `VProc` class in `VProcClass.h` (headers in `$VIP_DIR/include`, see [Running the co-simulation](#running-the-co-simulation)):
-
-```c++
-VProc (const uint32_t node);
-
-int  write (const unsigned addr, const unsigned  data, const int delta=0);
-int  read  (const unsigned addr,       unsigned *data, const int delta=0);
-int  tick  (const unsigned ticks);
-```
-
-Addresses are byte addresses; `delta` stays at its default. `tick()` advances simulation time by a number of cycles of the node's clock, without a bus transaction. Finer accesses: `writeByte`, `writeHword`, `writeWord` and their `read` twins; the rest is in the [VProc manual](https://github.com/wyvernSemi/vproc/blob/master/doc/VProc.pdf).
-
-A program can also reach the sparse memory model directly, through `mem.h` (C functions: `extern "C"` from C++):
-
-```c++
-void     WriteRamByte  (const uint64_t addr, const uint32_t data, const uint32_t node);
-void     WriteRamHWord (const uint64_t addr, const uint32_t data, const int little_endian, const uint32_t node);
-void     WriteRamWord  (const uint64_t addr, const uint32_t data, const int little_endian, const uint32_t node);
-uint32_t ReadRamByte   (const uint64_t addr, const uint32_t node);
-uint32_t ReadRamHWord  (const uint64_t addr, const int little_endian, const uint32_t node);
-uint32_t ReadRamWord   (const uint64_t addr, const int little_endian, const uint32_t node);
-```
-
-No default arguments (C). `node` selects a memory space, not a VProc node; we use one, 0. Every `mem_model` instance in the HDL sees the same memory as this API, so programs and logic exchange data through it.
+A VProc program is C or C++ with `VUserMain<n>()` as its entry point. Its C++ API, and the `mem.h` API to the sparse memory: [openPCIE_BFM](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/integration.md#vproc-and-memh-api). Headers in `$VIP_DIR/include` ([Running the co-simulation](#running-the-co-simulation)).
 
 <div align="center">
 <img alt="soc_cpu VProc software stack" src="../0.doc/5.sim/soc-cpu-vproc-stack.png" width=800>
@@ -621,7 +540,7 @@ Code on the rv32 ISS uses the RISC-V `gdb`: with `-g` in `vusermain.cfg`, the IS
 
 ## The mem_model Co-Simulation Sparse Memory Model
 
-[mem_model](https://github.com/wyvernSemi/mem_model) is a sparse memory in C, part of the pcieVHost software: a 64-bit address space, pages allocated only when touched. Programs reach it through the API above; logic reaches the same memory through the `mem_model` HDL component, instantiable any number of times. That shared space is how VProc programs and simulated logic hand data to each other. Details: [`models/cosim/README.md`](models/cosim/README.md).
+A sparse memory in C, part of pcieVHost, shared by VProc programs and the `mem_model` HDL component: [openPCIE_BFM](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/integration.md#vproc-and-mem_model). Its integration here: [`models/cosim/README.md`](models/cosim/README.md).
 
 ## Driving the PCIE Link
 

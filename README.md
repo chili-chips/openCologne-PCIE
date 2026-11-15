@@ -362,13 +362,22 @@ Our posts so far:
 - [2025-10-02, LinkedIn (announcement)](https://www.linkedin.com/feed/update/urn:li:activity:7379769413421559808)
 - [2025-08-25, LinkedIn (pcievhost)](https://www.linkedin.com/feed/update/urn:li:ugcPost:7362742908170473473?commentUrn=urn%3Ali%3Acomment%3A%28ugcPost%3A7362742908170473473%2C7363111076936232962%29&dashCommentUrn=urn%3Ali%3Afsd_comment%3A%287363111076936232962%2Curn%3Ali%3AugcPost%3A7362742908170473473%29)
 
-**Issues filed upstream.** JanusHDL has no public tracker (it is closed source, so it can read encrypted IP), so its issues are here, under the [`JanusHDL` label](https://github.com/issues?q=org%3Achili-chips+label%3AJanusHDL):
+**Issues filed upstream** from this project, open and closed. Details of the open ones: their trackers in our [issues](https://github.com/chili-chips/openCologne-PCIE/issues).
 
 | Tool / project | Issue | What | State |
 |---|---|---|---|
+| nextpnr | [nextpnr#1909](https://github.com/YosysHQ/nextpnr/issues/1909) | report utilization per hierarchy level | open |
+| nextpnr | [nextpnr#1732](https://github.com/YosysHQ/nextpnr/issues/1732) (comment) | router2 never clears one overused wire: two nets take it in turns | open |
 | prjpeppercorn-test-cases | [#12](https://github.com/YosysHQ/prjpeppercorn-test-cases/issues/12) | offer: this design as a test case for their regression and QA runs | open |
+| Yosys | [yosys#6500](https://github.com/YosysHQ/yosys/issues/6500) | `read_slang --best-effort-hierarchy`: a modport output the module never assigns (per-block build) | open |
+| Verilator | [verilator#9144](https://github.com/verilator/verilator/issues/9144) (comment) | `=== 'z` on a tristate net driven to 0 ([#17](https://github.com/chili-chips/openCologne-PCIE/issues/17)) | open |
+| Icarus Verilog | iverilog#1703 | `?:` between values of one enum needs a cast ([#18](https://github.com/chili-chips/openCologne-PCIE/issues/18)) | open, as [iverilog#1048](https://github.com/steveicarus/iverilog/issues/1048) |
+| Icarus Verilog | iverilog#1699 | an imported package constant in a `?:` port connection reads as z | closed (fixed, [iverilog#1702](https://github.com/steveicarus/iverilog/pull/1702)) |
+| WaveCrux | [wavecrux#100](https://github.com/Ferrite-Engineering/wavecrux/issues/100), [#101](https://github.com/Ferrite-Engineering/wavecrux/issues/101), [#89](https://github.com/Ferrite-Engineering/wavecrux/issues/89) (comment) | decoder row colors; type to filter the signal pickers; WCP load of a session | open |
 | JanusHDL | [#1](https://github.com/chili-chips/openCologne-PCIE/issues/1) | 0.17.0: what simulates and what does not | open |
 | JanusHDL | [#2](https://github.com/chili-chips/openCologne-PCIE/issues/2) | performance against Verilator and Icarus | open |
+
+Numbers without a link were filed from an account that is no longer available. JanusHDL has no public tracker (closed source, so it can read encrypted IP): its issues are in our repos, under the [`JanusHDL` label](https://github.com/issues?q=org%3Achili-chips+label%3AJanusHDL).
 
 Planned fairs and conferences:
 
@@ -401,8 +410,8 @@ Beyond that and ports to other FPGA families + ASICs, we are considering:
 - bolting our PCIE EP to [ztachip](https://github.com/ztachip/ztachip), to accelerate PC host Python
 > This borrows from Xilinx PYNQ and Alveo, where programmable [DPUs](https://www.amd.com/en/products/adaptive-socs-and-fpgas/intellectual-property/dpu.html) map algorithms into acceleration hardware without RTL design and validation. The result would be the first opensource "DPU" co-processor, working hand-in-hand with our two new cards. After all, NiteFury and SQRL Acorn CLE 215+ M.2 cards were made for acceleration of crypto mining
 - possibly also the SerDes HM building brick. Two opensource SerDes are in the works, in two process technologies, and more are likely to follow:
-  - **180 nm CMOS**, GlobalFoundries [GF180MCU](https://github.com/google/gf180mcu-pdk). [wafer.space](https://wafer.space), who run shuttles on it, track that work and expect it in 6 to 9 months (as of October 2026);
-  - **130 nm SiGe BiCMOS**, the EU-based [IHP](https://www.ihp-microelectronics.com) [SG13G2](https://github.com/IHP-GmbH/IHP-Open-PDK): [BRICD](https://www.thebricd.org)'s Open-SERDES, with an open channel-to-GDS flow.
+  - **130 nm SiGe BiCMOS**, the EU-based [IHP](https://www.ihp-microelectronics.com) [SG13G2](https://github.com/IHP-GmbH/IHP-Open-PDK): [BRICD](https://www.thebricd.org)'s Open-SERDES, with an open channel-to-GDS flow;
+  - **180 nm CMOS**, GlobalFoundries [GF180MCU](https://github.com/google/gf180mcu-pdk). [wafer.space](https://wafer.space), who run shuttles on it, track that work and expect it in 6 to 9 months (as of October 2026).
 
 --------------------
 
