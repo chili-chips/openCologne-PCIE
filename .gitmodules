@@ -1,0 +1,6 @@
+[submodule "2.rtl/1.phy/2.openSERDES_BFM"]
+	path = 2.rtl/1.phy/2.openSERDES_BFM
+	url = https://github.com/chili-chips/openSERDES_BFM
+[submodule "5.sim/vip/openPCIE_BFM"]
+	path = 5.sim/vip/openPCIE_BFM
+	url = https://github.com/chili-chips/openPCIE_BFM

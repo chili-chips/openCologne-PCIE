@@ -42,9 +42,9 @@ design_rtl() {
   ls "$m"/*.sv | grep -v -E '_(if|pkg)\.sv'
   ls "$d"/*.sv | grep -v -E '_(if|pkg)\.sv'
   if [ "${3:-}" = sim ]; then
-    echo "$r"/1.phy/2.opensource-serdes-model/ccfpga_serdes_pkg.sv "$r"/1.phy/2.opensource-serdes-model/ccfpga_serdes.BFM.sv
+    echo "$r"/1.phy/2.openSERDES_BFM/1.gatemate/1.model/ccfpga_serdes_pkg.sv "$r"/1.phy/2.openSERDES_BFM/1.gatemate/1.model/ccfpga_serdes.BFM.sv
   else
-    echo "$r"/1.phy/2.opensource-serdes-model/ccfpga_serdes.SYNTH.sv
+    echo "$r"/1.phy/2.openSERDES_BFM/1.gatemate/1.model/ccfpga_serdes.SYNTH.sv
   fi
 }
 

@@ -6,7 +6,7 @@ Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's 
 |---|---|
 | [`phy_top.sv`](phy_top.sv) | the PHY: `ccfpga_pipe_top` + one `ccfpga_serdes` |
 | [`1.serdes-test.STANDALONE`](1.serdes-test.STANDALONE/README.md) | SerDes PRBS loopback on the GateMate EVB, tested on the board |
-| [`2.opensource-serdes-model`](2.opensource-serdes-model) | the SerDes BFM (simulation) and `ccfpga_serdes.SYNTH.sv` (chip) |
+| `2.openSERDES_BFM` | git submodule: [openSERDES_BFM](https://github.com/chili-chips/openSERDES_BFM), the SerDes BFM (simulation) and `ccfpga_serdes.SYNTH.sv` (chip), in `1.gatemate/1.model` |
 | [`3.sim`](3.sim/README.md) | PHY tests |
 
 #### References:
@@ -68,7 +68,7 @@ So a GateMate board can route each pair the short way: no crossing vias, no stub
 --------------------
 ## Open-source SerDes simulation model
 
-`2.opensource-serdes-model/` holds a copy of the open-source **SerDes BFM**, a behavioural model of the GateMate SerDes at the level of Cologne Chip's sim model `ccfpga_serdes`, not the `CC_SERDES` primitive. Its sibling `ccfpga_serdes.SYNTH.sv` puts `CC_SERDES` behind the same ports for the chip: `phy_top` has one SerDes instance, the file list picks the file. So the PIPE, MAC and DLL simulate with open tools. Master copy, documentation, tests and 8b/10b proofs: [openCologne `7.SerDes/1.sim-model`](https://github.com/chili-chips/openCologne/blob/main/7.SerDes/1.sim-model/README.md).
+The submodule `2.openSERDES_BFM` is the open-source **SerDes BFM**, at the level of Cologne Chip's `ccfpga_serdes`, with `ccfpga_serdes.SYNTH.sv` for the chip: `phy_top` has one SerDes instance, the file list picks the file. What it models, its settings and its tests: [openSERDES_BFM, Target 1: GateMate](https://github.com/chili-chips/openSERDES_BFM/blob/main/1.gatemate/README.md).
 
 | flow | result |
 |---|---|
@@ -80,7 +80,7 @@ PHY flows: [3.sim/README.md](3.sim/README.md). DLL over this PHY: [4.dll/sim/REA
 --------------------
 ## ccfpga_serdes I/O
 
-The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), documents the hard macro, `CC_SERDES`: 61 pins. Cologne Chip's simulation model and our BFM (`2.opensource-serdes-model/ccfpga_serdes.BFM.sv`) are the `ccfpga_serdes` wrapper around it: the same 84 ports, its own logic on 23 of them. For the chip, `ccfpga_serdes.SYNTH.sv` is the wrapper, with no logic: it connects the 61 pins.
+The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), documents the hard macro, `CC_SERDES`: 61 pins. Cologne Chip's simulation model and our BFM (`2.openSERDES_BFM/1.gatemate/1.model/ccfpga_serdes.BFM.sv`) are the `ccfpga_serdes` wrapper around it: the same 84 ports, its own logic on 23 of them. For the chip, `ccfpga_serdes.SYNTH.sv` is the wrapper, with no logic: it connects the 61 pins.
 
 - 🟪 **HM**: a `CC_SERDES` pin (**Pin**), through the wrapper. All 61 are.
 - 🟥 **wrapper only**: the vendor model's own logic (config port, scan, test, core resets, serial pins, reference clock). On the chip unused, or the constant in brackets.
@@ -181,7 +181,7 @@ The GateMate SerDes by function. DS1001, the GateMate datasheet (section 2.5), d
 --------------------
 ## ccfpga_serdes parameters
 
-The vendor model's 115, plus `SERDES_ENABLE` and `SERDES_AUTO_INIT` of `CC_SERDES`: 117. All but 🟥 are `CC_SERDES` parameters, each the reset value of the register-file field of its name (`ALIGN_*` is `RX_ALIGN_*`, `RX_RESETDONE_GATE` is `RX_RESET_DONE_GATE`). **Default**: DS1001's register map (Table 2.59); six differ elsewhere ([four-way compare](#four-way-compare-ds1001-vendor-model-bfm-synth)). **BFM**: M modelled, R read back only, – accepted, not modelled (analog or calibration).
+The vendor model's 115, plus `SERDES_ENABLE` and `SERDES_AUTO_INIT` of `CC_SERDES`: 117. All but 🟥 are `CC_SERDES` parameters, each the reset value of the register-file field of its name (`ALIGN_*` is `RX_ALIGN_*`, `RX_RESETDONE_GATE` is `RX_RESET_DONE_GATE`). **Default**: DS1001's register map (Table 2.59); six differ elsewhere ([four-way compare](https://github.com/chili-chips/openSERDES_BFM/blob/main/1.gatemate/README.md#ds1001-vendor-model-bfm-and-synth-where-they-differ)). **BFM**: M modelled, R read back only, – accepted, not modelled (analog or calibration).
 
 - 🟥 **wrapper only**: `TX_BUFFER_ADDR_WIDTH`; the four `RX_*_OVR`, which the wrapper packs into `RX_EN_EQA_EXT_VALUE` of `CC_SERDES`.
 
@@ -272,7 +272,7 @@ The vendor model's 115, plus `SERDES_ENABLE` and `SERDES_AUTO_INIT` of `CC_SERDE
 
 ### DS1001, vendor model, BFM and SYNTH wrapper
 
-Where the datasheet, the vendor simulation model, our BFM and the SYNTH wrapper differ (ports, parameters, defaults) is listed with the model, in [openCologne `7.SerDes/1.sim-model`](https://github.com/chili-chips/openCologne/blob/main/7.SerDes/1.sim-model/README.md#ds1001-vendor-model-bfm-and-synth-where-they-differ).
+Where the datasheet, the vendor simulation model, our BFM and the SYNTH wrapper differ (ports, parameters, defaults) is listed with the model, in [openSERDES_BFM](https://github.com/chili-chips/openSERDES_BFM/blob/main/1.gatemate/README.md#ds1001-vendor-model-bfm-and-synth-where-they-differ).
 
 What matters here: `phy_top` sets `RX_EI_BIAS = 4` and `PLL_SET_OP_LOCK = 0`. Left unset, simulation and chip would differ: the BFM's RX electrical-idle detector runs (4, as DS1001), the chip gets the Yosys default (0, detector off), and `rx_ei_en_o` is the PIPE's `RxElecIdle` (`ccfpga_pipe_top.sv`).
 

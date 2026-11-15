@@ -77,7 +77,7 @@ module tb #(
   end
 
   // One clock: PCLK. Each model makes its symbol clock from it
-  // (models/PIPEx1__pcieVHost.sv)
+  // (vip/openPCIE_BFM/2.rtl/PIPEx1__pcieVHost.sv)
 
   initial begin
     fork

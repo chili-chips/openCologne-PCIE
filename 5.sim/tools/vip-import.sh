@@ -3,33 +3,23 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
-# Import the co-simulation VIP from upstream (github.com/wyvernSemi) into
-# 5.sim/vip, with our changes applied. Run it only to upgrade a model: set
-# the pins below, run, then run both simulators and update vip/README.md.
+# Import the rv32 ISS from upstream (github.com/wyvernSemi/rv32) into
+# 5.sim/vip/rv32, with openPCIE's two ISS fixes applied. Run it only to
+# upgrade the ISS: set the pin below, run, then run make EP=rtl CPU=iss run
+# and update vip/README.md.
 #
 #   bash 5.sim/tools/vip-import.sh
 #
+# VProc, pcieVHost and mem_model come from the openPCIE_BFM submodule
+# (vip/openPCIE_BFM); its 4.build/vip-import.sh imports them.
+#
 # Copies only the files the build uses, with LF line endings, then applies:
-#   - pcieVHost.v: VProc's BE and Burst ports, left open (we build VProc with
-#     VPROC_BYTE_ENABLE)
-#   - test_defs.v: `fatal calls tb.Fatal, our test bench top
-#   - pcieVHost: transaction taps, TLP and DLLP ports
-#     (models/pcievhost/pcievhost-taps.patch)
-#   - pcie_vhost_map.v: generated from pcie_vhost_map.h, as upstream's make
-#     files do
-#   - rv32: openPCIE's rv32-openpcie.patch (models/rv32)
-#   - SystemVerilog names, after the patches (they name upstream's files):
-#     modules .sv, `include headers .svh, the `include lines to match
-#   - READMEs: <p align="center"> blocks become <div align="center">
-# pcieVHost's src/ltssm.c is not copied: the make file compiles openPCIE's
-# models/a7rc-model/ltssm.c, with its LTSSM patch (see 5.sim/README.md).
+#   - openPCIE's rv32-openpcie.patch (models/rv32)
+#   - README: <p align="center"> blocks become <div align="center">
 #
 # DEPS_WORK (default ~/.cache/opencologne-pcie-deps) holds the upstream
-# clones. Needs git, patch, sed.
+# clone. Needs git, patch, sed.
 set -euo pipefail
-VPROC_REF=${VPROC_REF:-VERSION_1_13_4}
-PCIEVHOST_REF=${PCIEVHOST_REF:-VESRSION_1_9_3}   # sic: upstream's tag name
-MEM_MODEL_REF=${MEM_MODEL_REF:-c7b9c62}
 RV32_REF=${RV32_REF:-774d84fa}
 HERE=$(cd "$(dirname "$0")" && pwd)
 D=$(cd "$HERE/.." && pwd)/vip
@@ -46,74 +36,8 @@ cp_lf() {  # <src> <dst>: upstream mixes CRLF and LF; we keep LF
   tr -d '\r' < "$1" > "$2"
 }
 
-fetch vproc "$VPROC_REF"
-fetch pcievhost "$PCIEVHOST_REF"
-fetch mem_model "$MEM_MODEL_REF"
 fetch rv32 "$RV32_REF"
-rm -rf "$D"/{vproc,pcievhost,mem_model,rv32}
-
-# ---- VProc --------------------------------------------------------------------
-for f in VSched.c VUser.c VProc.h VProcClass.h VProcIrqClass.h VSched_pli.h VUser.h; do
-  cp_lf "$U/vproc/code/$f" "$D/vproc/code/$f"
-done
-for f in f_VProc.v extradefs.v vprocdefs.vh vprocdpi.vh LICENSE README.md; do
-  cp_lf "$U/vproc/$f" "$D/vproc/$f"
-done
-
-# ---- pcieVHost ----------------------------------------------------------------
-P=$D/pcievhost
-for f in "$U"/pcievhost/src/*.c "$U"/pcievhost/src/*.h; do
-  [ "$(basename "$f")" = ltssm.c ] && continue   # the make file compiles openPCIE's
-  cp_lf "$f" "$P/src/$(basename "$f")"
-done
-for f in allheaders.v pciedispheader.v pciexpress_header.v timescale.v; do
-  cp_lf "$U/pcievhost/verilog/headers/$f" "$P/verilog/headers/$f"
-done
-cp_lf "$U/pcievhost/verilog/test/test_defs.v" "$P/verilog/test/test_defs.v"
-for f in pcieVHost.v pcieVHostPipex1.v; do cp_lf "$U/pcievhost/verilog/pcieVHost/$f" "$P/verilog/pcieVHost/$f"; done
-for f in clkmux.v Serialiser.v; do cp_lf "$U/pcievhost/verilog/lib/$f" "$P/verilog/lib/$f"; done
-for f in LICENSE README.md; do cp_lf "$U/pcievhost/$f" "$P/$f"; done
-
-# change: `fatal calls tb.Fatal
-sed -i 's/`define fatal test\.Fatal;/`define fatal tb.Fatal;/' "$P/verilog/test/test_defs.v"
-grep -q 'define fatal tb\.Fatal' "$P/verilog/test/test_defs.v"
-
-# change: VProc byte-enable and burst ports, left open
-F=$P/verilog/pcieVHost/pcieVHost.v
-grep -qE '^\s*\.RD\s*\(RD\),$' "$F"
-sed -i -E '/^\s*\.RD\s*\(RD\),$/a\
-`ifdef VPROC_BYTE_ENABLE\
-           .BE             (),\
-`endif\
-`ifdef VPROC_BURST_IF\
-           .Burst          (),\
-           .BurstFirst     (),\
-           .BurstLast      (),\
-`endif' "$F"
-
-# change: transaction taps, TLP and DLLP ports (models/pcievhost/README.md)
-patch -s --no-backup-if-mismatch -p1 -d "$P" < "$HERE/../models/pcievhost/pcievhost-taps.patch"
-
-# change: the register map, generated from the C header
-sed "s/0x/32'h/;s/#/\`/;s/DEFINES/AUTO GENERATED. DO NOT EDIT!/;" "$P/src/pcie_vhost_map.h" \
-  > "$P/verilog/headers/pcie_vhost_map.v"
-
-# ---- mem_model (its C model is part of pcieVHost) -------------------------------
-for f in mem_model.v mem_model_dpi.vh LICENSE README.md; do cp_lf "$U/mem_model/$f" "$D/mem_model/$f"; done
-
-# ---- SystemVerilog names: modules .sv, `include headers .svh ------------------
-for f in "$D"/vproc/f_VProc.v "$P"/verilog/pcieVHost/*.v "$P"/verilog/lib/*.v; do
-  mv "$f" "${f%.v}.sv"
-done
-mv "$D/mem_model/mem_model.v" "$D/mem_model/f_mem_model.sv"  # upstream has a mem_model.sv of its own
-for f in "$D"/vproc/extradefs.v "$P"/verilog/headers/*.v "$P"/verilog/test/test_defs.v; do
-  mv "$f" "${f%.v}.svh"
-done
-sed -i -E 's/(`include "\w+)\.v"/\1.svh"/' "$D"/vproc/vprocdefs.vh "$P"/verilog/headers/allheaders.svh \
-  "$P"/verilog/lib/*.sv "$P"/verilog/pcieVHost/*.sv
-if grep -rqE '`include "\w+\.v"' "$D"/vproc "$P"/verilog "$D"/mem_model; then
-  echo "ERROR: an \`include of a .v file is left"; exit 1
-fi
+rm -rf "$D"/rv32
 
 # ---- rv32 ISS -------------------------------------------------------------------
 for f in "$U"/rv32/iss/src/*; do cp_lf "$f" "$D/rv32/iss/src/$(basename "$f")"; done
@@ -121,12 +45,12 @@ for f in LICENSE README.md; do cp_lf "$U/rv32/$f" "$D/rv32/$f"; done
 # change: openPCIE's two ISS fixes
 patch -s --no-backup-if-mismatch -p0 -d "$D/rv32/iss/src" < "$HERE/../models/rv32/rv32-openpcie.patch"
 
-# ---- upstream READMEs: centred blocks in <div>, which GitLab also honors ---------
+# ---- upstream README: centred blocks in <div>, which GitLab also honors ----------
 sed -i -e '/<p align="center">/,/<\/p>/{s#<p align="center">#<div align="center">#;s#</p>#</div>#}' \
-  "$D"/{vproc,pcievhost,mem_model,rv32}/README.md
+  "$D"/rv32/README.md
 
-echo "imported: VProc $VPROC_REF, pcieVHost $PCIEVHOST_REF, mem_model $MEM_MODEL_REF, rv32 $RV32_REF"
-echo "next: update vip/README.md, then run both simulators"
+echo "imported: rv32 $RV32_REF"
+echo "next: update vip/README.md, then run make EP=rtl CPU=iss run"
 
 # -----------------------------------------------------------------------------
 # Project:     openCologne-PCIE

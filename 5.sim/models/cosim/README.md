@@ -36,7 +36,7 @@ This model can also be accessed from the HDL using the `mem_model` HDL component
 
 ## VProc and mem_model integration into _openCologne-PCIE_
 
-This directory holds only our wrapper, `mem_model.sv`, which wraps upstream's `mem_model.v` (our `f_mem_model.sv`) in Verilator `lint_off` pragmas so third-party code stays out of our lint. Everything else, the VProc and mem_model HDL (`f_VProc.sv`, `f_mem_model.sv` and their headers) and the C libraries, is built from the upstream copies in [`../../vip`](../../vip) by [`../../tools/build-vip.sh`](../../tools/build-vip.sh) into `$VIP_DIR`, and [`../../tb.f`](../../tb.f) lists the files from there.
+The VProc and mem_model HDL (`f_VProc.sv`, `f_mem_model.sv` and their headers) and the C libraries are built from the openPCIE_BFM submodule ([`../../vip`](../../vip/README.md)) into `$VIP_DIR`, with its `4.build/build-vip.sh`; [`../../tb.f`](../../tb.f) lists the files from there, and openPCIE_BFM's `2.rtl/mem_model.sv`, which wraps upstream's `mem_model.v` in Verilator `lint_off` pragmas.
 
 The software of both models is in `$VIP_DIR/lib`: _VProc_ in `libcosimlnx.a` for DPI-C (Verilator) and `libcosimica.a` for VPI (Icarus); _mem_model_'s C code, part of pcieVHost, in `libpcielnx.a` and `libpcieica.a`. Their headers are in `$VIP_DIR/include`. To use the models' APIs, the user code must include either the  `VProcClass.h` header for the *VProc* C++ API, or `VUser.h` for the *VProc* C API, and the `mem.h` header for the memory model C API. Note that the `VUser.h` and `mem.h` inclusions must be wrapped as C linkage if included in code that will be compiled as C++. E.g.:
 

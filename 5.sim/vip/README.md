@@ -1,17 +1,13 @@
-# Co-simulation VIP: upstream copies
+# Co-simulation VIP
 
-The files of the [wyvernSemi](https://github.com/wyvernSemi) models this test bench builds, with LF line endings and [our changes](../README.md#vip-versions-and-local-changes). GPL-3.0-or-later, by Simon Southwell (each folder has its `LICENSE`).
-
-| Folder | Upstream | Version |
+| Folder | What | Version |
 |---|---|---|
-| `vproc` | [wyvernSemi/vproc](https://github.com/wyvernSemi/vproc) | `VERSION_1_13_4` (8fa7a6d) |
-| `pcievhost` | [wyvernSemi/pcievhost](https://github.com/wyvernSemi/pcievhost) | `VESRSION_1_9_3` (sic, 77d6462) |
-| `mem_model` | [wyvernSemi/mem_model](https://github.com/wyvernSemi/mem_model) | `main` c7b9c62 |
-| `rv32` | [wyvernSemi/rv32](https://github.com/wyvernSemi/rv32) | `main` 774d84f |
+| `openPCIE_BFM` | git submodule: [openPCIE_BFM](https://github.com/chili-chips/openPCIE_BFM), our PCIE model with the upstream copies of VProc, pcieVHost and mem_model ([versions](https://github.com/chili-chips/openPCIE_BFM/blob/main/1.upstream/vip/README.md)) | the submodule's commit |
+| `rv32` | upstream copy of [wyvernSemi/rv32](https://github.com/wyvernSemi/rv32), the RISC-V ISS, with openPCIE's fixes ([`../models/rv32`](../models/rv32/README.md)); GPL-3.0-or-later, by Simon Southwell | `main` 774d84f |
 
-Only the files the build uses are here; docs and examples stay upstream. [`../tools/build-vip.sh`](../tools/build-vip.sh) builds them.
+The make file builds the PCIE VIP with the submodule's `4.build/build-vip.sh`, and the ISS itself. After a fresh clone: `git submodule update --init`.
 
-To upgrade: set the new version in [`../tools/vip-import.sh`](../tools/vip-import.sh), run it, update this table, run both simulators.
+To upgrade the ISS: set the new version in [`../tools/vip-import.sh`](../tools/vip-import.sh), run it, update this table, run `make EP=rtl CPU=iss run`. To upgrade the PCIE model: `git submodule update --remote openPCIE_BFM`, then `bash ../run-sanity.sh`.
 
 --------------------
 #### End of Document

@@ -19,7 +19,7 @@ set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 PHY_DIR="${REPO_ROOT}/2.rtl/1.phy"
-MODEL_DIR="${PHY_DIR}/2.opensource-serdes-model"
+MODEL_DIR="${PHY_DIR}/2.openSERDES_BFM/1.gatemate/1.model"
 PIPE_DIR="${REPO_ROOT}/2.rtl/2.pipe"
 MAC_DIR="${REPO_ROOT}/2.rtl/3.mac"
 DLL_DIR="${REPO_ROOT}/2.rtl/4.dll"

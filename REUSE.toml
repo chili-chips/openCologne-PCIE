@@ -51,7 +51,7 @@ SPDX-License-Identifier = "BSD-3-Clause"
 # Our own integration files carry their own BSD header, which wins
 # (precedence "closest").
 [[annotations]]
-path = ["5.sim/vip/**", "5.sim/models/cosim/**", "5.sim/models/pcievhost/**", "5.sim/models/rv32/**"]
+path = ["5.sim/vip/**", "5.sim/models/cosim/**", "5.sim/models/rv32/**"]
 precedence = "closest"
 SPDX-FileCopyrightText = "2004-2025 Simon Southwell"
 SPDX-License-Identifier = "GPL-3.0-or-later"

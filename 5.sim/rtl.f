@@ -8,7 +8,7 @@
 // (models/phy_vproc_rc.sv).
 
 // Packages
-models/pipe_sym_pkg.sv
+vip/openPCIE_BFM/2.rtl/pipe_sym_pkg.sv
 ../2.rtl/2.pipe/pipe_pkg.sv
 ../2.rtl/3.mac/mac_pkg.sv
 ../2.rtl/4.dll/dll_pkg.sv
@@ -88,5 +88,5 @@ models/pipe_sym_pkg.sv
 
 // GateMate primitives for simulation, and the phy_top socket
 models/gatemate_cells_sim.sv
-models/pipe_phy_core.sv
+vip/openPCIE_BFM/2.rtl/pipe_phy_core.sv
 models/phy_vproc_rc.sv

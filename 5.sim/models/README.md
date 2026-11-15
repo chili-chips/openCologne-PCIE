@@ -3,13 +3,8 @@
 This directory contains the following models
 
 * `soc_cpu.VPROC.sv` : _VProc_ based `soc_cpu` compatible virtual processor.
-* `PIPEx1__pcieVHost.sv` : a pcieVHost on an x1 PIPE link, as RC or EP, with the link offered at the PIPE, Data Link and Transaction layers.
-* `RCPIPEx1__pcieVHost.sv` : the host, `PIPEx1__pcieVHost` fixed to the RC role.
-* `phy_vproc_rc.sv` : the `phy_top` socket with `IFACE=pipe`, the host at the PIPE: a wrapper of `pipe_phy_core.sv`.
-* `pipe_phy_core.sv` : the PHY side of PIPE with its handshakes (PhyStatus, receiver detection, power state), shared with openPCIE (master there).
-* `pipe_sym_pkg.sv` : the symbol values on the PIPE (`NOSIG_SYM`, electrical idle) for `pipe_phy_core.sv` and `pipe_mac_adapter.sv`, shared with openPCIE (master there).
-* `pipe_mac_adapter.sv` : the MAC side of PIPE, for a pcieVHost model above a PHY (reset, receiver detection, P0, symbols both ways, assertions on the PHY's answers), the mirror of `pipe_phy_core.sv`, shared with openPCIE (master there).
-* `ep_model_phy.sv` : `IFACE=phy`, the EP model behind our PHY: `phy_top` with the EP model on its PIPE through `pipe_mac_adapter.sv`.
+* `phy_vproc_rc.sv` : the `phy_top` socket with `IFACE=pipe`, the host at the PIPE: a wrapper of openPCIE_BFM's `pipe_phy_core.sv`.
+* `ep_model_phy.sv` : `IFACE=phy`, the EP model behind our PHY: `phy_top` with the EP model on its PIPE through openPCIE_BFM's `pipe_mac_adapter.sv`.
 * `ep_wavecrux_view.sv` : our EP's layer boundaries, for the WaveCrux decoders (`EP=rtl DUMP=1`).
 * `tlp_dw_if.sv`, `tlp_dw_monitor.sv`, `tlp_wavecrux_view.sv` : the SOC's AXI-Stream TLPs, one DW per clock, for the TLP decoder.
 * `gatemate_cells_sim.sv` : simulation models of the GateMate primitives `clk_rst_gen` uses: `CC_USR_RSTN`, `CC_BUFG`.
@@ -17,9 +12,10 @@ This directory contains the following models
 
 In addition, sub-directories contain the following models
 
-* [`cosim`](cosim/README.md) : Contains the _VProc_ and _mem_model_ co-simulation VIP.
+* [`cosim`](cosim/README.md) : notes on the _VProc_ and _mem_model_ co-simulation VIP, as this test bench uses them.
 * [`rv32`](rv32/README.md) : Contains the _rv32_ RISC-V RV32GCC_Zbb instruction set simulator C++ model
-* [`pcievhost`](pcievhost/README.md) : Points to the pcieVHost VIP, the PCIE link partner with a PIPE interface, copied into [`../vip`](../vip/README.md).
+
+The PCIE models (the pcieVHost wrappers, the PIPE adapters, the Artix-7 RC host) are [openPCIE_BFM](https://github.com/chili-chips/openPCIE_BFM#layout)'s, in the submodule [`../vip/openPCIE_BFM`](../vip/README.md).
 
 ## soc_cpu.VPROC
 

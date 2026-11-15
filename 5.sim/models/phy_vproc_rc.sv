@@ -39,7 +39,7 @@
 // Description:
 //   phy_vproc_rc: the phy_top socket with IFACE=pipe, the host at the PIPE.
 //   It is the PHY side of pipe_if for our MAC, PCLK from the test bench: a
-//   wrapper of models/pipe_phy_core.sv (master in openPCIE), which gives the
+//   wrapper of openPCIE_BFM's 2.rtl/pipe_phy_core.sv (vip/openPCIE_BFM), which gives the
 //   PIPE handshakes (PhyStatus, receiver detection) and electrical idle both
 //   ways (NOSIG on the host's data).
 //==========================================================================

@@ -12,12 +12,13 @@
 #
 # Open-source simulators: Verilator (default) or Icarus (SIM); JanusHDL, free but
 # closed source, is an option. The VIP is the same as on openPCIE: VProc, the
-# pcieVHost PCIE model, mem_model: upstream copies in vip/, built by
-# tools/build-vip.sh into ~/.cache. models/ holds our own wrappers.
+# pcieVHost PCIE model, mem_model, from openPCIE_BFM (the submodule
+# vip/openPCIE_BFM: upstream copies, our PIPE wrappers, the host), built by its
+# 4.build/build-vip.sh into ~/.cache. models/ holds our own models.
 #
 # Nodes: VProc node 2 is the host, RCPIPEx1__pcieVHost, a pcieVHost in RC mode
-# running openPCIE's Artix-7 RC model, copied into models/a7rc-model/:
-# VUserMain2.cpp, the checker, ltssm.c, and pcieVHost and VProc built with
+# running openPCIE's Artix-7 RC model, from openPCIE_BFM (3.sw/a7rc):
+# VUserMain2.cpp, the checker, 3.sw/ltssm/ltssm.c, and pcieVHost and VProc built with
 # pcievhost-speed.patch and vproc-coroutine.patch. What it expects of our EP RTL: usercode/a7rc_ep.h.
 # The EP is selected with EP: the EP RTL + firmware, or the EP model
 # EPPIPEx1__pcieVHost_DUT, a pcieVHost in EP mode at node 1 (stubs/,
@@ -45,7 +46,7 @@ SIM           ?= verilator
 #               EP=model pcieVHost's own serialiser
 #   IFACE=phy   EP=model only: the host on the serial line, the EP model behind
 #               our PHY: phy_top as in EP=rtl IFACE=serial, with the EP model
-#               on its PIPE through models/pipe_mac_adapter.sv in place of
+#               on its PIPE through openPCIE_BFM's pipe_mac_adapter.sv in place of
 #               pcie_top (ep_phy.f). A failure points at the PHY. Verilator only
 ifneq ($(origin DUT)$(origin PHY),undefinedundefined)
   $(error DUT and PHY are now EP=model|rtl and IFACE=pipe|serial (PHY=rtl and PHY=mock become IFACE=serial))
@@ -97,10 +98,11 @@ else ifneq ($(IFACE),pipe)
 endif
 
 # ---- host ---------------------------------------------------------------------
-# openPCIE's Artix-7 RC model, a copy in models/a7rc-model/ (masters in
-# openPCIE): at the PIPE, or on the serial line (IFACE=serial) with 8b/10b and
-# scrambling on
-A7RC_DIR       = $(CURDIR)/models/a7rc-model
+# openPCIE's Artix-7 RC model, from openPCIE_BFM: at the PIPE, or on the serial
+# line (IFACE=serial) with 8b/10b and scrambling on
+BFM            = $(CURDIR)/vip/openPCIE_BFM
+A7RC_DIR       = $(BFM)/3.sw/a7rc
+LTSSM_DIR      = $(BFM)/3.sw/ltssm
 # A7RC=0 (default): the host is a tester: the lab RC's sequence, then what its
 # firmware never sends but the spec allows (README.md, Tester and literal).
 # A7RC=1: literal, only what the lab RC sends
@@ -122,7 +124,7 @@ REGRESS_JOBS  ?= 1
 REGRESS_QUIET ?= 1
 REGRESS_DUMP  ?= none
 # make wavecrux SEED=N: that seed again with DUMP=1, in obj/wavecrux/<N>/, then
-# its FST in WaveCrux at the checker's first violation (tools/wavecrux.py; WaveCrux
+# its FST in WaveCrux at the checker's first violation (openPCIE_BFM 4.build/wavecrux.py; WaveCrux
 # runs with --wcp-port 54321). WCX_OPEN=0: the dump only. REGRESS_DUMP=fail: after
 # make regress, every failing seed dumped that way
 WCX_OPEN      ?= 1
@@ -137,8 +139,9 @@ ifeq ($(filter 0 1,$(DMA)),)
 endif
 HOST_DEFS      = -DRC_GEN=2 -DA7RC_LITERAL=$(A7RC) $(A7RC_EXPECT) $(if $(filter serial phy,$(IFACE)),-DSIM_SERIAL) \
                  $(if $(filter 0,$(DMA)),-DA7RC_NO_DMA) $(IFACE_DEFS)
-VIP_ENV        = VIP_PATCH=$(A7RC_DIR)/pcievhost-speed.patch \
-                 VPROC_PATCH=$(A7RC_DIR)/vproc-coroutine.patch
+VIP_ENV        = VIP_PATCH=$(BFM)/1.upstream/patches/pcievhost-speed.patch \
+                 VPROC_PATCH=$(BFM)/1.upstream/patches/vproc-coroutine.patch \
+                 VIP_BUILD=$(HOME)/.cache/opencologne-pcie/vip
 
 # ---- CPU ----------------------------------------------------------------------
 #   rtl    (default) the eduBOS5 RTL core, running firmware.hex
@@ -173,7 +176,7 @@ endif
 # ---- user code ----------------------------------------------------------------
 # USER_C: our programs in USRCODEDIR (the EP model, the native CPU). The host,
 # openPCIE's VUserMain2.cpp, its spec checker a7rc_check.cpp and its ltssm.c
-# (models/a7rc-model),
+# (openPCIE_BFM 3.sw),
 # the link-training helper, are always compiled with them
 USRCODEDIR    ?= $(CURDIR)/usercode
 OPTFLAG       ?= -O2 -g
@@ -181,7 +184,7 @@ USRSIMFLAGS   ?=
 
 # ---- models -------------------------------------------------------------------
 # VIP_DIR: lib/, include/, hdl/ of the VIP; built once, then reused
-VIP_DIR       ?= $(shell $(VIP_ENV) bash $(CURDIR)/tools/build-vip.sh)
+VIP_DIR       ?= $(shell $(VIP_ENV) bash $(BFM)/4.build/build-vip.sh)
 export VIP_DIR
 
 # ---- tools --------------------------------------------------------------------
@@ -317,7 +320,7 @@ $(OBJDIR)/%.o: $(USRCODEDIR)/%.c | $(OBJDIR)
 $(OBJDIR)/%.o: $(USRCODEDIR)/%.cpp | $(OBJDIR)
 	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) $(INCLPATHS) $< -o $@
 
-# The host: the model, its checker and its ltssm.c (models/a7rc-model), without
+# The host: the model, its checker and its ltssm.c (openPCIE_BFM 3.sw), without
 # LTSSM_ABBREVIATED, as openPCIE compiles them (the model sets its own
 # Polling count)
 $(OBJDIR)/VUserMain2.o: $(A7RC_DIR)/VUserMain2.cpp $(A7RC_DIR)/a7rc_check.h | $(OBJDIR)
@@ -326,7 +329,7 @@ $(OBJDIR)/VUserMain2.o: $(A7RC_DIR)/VUserMain2.cpp $(A7RC_DIR)/a7rc_check.h | $(
 $(OBJDIR)/a7rc_check.o: $(A7RC_DIR)/a7rc_check.cpp $(A7RC_DIR)/a7rc_check.h | $(OBJDIR)
 	@$(HOST_CXX) -c -fPIC -MMD -MP $(OPTFLAG) $(CPPSTD) -Wno-write-strings $(DEFS) $(INCLPATHS) $< -o $@
 
-$(OBJDIR)/ltssm.o: $(A7RC_DIR)/ltssm.c | $(OBJDIR)
+$(OBJDIR)/ltssm.o: $(LTSSM_DIR)/ltssm.c | $(OBJDIR)
 	@$(HOST_CC) -c -fPIC -MMD -MP $(OPTFLAG) $(DEFS) $(INCLPATHS) $< -o $@
 
 $(USERLIB): $(VOBJS)
@@ -371,10 +374,10 @@ run: all
 	@cd $(CURDIR) && $(FW_IN) A7RC_SEED=$(SEED) $(SIM_CMD); s=$$?; $(FW_OUT) exit $$s
 
 # The tester over seeds 1 to SEEDS, each in obj/regress/<seed>/, so seeds can
-# run side by side (tools/regress.sh). PL.SPEED and PL.EIOS are listed apart:
+# run side by side (openPCIE_BFM 4.build/regress.sh). PL.SPEED and PL.EIOS are listed apart:
 # our EP and the EP model are Gen1, so no seed changes the speed
 regress: all
-	@cd $(CURDIR) && $(FW_IN) REGRESS_NA="PL.SPEED PL.EIOS" bash tools/regress.sh $(SEEDS) $(REGRESS_JOBS) $(REGRESS_S) $(REGRESS_TRIES) \
+	@cd $(CURDIR) && $(FW_IN) REGRESS_NA="PL.SPEED PL.EIOS" bash $(BFM)/4.build/regress.sh $(SEEDS) $(REGRESS_JOBS) $(REGRESS_S) $(REGRESS_TRIES) \
 	    $(REGRESS_QUIET) $(CURDIR)/obj/regress "vusermain.cfg firmware.hex" -- $(SIM_CMD); s=$$?; $(FW_OUT) \
 	$(if $(filter fail,$(REGRESS_DUMP)),for d in obj/regress/*/; do [ ! -e $$d/failed ] || \
 	    $(MAKE) --no-print-directory wavecrux SEED=$$(basename $$d) WCX_OPEN=0; done;) exit $$s
@@ -388,7 +391,7 @@ wavecrux_run: all
 	for f in vusermain.cfg; do if [ -f $$f ]; then cp $$f $$d/; fi; done; \
 	cd $$d && $(FW_IN) A7RC_SEED=$(SEED) $(SIM_CMD) > run.log 2>&1; \
 	echo "seed $(SEED): $$(grep -a -m1 'RC MODEL RESULT' $$d/run.log), $$d/$(WCX_FST)"; \
-	$(if $(filter 1,$(WCX_OPEN)),python3 $(CURDIR)/tools/wavecrux.py $$d/$(WCX_FST) $$d/run.log $(WCX_SIGNALS),echo "  open it: make wavecrux SEED=$(SEED)")
+	$(if $(filter 1,$(WCX_OPEN)),python3 $(BFM)/4.build/wavecrux.py $$d/$(WCX_FST) $$d/run.log $(WCX_SIGNALS),echo "  open it: make wavecrux SEED=$(SEED)")
 
 help:
 	@echo "make [SIM=verilator|icarus|janushdl] [EP=model|rtl] [IFACE=pipe|serial|phy]   build the models and the simulation (EP=rtl, IFACE=phy: Verilator only)"

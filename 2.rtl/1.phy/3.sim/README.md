@@ -1,6 +1,6 @@
 # PHY block-level simulation
 
-`tb_phy.sv` tests the PHY: the PIPE layer of [gatemate-pipe](https://github.com/colognechip/gatemate-pipe) on a GateMate SerDes model, or the opensource SerDes BFM ([2.opensource-serdes-model](../2.opensource-serdes-model/)) on its own. `run-phy.sh` compiles one of its tests with Icarus Verilog and runs it. None of them needs the proprietary SerDes sources. The layers above get their own block-level flows (the DLL over this PHY: [4.dll/sim](../../4.dll/sim/)); the top level is [5.sim](../../../5.sim/).
+`tb_phy.sv` tests the PHY: the PIPE layer of [gatemate-pipe](https://github.com/colognechip/gatemate-pipe) on a GateMate SerDes model, or the opensource SerDes BFM ([openSERDES_BFM](https://github.com/chili-chips/openSERDES_BFM), the submodule `../2.openSERDES_BFM`) on its own. `run-phy.sh` compiles one of its tests with Icarus Verilog and runs it. None of them needs the proprietary SerDes sources. The layers above get their own block-level flows (the DLL over this PHY: [4.dll/sim](../../4.dll/sim/)); the top level is [5.sim](../../../5.sim/).
 
 | test | what it exercises | run time |
 |---|---|---|

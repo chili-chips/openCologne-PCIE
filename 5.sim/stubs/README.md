@@ -9,7 +9,7 @@
 
 Its name mirrors the host's, `RCPIPEx1__pcieVHost`: the same model, in the other role.
 
-It is our pcieVHost wrapper [`PIPEx1__pcieVHost`](../models/PIPEx1__pcieVHost.sv) (instance `bfm_pcie`), configured as an EP at VProc node 1, running [`../usercode/VUserMain1.cpp`](../usercode/VUserMain1.cpp) against the host, openPCIE's Artix-7 RC model at node 2. Its ports are those the real EP will show the test bench:
+It is our pcieVHost wrapper `PIPEx1__pcieVHost` ([openPCIE_BFM](https://github.com/chili-chips/openPCIE_BFM#layout)) (instance `bfm_pcie`), configured as an EP at VProc node 1, running [`../usercode/VUserMain1.cpp`](../usercode/VUserMain1.cpp) against the host, openPCIE's Artix-7 RC model at node 2. Its ports are those the real EP will show the test bench:
 
 - PIPE data out and in, 64 bits wide with one K flag per byte, as Cologne Chip's PIPE
 - `pclk` (the PIPE clock, 31.25 MHz for 64 bits; the model makes its 250 MHz symbol clock from it)

@@ -4,12 +4,12 @@
 [![License:BSD-3/CC-BY-SA](https://badgen.net/badge/License/BSD-3%2FCC-BY-SA/blue)](LICENSES)
 [![REUSE:Compliant](https://badgen.net/badge/REUSE/Compliant/green)](REUSE.toml)
 [![eduBOS5:YES](https://badgen.net/badge/eduBOS5/YES/green)](https://github.com/chili-chips/openPCIE/blob/main/2.rtl/0.common.opensource/src/CPU.eduBOS5/README.md)
-[![pcievhost:YES](https://badgen.net/badge/pcievhost/YES/green)](5.sim/models/pcievhost/README.md)
+[![pcievhost:YES](https://badgen.net/badge/pcievhost/YES/green)](https://github.com/chili-chips/openPCIE_BFM)
 [![WaveCrux:YES](https://badgen.net/badge/WaveCrux/YES/green)](2.rtl/4.dll/README.md#viewing-the-dll-in-wavecrux)
 [![JanusHDL:WIP](https://badgen.net/badge/JanusHDL/WIP/orange)](https://que.no/janushdl/)
 [![Lint](https://badgen.net/github/checks/chili-chips/openCologne-PCIE/main/run-lint?label=Lint)](https://github.com/chili-chips/openCologne-PCIE/actions/workflows/lint.yml)
 [![Verible](https://badgen.net/github/checks/chili-chips/openCologne-PCIE/main/verible?label=Verible)](https://github.com/chili-chips/openCologne-PCIE/actions/workflows/verible.yml)
-[![8b10b-Formal:Pass](https://badgen.net/badge/8b10b%20Formal/Pass/green)](https://github.com/chili-chips/openCologne/tree/main/7.SerDes/1.sim-model/formal_8b10b)
+[![8b10b-Formal:Pass](https://badgen.net/badge/8b10b%20Formal/Pass/green)](https://github.com/chili-chips/openSERDES_BFM/tree/main/1.gatemate/2.formal)
 [![DLL+PHY-Sim:Pass](https://badgen.net/badge/DLL%2BPHY%20Sim/Pass/green)](2.rtl/4.dll/sim)
 [![TopSim:WIP](https://badgen.net/badge/TopSim/WIP/orange)](5.sim)
 [![PCIE:TODO](https://badgen.net/badge/PCIE/TODO/red)](#project-status)
@@ -122,7 +122,7 @@ The GateMate SerDes has not been used for PCIE before, so expect PHY issues (sig
 # RTL Architecture
 
 Two major elements:
-- **PCIE-capable SerDes:** Cologne Chip (CC) **proprietary** mixed-signal hard IP, wrapped in a thin soft adaptation layer (_phy_top_) with an industry-standard PIPE interface. An opensource SerDes BFM stands in for it in faster, public-domain simulations.
+- **PCIE-capable SerDes:** Cologne Chip (CC) **proprietary** mixed-signal hard IP, wrapped in a thin soft adaptation layer (_phy_top_) with an industry-standard PIPE interface. An opensource SerDes BFM, [openSERDES_BFM](https://github.com/chili-chips/openSERDES_BFM), stands in for it in faster, public-domain simulations.
 - **PCIE protocol stack:** soft RTL: MAC/LTSSM by Cologne Chip; DLL, TL, app, test, validation, system, infrastructure and process by Chili.CHIPS (MAC from Cologne Chip's [gatemate-pipe](https://github.com/colognechip/gatemate-pipe)), topped by an eduBOS5-based RISC-V SOC as the application layer.
 
 > **TRN-compatible:** the TL's user interface, `trn_tx_if` / `trn_rx_if`, is derived from the TRN interface of the AMD Artix-7 `PCIE_2_1` hard macro in EndPoint mode, cut to the signals this core uses. `trn_compat` maps it back to TRN for user logic written for that HM, and lists what is not supported ([details](2.rtl/README.md#compatibility-goal-an-artix-7-endpoint-in-open-source)).
@@ -157,7 +157,7 @@ Details: [3.sw/README.md](3.sw/README.md)
     <img alt="openCologne-PCIE test bench: the host, openPCIE's A7RC driver + checker on RCPIPEx1__pcieVHost, on top, driving our DUT at its PIPE interface below it: MAC, DLL and TL RTL, CSR registers and the SOC CPU socket" width="100%" src="0.doc/5.sim/tb-structure.drawio.png">
 </div>
 
-The [test bench](5.sim/README.md) uses open-source simulators only: Verilator or Icarus Verilog. The host is openPCIE's A7RC driver + checker (59 PCIe 2.1 rules) on the [_pcieVHost VIP_](https://github.com/wyvernSemi/pcievhost) in the RC role, `RCPIPEx1__pcieVHost`: it drives our DUT at its PIPE interface, trains the link and enumerates the EP. The same model already ran against the AMD `PCIE_2_1` hard macro on openPCIE, which raises the odds that our EP works first time against a physical Artix-7 RC.
+The [test bench](5.sim/README.md) uses open-source simulators only: Verilator or Icarus Verilog. The host is openPCIE's A7RC driver + checker (59 PCIe 2.1 rules) on [openPCIE_BFM](https://github.com/chili-chips/openPCIE_BFM), our model on Simon Southwell's [_pcieVHost VIP_](https://github.com/wyvernSemi/pcievhost), in the RC role, `RCPIPEx1__pcieVHost`: it drives our DUT at its PIPE interface, trains the link and enumerates the EP. The same model already ran against the AMD `PCIE_2_1` hard macro on openPCIE, which raises the odds that our EP works first time against a physical Artix-7 RC.
 
 ### Coverage plan: every layer, against a known-good partner
 
@@ -179,9 +179,9 @@ Waveforms decode as transactions in the [WaveCrux PCIE decoders](https://github.
   * natively compiled test code;
   * the firmware itself, compiled natively through the same [HAL](5.sim/README.md#hal);
   * RISC-V code on the [rv32 RISC-V ISS model](5.sim/models/rv32/README.md).
-* A C [sparse memory model](https://github.com/wyvernSemi/mem_model):
-  * an [HDL component](5.sim/models/cosim/README.md) gives logic access to it;
-  * an API gives _VProc_ code direct access from the _pcieVHost_ software.
+* A C [sparse memory model](https://github.com/wyvernSemi/mem_model), shared by logic and _VProc_ code ([notes](5.sim/models/cosim/README.md)).
+
+Both simulation models are submodules: clone with `git clone --recurse-submodules`, or run `git submodule update --init` in a clone.
 
 Details: [5.sim/README.md](5.sim/README.md)
 
@@ -366,6 +366,7 @@ Our posts so far:
 
 | Tool / project | Issue | What | State |
 |---|---|---|---|
+| prjpeppercorn-test-cases | [#12](https://github.com/YosysHQ/prjpeppercorn-test-cases/issues/12) | offer: this design as a test case for their regression and QA runs | open |
 | JanusHDL | [#1](https://github.com/chili-chips/openCologne-PCIE/issues/1) | 0.17.0: what simulates and what does not | open |
 | JanusHDL | [#2](https://github.com/chili-chips/openCologne-PCIE/issues/2) | performance against Verilator and Icarus | open |
 
