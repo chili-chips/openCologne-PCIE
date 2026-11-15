@@ -14,6 +14,12 @@
 module ccfpga_mac_top
   import pipe_pkg::*;
   import mac_pkg::*;
+#(
+    // Detect.Quiet and Detect.Active timeout, in us: 12 ms by the spec. A test
+    // bench of two of these MACs may shorten it: both start electrically idle,
+    // so neither leaves Detect.Quiet before the timeout.
+    parameter int DETECT_TIMEOUT_US = 12000
+)
 (
     input  logic i_reset_n,  // Asynchronous Reset
 
@@ -199,7 +205,7 @@ module ccfpga_mac_top
   // Max count for timeout at each state
   always_comb begin
     unique case (s_fsm_state)
-      DETECT_QUIET, DETECT_ACTIVE: clk_max_count = 21'(12 * 1000000 / CYCLE_TIME);
+      DETECT_QUIET, DETECT_ACTIVE: clk_max_count = 21'(DETECT_TIMEOUT_US * 1000 / CYCLE_TIME);
       POLLING_ACTIVE, CONFIG_LINKWIDTH_START, RECOVERY_RCVRLOCK, CONFIG_LINKWIDTH_START_LINKNUM:
       clk_max_count = 21'(24 * 1000000 / CYCLE_TIME);
       POLLING_CONFIG, RECOVERY_RCVRCFG: clk_max_count = 21'(48 * 1000000 / CYCLE_TIME);

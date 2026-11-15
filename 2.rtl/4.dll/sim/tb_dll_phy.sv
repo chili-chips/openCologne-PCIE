@@ -191,7 +191,11 @@ module tb_dll_phy
       .TX_SERIO_N        ( ep_tx_n        )
    );
 
-   pcie_stack rc (
+   // The RC leaves Detect.Quiet on a short timeout and starts to transmit;
+   // the EP keeps the spec's 12 ms and leaves on its RxElecIdle detector.
+   pcie_stack #(
+      .DETECT_TIMEOUT_US ( 20 )
+   ) rc (
       .clk_ref           ( clk_ref        ),
       .clk_aon           ( clk_aon        ),
       .clk_cfg           ( clk_cfg        ),

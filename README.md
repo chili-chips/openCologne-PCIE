@@ -25,7 +25,7 @@
   - SerDes PHY is the only Hard Macro (HM)
     - project RTL stack can move to other FPGA families and [OpenROAD](https://github.com/The-OpenROAD-Project) ASICs
   - Transaction layer interface compatible with Artix7 PCIE_2_1 HM
-  - **`This is the only soft PCIE protocol stack in opensource at the moment`**
+  - **`To our knowledge, this is the only soft PCIE protocol stack in opensource at the moment`**
     
 - **End-to-End simulated:**
   - comes with unique opensource **Verification IP (VIP)**

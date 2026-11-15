@@ -42,7 +42,8 @@
 module pcie_stack
   import pipe_pkg::*;
 #(
-   parameter PATTERN_WIDTH = 128
+   parameter PATTERN_WIDTH     = 128,
+   parameter DETECT_TIMEOUT_US = 12000  // the MAC's Detect timeout (12 ms by the spec)
    )
    (
    input  logic                   clk_ref,
@@ -167,7 +168,9 @@ assign pipe.reset_n = pipe_reset_n;
    assign tl_rx_packet_type = dll2tl.rx_dllp.packet_type;
    assign tl_rx_dllp_valid = dll2tl.rx_dllp.valid;
 
-   ccfpga_mac_top mac (
+   ccfpga_mac_top #(
+      .DETECT_TIMEOUT_US ( DETECT_TIMEOUT_US )
+   ) mac (
       .i_reset_n      ( mac_reset_n       ),
       .pipe (pipe),
       .mac (mac2dll)
