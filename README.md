@@ -159,6 +159,11 @@ Details: [3.sw/README.md](3.sw/README.md)
 
 The [test bench](5.sim/README.md) uses open-source simulators only: Verilator or Icarus Verilog. The host is openPCIE's A7RC driver + checker (59 PCIe 2.1 rules) on [openPCIE_BFM](https://github.com/chili-chips/openPCIE_BFM), our model on Simon Southwell's [_pcieVHost VIP_](https://github.com/wyvernSemi/pcievhost), in the RC role, `RCPIPEx1__pcieVHost`: it drives our DUT at its PIPE interface, trains the link and enumerates the EP. The same model already ran against the AMD `PCIE_2_1` hard macro on openPCIE, which raises the odds that our EP works first time against a physical Artix-7 RC.
 
+<div align="center">
+  <a href="https://github.com/chili-chips/openPCIE_BFM"><img width="13%" alt="openPCIE_BFM logo" src="0.doc/artwork/openPCIE_BFM.hex.png"></a>
+  <a href="https://github.com/chili-chips/openSERDES_BFM"><img width="13%" alt="openSERDES_BFM logo" src="0.doc/artwork/openSERDES_BFM.hex.png"></a>
+</div>
+
 ### Coverage plan: every layer, against a known-good partner
 
 Either half of the design can be swapped for pcieVHost:

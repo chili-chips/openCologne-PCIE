@@ -64,7 +64,7 @@ else ifeq ($(EP),rtl)
   endif
   A7RC_EXPECT  = -DA7RC_EP_EXPECT='"a7rc_ep.h"' -DA7RC_PIPE_SCRAMBLE  # our EP scrambles at the PIPE too
   EP_FILES     = rtl.f
-  EP_VLT       = +define+EP_RTL --timescale 1ns/1ps -F rtl.f --assert models/ep_sva.sv
+  EP_VLT       = +define+EP_RTL -F rtl.f --assert models/ep_sva.sv
   EP_OBJ       = _rtl
   FW_IN        = cp $(CURDIR)/../4.build/sw_build/firmware.hex firmware.hex &&
   FW_OUT       = rm -f firmware.hex;
@@ -88,7 +88,7 @@ else ifeq ($(IFACE),phy)
   endif
   # the host scrambles on the line; the EP model scrambles at the PIPE, our
   # PHY does 8b/10b (usercode/VUserMain1.cpp)
-  EP_VLT      += +define+IFACE_SERIAL +define+IFACE_PHY +define+CDR_MODEL=FAST --timescale 1ns/1ps \
+  EP_VLT      += +define+IFACE_SERIAL +define+IFACE_PHY +define+CDR_MODEL=FAST \
                  --assert -F ep_phy.f
   EP_FILES     = ep_phy.f phy.f
   IFACE_DEFS   = -DIFACE_PHY
@@ -258,7 +258,7 @@ endif
 # CFG_LDFLAGS_VERILATED cleared: a Verilator built with mold links through it
 # (-fuse-ld=mold), and mold fails on network shares (fchmod); the default
 # linker works everywhere
-VLTFLAGS       = --binary -sv --timing --top-module tb -Mdir $(OBJDIR) $(VLTDUMP) \
+VLTFLAGS       = --binary -sv --timing --timescale 1ns/1ps --top-module tb -Mdir $(OBJDIR) $(VLTDUMP) \
                  -Wno-fatal -Wno-WIDTH -Wno-lint -Wno-style                     \
                  +define+VPROC_SV +define+VPROC_BYTE_ENABLE                      \
                  $(EP_VLT) $(VLTVIEWS) -F tb.f $(USRSIMFLAGS)                  \
@@ -268,7 +268,8 @@ VLTFLAGS       = --binary -sv --timing --top-module tb -Mdir $(OBJDIR) $(VLTDUMP
 
 # ---- Icarus -------------------------------------------------------------------
 # The same file list, with $VIP_DIR filled in; mem_model.sv is left out, as
-# this test bench does not instantiate it
+# this test bench does not instantiate it. Its first line is the default
+# timescale, for files without one (no `timescale in RTL)
 ICA_FILES      = $(OBJDIR)/tb.icarus.f
 ICAFLAGS       = -g2012 -DVPROC_BYTE_ENABLE $(ICA_IFACE) $(ICADUMP) -s tb -c $(ICA_FILES) $(USRSIMFLAGS)
 
@@ -349,8 +350,8 @@ $(VPROC_SO): $(USERLIB) $(RV32LIB)
 
 # JanusHDL reads the list at each run, also from obj/regress/<seed>/: full paths
 $(ICA_FILES): tb.f $(EP_FILES) FORCE | $(OBJDIR)
-	@sed -e 's#$$VIP_DIR#$(VIP_DIR)#g' -e '/mem_model\.sv/d' \
-	    $(if $(filter janushdl,$(SIM)),-e 's#^[A-Za-z0-9_.]#$(CURDIR)/&#') $(EP_FILES) tb.f > $@
+	@{ echo '+timescale+1ns/1ps'; sed -e 's#$$VIP_DIR#$(VIP_DIR)#g' -e '/mem_model\.sv/d' \
+	    $(if $(filter janushdl,$(SIM)),-e 's#^[A-Za-z0-9_.]#$(CURDIR)/&#') $(EP_FILES) tb.f; } > $@
 
 ifeq ($(SIM),icarus)
 $(SIMEXE): $(VPROC_SO) $(ICA_FILES) FORCE
