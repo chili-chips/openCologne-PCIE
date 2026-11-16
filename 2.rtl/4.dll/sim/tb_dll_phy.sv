@@ -37,7 +37,8 @@
 //              https://opensource.org/license/bsd-3-clause
 //==========================================================================
 
-`timescale 1ns/100fs
+// No `timescale: 1ns/10ps from the simulator command line (run-dll-phy.sh);
+// every delay carries its unit.
 
 module tb_dll_phy
   import pipe_pkg::*;
@@ -102,24 +103,24 @@ module tb_dll_phy
    logic reset_n;
 
    initial clk_ref = 1'b1;
-   always #(CLKPERIOD_REF/2.0) clk_ref = ~clk_ref;
+   always #(CLKPERIOD_REF/2.0 * 1ns) clk_ref = ~clk_ref;
    initial clk_aon = 1'b1;
-   always #(CLKPERIOD_REG/2.0) clk_aon = ~clk_aon;
+   always #(CLKPERIOD_REG/2.0 * 1ns) clk_aon = ~clk_aon;
    initial clk_cfg = 1'b1;
-   always #(CLKPERIOD_CFG/2.0) clk_cfg = ~clk_cfg;
+   always #(CLKPERIOD_CFG/2.0 * 1ns) clk_cfg = ~clk_cfg;
 
    initial begin
       reset_n = 1'b0;
-      #(CLKPERIOD_REF*20 + 1) reset_n = 1'b1;
+      #((CLKPERIOD_REF*20 + 1) * 1ns) reset_n = 1'b1;
    end
 
    logic ep_tx_p, ep_tx_n, rc_tx_p, rc_tx_n;
    logic  ep2rc_p, ep2rc_n, rc2ep_p, rc2ep_n;
 
-   always @(ep_tx_p) ep2rc_p <= #(WIRE_DELAY_NS) ep_tx_p;
-   always @(ep_tx_n) ep2rc_n <= #(WIRE_DELAY_NS) ep_tx_n;
-   always @(rc_tx_p) rc2ep_p <= #(WIRE_DELAY_NS) rc_tx_p;
-   always @(rc_tx_n) rc2ep_n <= #(WIRE_DELAY_NS) rc_tx_n;
+   always @(ep_tx_p) ep2rc_p <= #(WIRE_DELAY_NS * 1ns) ep_tx_p;
+   always @(ep_tx_n) ep2rc_n <= #(WIRE_DELAY_NS * 1ns) ep_tx_n;
+   always @(rc_tx_p) rc2ep_p <= #(WIRE_DELAY_NS * 1ns) rc_tx_p;
+   always @(rc_tx_n) rc2ep_n <= #(WIRE_DELAY_NS * 1ns) rc_tx_n;
 
    logic                  pclk        [0:1];
    logic                  link_up     [0:1];
@@ -282,7 +283,7 @@ module tb_dll_phy
       for (g = 0; g < 2; g = g + 1) begin : trace
          always @(ltssm[g])
             if (ltssm_name(ltssm[g]) != "")
-               $display("[%10.1f ns] %s LTSSM : %0s", $realtime, g == EP ? "EP" : "RC", ltssm_name(ltssm[g]));
+               $display("[%10.1f ns] %s LTSSM : %0s", $realtime / 1ns, g == EP ? "EP" : "RC", ltssm_name(ltssm[g]));
       end
    endgenerate
 
@@ -360,7 +361,7 @@ module tb_dll_phy
                   line_tlp_bytes[g] = cnt - 6;
                   if ({tlp[cnt-1], tlp[cnt-2], tlp[cnt-3], tlp[cnt-4]} !== crc) begin
                      line_lcrc_err = line_lcrc_err + 1;
-                     $display("[%10.1f ns] ERROR: %s LCRC %h, expected %h", $realtime, g == EP ? "EP" : "RC",
+                     $display("[%10.1f ns] ERROR: %s LCRC %h, expected %h", $realtime / 1ns, g == EP ? "EP" : "RC",
                               {tlp[cnt-1], tlp[cnt-2], tlp[cnt-3], tlp[cnt-4]}, crc);
                   end
                end
@@ -393,7 +394,7 @@ module tb_dll_phy
          end
          if (!tx_ready[s]) begin
             errors = errors + 1;
-            $display("[%10.1f ns] ERROR: %s tl_tx_tlp_ready never asserted", $realtime, s == EP ? "EP" : "RC");
+            $display("[%10.1f ns] ERROR: %s tl_tx_tlp_ready never asserted", $realtime / 1ns, s == EP ? "EP" : "RC");
          end
       end
    endtask
@@ -402,7 +403,7 @@ module tb_dll_phy
       integer i;
       begin
          wait_tx_ready(s);
-         #1;
+         #1ns;
          tx_valid[s] = 1'b1;
          for (i = 0; i < n; i = i + 1) begin
             tx_data[s]  = tlp_words[i];
@@ -410,7 +411,7 @@ module tb_dll_phy
             tx_last[s]  = (i == n - 1);
             tx_half[s]  = (i == n - 1) && half;
             tick(s);
-            #1;
+            #1ns;
          end
          tx_valid[s] = 1'b0;
          tx_first[s] = 1'b0;
@@ -423,13 +424,13 @@ module tb_dll_phy
    task send_dllp(input integer s, input [7:0] hdr, input [11:0] dcr,
                   input [1:0] upd, input [1:0] pkt);
       begin
-         tick(s); #1;
+         tick(s); #1ns;
          tx_hdr[s]  = hdr;
          tx_dcr[s]  = dcr;
          tx_upd[s]  = upd;
          tx_pkt[s]  = pkt;
          tx_dllp[s] = 1'b1;
-         tick(s); #1;
+         tick(s); #1ns;
          tx_dllp[s] = 1'b0;
       end
    endtask
@@ -445,7 +446,7 @@ module tb_dll_phy
          end
          if (!rx_tvalid[s]) begin
             errors = errors + 1;
-            $display("[%10.1f ns] ERROR: %s no TLP received", $realtime, s == EP ? "EP" : "RC");
+            $display("[%10.1f ns] ERROR: %s no TLP received", $realtime / 1ns, s == EP ? "EP" : "RC");
          end
          else begin
             for (i = 0; i < n; i = i + 1) begin
@@ -453,23 +454,23 @@ module tb_dll_phy
                                         : {DATA_WIDTH{1'b1}};
                if (i != 0 && !rx_tvalid[s]) begin
                   errors = errors + 1;
-                  $display("[%10.1f ns] ERROR: word %0d not valid", $realtime, i);
+                  $display("[%10.1f ns] ERROR: word %0d not valid", $realtime / 1ns, i);
                end
                if ((i == 0) != rx_first[s]) begin
                   errors = errors + 1;
-                  $display("[%10.1f ns] ERROR: word %0d first flag wrong", $realtime, i);
+                  $display("[%10.1f ns] ERROR: word %0d first flag wrong", $realtime / 1ns, i);
                end
                if ((i == n - 1) != rx_last[s]) begin
                   errors = errors + 1;
-                  $display("[%10.1f ns] ERROR: word %0d last flag wrong", $realtime, i);
+                  $display("[%10.1f ns] ERROR: word %0d last flag wrong", $realtime / 1ns, i);
                end
                if ((rx_data[s] & m) !== (tlp_words[i] & m)) begin
                   errors = errors + 1;
-                  $display("[%10.1f ns] ERROR: word %0d expected %h got %h", $realtime, i, tlp_words[i] & m, rx_data[s] & m);
+                  $display("[%10.1f ns] ERROR: word %0d expected %h got %h", $realtime / 1ns, i, tlp_words[i] & m, rx_data[s] & m);
                end
                if (i != n - 1) tick(s);
             end
-            $display("[%10.1f ns]   %s received %0d DW, checked", $realtime, s == EP ? "EP" : "RC", half ? 2 * n - 1 : 2 * n);
+            $display("[%10.1f ns]   %s received %0d DW, checked", $realtime / 1ns, s == EP ? "EP" : "RC", half ? 2 * n - 1 : 2 * n);
          end
          tick(s);
       end
@@ -490,10 +491,10 @@ module tb_dll_phy
          end
          if (!found) begin
             errors = errors + 1;
-            $display("[%10.1f ns] ERROR: %s DLLP hdr=%0d data=%0d not received", $realtime, s == EP ? "EP" : "RC", hdr, dcr);
+            $display("[%10.1f ns] ERROR: %s DLLP hdr=%0d data=%0d not received", $realtime / 1ns, s == EP ? "EP" : "RC", hdr, dcr);
          end
          else
-            $display("[%10.1f ns]   %s received UpdateFC hdr=%0d data=%0d", $realtime, s == EP ? "EP" : "RC", hdr, dcr);
+            $display("[%10.1f ns]   %s received UpdateFC hdr=%0d data=%0d", $realtime / 1ns, s == EP ? "EP" : "RC", hdr, dcr);
       end
    endtask
 
@@ -510,15 +511,15 @@ module tb_dll_phy
          bytes = half ? 8 * n - 4 : 8 * n;
          if (sent != 1) begin
             errors = errors + 1;
-            $display("[%10.1f ns] ERROR: %s sent the TLP %0d times", $realtime, src == EP ? "EP" : "RC", sent);
+            $display("[%10.1f ns] ERROR: %s sent the TLP %0d times", $realtime / 1ns, src == EP ? "EP" : "RC", sent);
          end
          if (line_tlp_bytes[src] != bytes) begin
             errors = errors + 1;
-            $display("[%10.1f ns] ERROR: %s put %0d TLP bytes on the line, expected %0d", $realtime,
+            $display("[%10.1f ns] ERROR: %s put %0d TLP bytes on the line, expected %0d", $realtime / 1ns,
                      src == EP ? "EP" : "RC", line_tlp_bytes[src], bytes);
          end
          if (sent == 1 && line_tlp_bytes[src] == bytes)
-            $display("[%10.1f ns]   %s sent it once, %0d TLP bytes on the line", $realtime,
+            $display("[%10.1f ns]   %s sent it once, %0d TLP bytes on the line", $realtime / 1ns,
                      src == EP ? "EP" : "RC", bytes);
       end
    endtask
@@ -539,7 +540,7 @@ module tb_dll_phy
          hit = 1'b0;
          n   = 0;
          while (!hit && n < 4000) begin
-            @(posedge pclk[RC]); #1;
+            @(posedge pclk[RC]); #1ns;
             n     = n + 1;
             inj_d = rc.mac_rx_data;
             inj_k = rc.mac_rx_datak;
@@ -559,11 +560,11 @@ module tb_dll_phy
          end
          if (!hit) begin
             errors = errors + 1;
-            $display("[%10.1f ns] ERROR: no %s for the RC's receiver to corrupt", $realtime, dllp ? "UpdateFC-P" : "TLP");
+            $display("[%10.1f ns] ERROR: no %s for the RC's receiver to corrupt", $realtime / 1ns, dllp ? "UpdateFC-P" : "TLP");
          end
          else begin
             force rc.dll.g_vc[0].u_vc.rx_sym = {inj_d, inj_k};  // pipe_sym_t {data, kcode}
-            @(posedge pclk[RC]); #1;
+            @(posedge pclk[RC]); #1ns;
             release rc.dll.g_vc[0].u_vc.rx_sym;
          end
       end
@@ -584,10 +585,10 @@ module tb_dll_phy
          repeat (40) tick(EP);
          if (ep_stp_cnt - stp_before < 2) begin
             errors = errors + 1;
-            $display("[%10.1f ns] ERROR: %0s corrupted: EP did not replay the TLP", $realtime, what);
+            $display("[%10.1f ns] ERROR: %0s corrupted: EP did not replay the TLP", $realtime / 1ns, what);
          end
          else
-            $display("[%10.1f ns]   %0s corrupted: EP sent the TLP %0d times, NAK and replay worked", $realtime,
+            $display("[%10.1f ns]   %0s corrupted: EP sent the TLP %0d times, NAK and replay worked", $realtime / 1ns,
                      what, ep_stp_cnt - stp_before);
       end
    endtask
@@ -607,11 +608,11 @@ module tb_dll_phy
          end
          if (got) begin
             errors = errors + 1;
-            $display("[%10.1f ns] ERROR: %s took a DLLP with a bad CRC, hdr=%0d data=%0d", $realtime,
+            $display("[%10.1f ns] ERROR: %s took a DLLP with a bad CRC, hdr=%0d data=%0d", $realtime / 1ns,
                      s == EP ? "EP" : "RC", hdr, dcr);
          end
          else
-            $display("[%10.1f ns]   %s dropped the UpdateFC with a bad CRC", $realtime, s == EP ? "EP" : "RC");
+            $display("[%10.1f ns]   %s dropped the UpdateFC with a bad CRC", $realtime / 1ns, s == EP ? "EP" : "RC");
       end
    endtask
 
@@ -644,21 +645,21 @@ module tb_dll_phy
       $display("");
 
       wait (serdes_rdy[EP] && serdes_rdy[RC]);
-      $display("[%10.1f ns] PHY  : both SerDes ready", $realtime);
+      $display("[%10.1f ns] PHY  : both SerDes ready", $realtime / 1ns);
 
       t = 0;
       while (!(ltssm[EP] == L0 && ltssm[RC] == L0) && t < 100000) begin
-         #(CLKPERIOD_REF);
+         #(CLKPERIOD_REF * 1ns);
          t = t + 1;
       end
       if (!(ltssm[EP] == L0 && ltssm[RC] == L0)) begin
          errors = errors + 1;
          $display("[%10.1f ns] ERROR: link training did not reach L0 (EP %0s, RC %0s)",
-                  $realtime, ltssm_name(ltssm[EP]), ltssm_name(ltssm[RC]));
+                  $realtime / 1ns, ltssm_name(ltssm[EP]), ltssm_name(ltssm[RC]));
          $display("  TEST FAILED");
          $finish;
       end
-      $display("[%10.1f ns] LINK : both MACs in L0, LinkUp", $realtime);
+      $display("[%10.1f ns] LINK : both MACs in L0, LinkUp", $realtime / 1ns);
 
       $display("=== Step 1: DLL initialisation, InitFC1/InitFC2 across the link ===");
       wait_tx_ready(EP);
@@ -667,7 +668,7 @@ module tb_dll_phy
          $display("  TEST FAILED");
          $finish;
       end
-      $display("[%10.1f ns]   both DLLs DL_Active", $realtime);
+      $display("[%10.1f ns]   both DLLs DL_Active", $realtime / 1ns);
 
       $display("=== Step 2: EP -> RC, three TLPs ===");
       tlp_words[0] = 64'h0001020304050607;
@@ -779,16 +780,16 @@ module tb_dll_phy
       tlp_nak(3, 1'b1, 22, "last TLP byte");
       end
 
-      $display("[%10.1f ns] LINE : %0d TLPs, LCRC checked, %0d wrong", $realtime, line_tlps, line_lcrc_err);
+      $display("[%10.1f ns] LINE : %0d TLPs, LCRC checked, %0d wrong", $realtime / 1ns, line_tlps, line_lcrc_err);
       errors = errors + line_lcrc_err;
 
       if (ltssm[EP] != L0 || ltssm[RC] != L0) begin
          errors = errors + 1;
-         $display("[%10.1f ns] ERROR: link left L0", $realtime);
+         $display("[%10.1f ns] ERROR: link left L0", $realtime / 1ns);
       end
       if (tx_buf_err[EP] || tx_buf_err[RC]) begin
          errors = errors + 1;
-         $display("[%10.1f ns] ERROR: TX elastic buffer error", $realtime);
+         $display("[%10.1f ns] ERROR: TX elastic buffer error", $realtime / 1ns);
       end
 
       $display("");
@@ -804,7 +805,7 @@ module tb_dll_phy
    end
 
    initial begin
-      #5_000_000;
+      #5ms;
       $display("");
       $display("ERROR: global watchdog expired (EP %0s, RC %0s)", ltssm_name(ltssm[EP]), ltssm_name(ltssm[RC]));
       $display("  TEST FAILED");

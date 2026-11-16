@@ -37,7 +37,8 @@
 //              https://opensource.org/license/bsd-3-clause
 //==========================================================================
 
-`timescale 1ns/100fs
+// No `timescale: 1ns/10ps from the simulator command line (run-tl.sh); every
+// delay carries its unit.
 
 module tb_tl_top
   import pipe_pkg::*;
@@ -254,7 +255,7 @@ module tb_tl_top
     end
 
     initial clk = 1'b0;
-    always #(CLK_PERIOD/2) clk = ~clk;
+    always #(CLK_PERIOD/2 * 1ns) clk = ~clk;
 
     integer errors;
 
@@ -360,13 +361,13 @@ module tb_tl_top
         begin
             count_credits;
             pack_tlp;
-            @(posedge clk); #1;
+            @(posedge clk); #1ns;
             for (i = 0; i < rx_len; i = i + 1) begin
                 tl_rx_data      = rx_words[i];
                 tl_rx_tlp_valid = 1'b1;
                 tl_rx_tlp_first = (i == 0);
                 tl_rx_tlp_last  = (i == rx_len - 1);
-                @(posedge clk); #1;
+                @(posedge clk); #1ns;
             end
             tl_rx_data      = {DATA_WIDTH{1'b0}};
             tl_rx_tlp_valid = 1'b0;
@@ -377,13 +378,13 @@ module tb_tl_top
 
     task rx_dllp(input [1:0] ptype, input [1:0] utype, input [7:0] hdr, input [11:0] data);
         begin
-            @(posedge clk); #1;
+            @(posedge clk); #1ns;
             tl_rx_packet_type = ptype;
             tl_rx_update_type = utype;
             tl_rx_hdr_credit  = hdr;
             tl_rx_data_credit = data;
             tl_rx_dllp_valid  = 1'b1;
-            @(posedge clk); #1;
+            @(posedge clk); #1ns;
             tl_rx_dllp_valid  = 1'b0;
         end
     endtask
@@ -930,17 +931,17 @@ module tb_tl_top
 
     task link_up(input [7:0] cplh, input [11:0] cpld);
         begin
-            #1 dl_state = DL_INITFC1;
+            #1ns dl_state = DL_INITFC1;
             rx_dllp(DLLP_INITFC1, FC_P,   8'd32, 12'd256);
             rx_dllp(DLLP_INITFC1, FC_NP,  8'd16, 12'd16);
             rx_dllp(DLLP_INITFC1, FC_CPL, cplh,  cpld);
             wait_cycles(4);
-            #1 dl_up = 1'b1;
+            #1ns dl_up = 1'b1;
             dl_state = DL_INITFC2;
             rx_dllp(DLLP_INITFC2, FC_P,   8'd32, 12'd256);
             rx_dllp(DLLP_INITFC2, FC_NP,  8'd16, 12'd16);
             rx_dllp(DLLP_INITFC2, FC_CPL, cplh,  cpld);
-            #1 dl_state = DL_ACTIVE;
+            #1ns dl_state = DL_ACTIVE;
             wait_cycles(4);
         end
     endtask
@@ -1407,7 +1408,7 @@ module tb_tl_top
 
         $display("=== Step 20: DL_Down resets the TL, finite completion credits ===");
         @(posedge clk);
-        #1 dl_up = 1'b0;
+        #1ns dl_up = 1'b0;
         dl_state = DL_INACTIVE;
         wait_cycles(10);
         exp_p_hdr   = INIT_PH;
@@ -1431,7 +1432,7 @@ module tb_tl_top
 
         $display("=== Step 21: DL_Down in the middle of a TLP on TRN RX ===");
         @(posedge clk);
-        #1 dl_up = 1'b0;
+        #1ns dl_up = 1'b0;
         dl_state = DL_INACTIVE;
         wait_cycles(10);
         link_up(8'd0, 12'd0);
@@ -1445,7 +1446,7 @@ module tb_tl_top
         wait_cycles(30);
         check("TLP cut on TRN RX", trn_rx_mid, 1'b1);
         @(posedge clk);
-        #1 dl_up = 1'b0;
+        #1ns dl_up = 1'b0;
         dl_state = DL_INACTIVE;
         wait_cycles(10);
         app_rx_ready <= 1'b1;
@@ -1471,7 +1472,7 @@ module tb_tl_top
     end
 
     initial begin
-        #2_000_000;
+        #2ms;
         $display("ERROR: watchdog");
         $display("TEST FAILED");
         $finish;

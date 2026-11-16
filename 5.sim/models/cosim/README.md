@@ -1,6 +1,6 @@
 # _VProc_ and _mem_model_ Co-simulation Components
 
-How _VProc_ and _mem_model_ work, and their APIs: [openPCIE_BFM, VProc and mem_model](https://github.com/chili-chips/openPCIE_BFM/blob/main/0.doc/integration.md#vproc-and-mem_model). What follows is how this repo builds and uses them.
+How _VProc_ and _mem_model_ work, and their APIs: [openPCIE_BFM, VProc and mem_model](https://github.com/chili-chips/openPCIE_BFM/blob/main/2.rtl/README.md#vproc-and-mem_model). What follows is how this repo builds and uses them.
 
 ## VProc and mem_model integration into _openCologne-PCIE_
 

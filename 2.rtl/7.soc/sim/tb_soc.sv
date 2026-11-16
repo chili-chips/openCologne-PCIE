@@ -14,7 +14,8 @@
 //   names. Run: bash run-soc.sh
 //==========================================================================
 
-`timescale 1ns / 1ps
+// No `timescale: 1ns/10ps from the simulator command line (run-soc.sh); every
+// delay carries its unit.
 
 module tb_soc
   import tl_pkg::*;
@@ -26,7 +27,7 @@ module tb_soc
   logic clk = 1'b0;
   logic resetn = 1'b0;
 
-  always #16 clk = ~clk;  // 31.25 MHz, the PCLK the SOC runs on in top
+  always #16ns clk = ~clk;  // 31.25 MHz, the PCLK the SOC runs on in top
 
   initial begin
     repeat (10) @(posedge clk);
@@ -152,12 +153,12 @@ module tb_soc
     if (tx_check) begin  // until the firmware is done, 1 ms at most
       fork
         wait (fw_pass);
-        #(1_000_000);
+        #1ms;
       join_any
       repeat (20) @(posedge clk);  // the last TLP leaves
     end
     else begin
-      #(RUN_NS);
+      #(RUN_NS * 1ns);
     end
     $timeformat(-9, 0, " ns", 0);
     $display("tb_soc: %0t, fw_pass=%0b", $realtime, fw_pass);

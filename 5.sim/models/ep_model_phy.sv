@@ -55,8 +55,6 @@
 //   runs once it is released, and a reset counted on PCLK would never end.
 //==========================================================================
 
-`timescale 1ps/1ps
-
 module ep_model_phy
   import pipe_pkg::*;
 (

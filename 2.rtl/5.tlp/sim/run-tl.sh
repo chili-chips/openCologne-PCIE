@@ -24,7 +24,7 @@ done
 mkdir -p "${BUILD}/sim"
 cd "${BUILD}"
 
-${VERILATOR} --binary --timing -Wno-fatal -Wno-lint -Wno-style --timescale 1ns/1ps ${DUMP} \
+${VERILATOR} --binary --timing -Wno-fatal -Wno-lint -Wno-style --timescale 1ns/10ps ${DUMP} \
     --top-module tb_tl_top -Mdir obj -o tb_tl_top \
     "${RTL}/2.pipe/pipe_pkg.sv" \
     "${RTL}/4.dll/dll_pkg.sv" \

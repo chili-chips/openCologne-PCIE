@@ -258,7 +258,7 @@ endif
 # CFG_LDFLAGS_VERILATED cleared: a Verilator built with mold links through it
 # (-fuse-ld=mold), and mold fails on network shares (fchmod); the default
 # linker works everywhere
-VLTFLAGS       = --binary -sv --timing --timescale 1ns/1ps --top-module tb -Mdir $(OBJDIR) $(VLTDUMP) \
+VLTFLAGS       = --binary -sv --timing --timescale 1ns/10ps --top-module tb -Mdir $(OBJDIR) $(VLTDUMP) \
                  -Wno-fatal -Wno-WIDTH -Wno-lint -Wno-style                     \
                  +define+VPROC_SV +define+VPROC_BYTE_ENABLE                      \
                  $(EP_VLT) $(VLTVIEWS) -F tb.f $(USRSIMFLAGS)                  \
@@ -350,7 +350,7 @@ $(VPROC_SO): $(USERLIB) $(RV32LIB)
 
 # JanusHDL reads the list at each run, also from obj/regress/<seed>/: full paths
 $(ICA_FILES): tb.f $(EP_FILES) FORCE | $(OBJDIR)
-	@{ echo '+timescale+1ns/1ps'; sed -e 's#$$VIP_DIR#$(VIP_DIR)#g' -e '/mem_model\.sv/d' \
+	@{ echo '+timescale+1ns/10ps'; sed -e 's#$$VIP_DIR#$(VIP_DIR)#g' -e '/mem_model\.sv/d' \
 	    $(if $(filter janushdl,$(SIM)),-e 's#^[A-Za-z0-9_.]#$(CURDIR)/&#') $(EP_FILES) tb.f; } > $@
 
 ifeq ($(SIM),icarus)

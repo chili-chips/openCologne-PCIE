@@ -37,7 +37,8 @@
 //              https://opensource.org/license/bsd-3-clause
 //==========================================================================
 
-`timescale 1ns/100fs
+// No `timescale: 1ns/10ps from the simulator command line; every delay
+// carries its unit.
 
 module tb_dll_wavecrux
   import pipe_pkg::*;
@@ -124,7 +125,7 @@ dll_if tl ();
     assign tl_rx_dllp_valid = tl.rx_dllp.valid;
 
     initial phy_clk = 1'b0;
-    always #(CLK_PERIOD/2) phy_clk = ~phy_clk;
+    always #(CLK_PERIOD/2 * 1ns) phy_clk = ~phy_clk;
 
     // 1. We can inject external data into DLL with external_en and external_data
     // 2. flip one bit flag will flip one bit of received data to corrupt it. lcrc check should fail
@@ -222,14 +223,14 @@ dll_if tl ();
                 errors = errors + 1;
                 $display("[%0t] ERROR: send_tlp: retry buffer not empty before send (timeout)", $time);
             end
-            #1;
+            #1ns;
             tl_tx_tlp_valid = 1'b1;
             for (i = 0; i < n; i = i + 1) begin
                 tl_tx_data      = tlp_words[i];
                 tl_tx_tlp_first = (i == 0);
                 tl_tx_tlp_last  = (i == n - 1);
                 @(posedge phy_clk);
-                #1;
+                #1ns;
             end
             tl_tx_tlp_valid = 1'b0;
             tl_tx_tlp_first = 1'b0;
@@ -241,14 +242,14 @@ dll_if tl ();
     task send_dllp(input [7:0] hdr_credit, input [11:0] data_credit, input [1:0] update_type, input [1:0] packet_type);
         begin
             @(posedge phy_clk);
-            #1;
+            #1ns;
             tl_tx_hdr_credit  = hdr_credit;
             tl_tx_data_credit = data_credit;
             tl_tx_update_type = update_type;
             tl_tx_packet_type = packet_type;
             tl_tx_dllp_valid  = 1'b1;
             @(posedge phy_clk);
-            #1;
+            #1ns;
             tl_tx_dllp_valid = 1'b0;
         end
     endtask

@@ -43,7 +43,9 @@
 //   the EP model EPPIPEx1__pcieVHost_DUT (node 1).
 //==========================================================================
 
-`timescale 1ps/1ps
+// No `timescale: 1ns/10ps from the simulator command line (Makefile); every
+// delay carries its unit. The periods below are in ps: a delay is
+// #(x * 1ns / 1000.0), as 1ps rounds to 0 at 10 ps precision.
 
 module tb #(
    parameter RUN_SIM_US     = 10000,
@@ -85,22 +87,22 @@ module tb #(
       // and the models' reset registers then see it after that edge, on every
       // simulator
       begin : board_rst_n
-        #(HALF_CLK_P_PERIOD_PS*RST_CYLES)
+        #(HALF_CLK_P_PERIOD_PS*RST_CYLES * 1ns / 1000.0)
           rst_n <= 1'b1;
       end
 
       forever begin: clk_p_gen
-        #(HALF_CLK_P_PERIOD_PS)
+        #(HALF_CLK_P_PERIOD_PS * 1ns / 1000.0)
           clk_p  = ~clk_p;
       end
 
       forever begin: pipe_clock_gen
-        #(HALF_PIPE_PERIOD_PS)
+        #(HALF_PIPE_PERIOD_PS * 1ns / 1000.0)
           pclk = ~pclk;
       end
 
       begin: run_sim
-        #(RUN_SIM_US * 64'd1_000_000);  // in ps, the timescale unit
+        #(RUN_SIM_US * 1us);
           $fatal(1, "time limit of %0d us: no RC MODEL RESULT", RUN_SIM_US);
       end
     join
@@ -141,14 +143,14 @@ module tb #(
   initial begin
     serclk = 1'b0;
     forever begin
-      #(HALF_SER_PERIOD_PS) serclk = ~serclk;
+      #(HALF_SER_PERIOD_PS * 1ns / 1000.0) serclk = ~serclk;
     end
   end
 
   initial begin
     pcieclk2 = 1'b0;
     forever begin
-      #(HALF_PCIE2_PERIOD_PS) pcieclk2 = ~pcieclk2;
+      #(HALF_PCIE2_PERIOD_PS * 1ns / 1000.0) pcieclk2 = ~pcieclk2;
     end
   end
 `endif
@@ -172,7 +174,7 @@ module tb #(
   initial begin
     clk_brd = 1'b0;
     forever begin
-      #(HALF_BRD_PERIOD_PS) clk_brd = ~clk_brd;
+      #(HALF_BRD_PERIOD_PS * 1ns / 1000.0) clk_brd = ~clk_brd;
     end
   end
 `endif
@@ -186,7 +188,7 @@ module tb #(
   initial begin
     refclk = 1'b0;
     forever begin
-      #(HALF_REF_PERIOD_PS) refclk = ~refclk;
+      #(HALF_REF_PERIOD_PS * 1ns / 1000.0) refclk = ~refclk;
     end
   end
 

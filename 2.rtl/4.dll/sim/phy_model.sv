@@ -1,5 +1,3 @@
-`timescale 1ns/100fs
-
 // SPDX-FileCopyrightText: 2026 Chili.CHIPS
 //
 // SPDX-License-Identifier: BSD-3-Clause

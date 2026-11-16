@@ -60,7 +60,7 @@ DLL_SRC="${DLL_DIR}/dll_pkg.sv $(find "${DLL_DIR}" -maxdepth 1 \( -name '*.v' -o
 MAC_SRC="${MAC_DIR}/mac_pkg.sv $(find "${MAC_DIR}" -maxdepth 1 \( -name '*.v' -o -name '*.sv' \) ! -name mac_pkg.sv)"
 PIPE_SRC="${PIPE_DIR}/pipe_pkg.sv $(find "${PIPE_DIR}" -maxdepth 1 \( -name '*.v' -o -name '*.sv' \) ! -name pipe_pkg.sv)"
 
-${IVL} -g2012 -c <(echo +timescale+1ns/1ps) -gspecify -Ttyp ${DUMP} ${DEFS} \
+${IVL} -g2012 -c <(echo +timescale+1ns/10ps) -gspecify -Ttyp ${DUMP} ${DEFS} \
        -I "${MODEL_DIR}" \
        -o "${BUILD}/dll_phy.vvp" \
        ${PIPE_SRC} \

@@ -44,8 +44,6 @@
 //   ways (NOSIG on the host's data).
 //==========================================================================
 
-`timescale 1ps/1ps
-
 module phy_vproc_rc #(
     parameter int DATA_BYTES = 8
 ) (

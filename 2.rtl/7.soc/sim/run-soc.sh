@@ -20,7 +20,7 @@ G=$R/../4.build/csr_build/generated-files
 E=$R/7.soc/CPU.eduBOS5
 B=${SOC_BUILD:-$HOME/.cache/opencologne-pcie/soc}
 mkdir -p "$B"
-verilator --binary --timing --trace-fst -Wno-fatal -Wno-lint -Wno-style --timescale 1ns/1ps \
+verilator --binary --timing --trace-fst -Wno-fatal -Wno-lint -Wno-style --timescale 1ns/10ps \
   --assert -DRISCV_FORMAL --top-module tb_soc --Mdir "$B/obj" -o Vtb_soc \
   "$R/2.pipe/pipe_pkg.sv" "$R/4.dll/dll_pkg.sv" "$R/5.tlp/trn_pkg.sv" "$R/5.tlp/tl_pkg.sv" "$R/6.trn_bridge/axis_pkg.sv" "$G/csr_pkg.sv" "$E/edubos5_pkg.sv" \
   "$R/6.trn_bridge/axis_if.sv" "$R/5.tlp/cfg_if.sv" "$R/7.soc/mem_if.sv" "$R/7.soc/rvfi_if.sv" \

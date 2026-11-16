@@ -99,7 +99,7 @@ if [ "${TEST}" = equiv ]; then
     echo "==> vendor model NOT compiled in; running behavioural self-check only"
   fi
   echo "==> compiling"
-  ${IVL} -g2012 -c <(echo +timescale+1ns/1ps) -gspecify -Ttyp ${DEFS} -I "${MODEL_DIR}" -o "${BUILD}/equiv.vvp" \
+  ${IVL} -g2012 -c <(echo +timescale+1ns/10ps) -gspecify -Ttyp ${DEFS} -I "${MODEL_DIR}" -o "${BUILD}/equiv.vvp" \
          ${OPEN_SRC} ${REF_SRC} "${HERE}/tb_phy.sv"
   echo "==> running"
   cd "${BUILD}"
@@ -123,7 +123,7 @@ fi
 PIPE_SRC="${PIPE_DIR}/pipe_pkg.sv $(find "${PIPE_DIR}" -maxdepth 1 -type f \( -name '*.v' -o -name '*.sv' \) ! -name pipe_pkg.sv)"
 
 echo "==> PIPE test, $((BYTES * 8))-bit PIPE, $([ "${VENDOR}" = 1 ] && echo vendor || echo open) SerDes model"
-${IVL} -g2012 -c <(echo +timescale+1ns/1ps) -gspecify -Ttyp -DPIPE ${DUMP} -I"${SERDES_INC}" \
+${IVL} -g2012 -c <(echo +timescale+1ns/10ps) -gspecify -Ttyp -DPIPE ${DUMP} -I"${SERDES_INC}" \
        -o "${BUILD}/sim/vlog_sim.vvp" ${SERDES_SRC} ${PIPE_SRC} "${HERE}/tb_phy.sv"
 cd "${BUILD}"
 ${VVP} -N sim/vlog_sim.vvp -fst

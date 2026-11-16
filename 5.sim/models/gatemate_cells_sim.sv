@@ -41,14 +41,12 @@
 //   the Yosys library has only as blackboxes: CC_USR_RSTN, CC_BUFG.
 //==========================================================================
 
-`timescale 1ps/1ps
-
 module CC_USR_RSTN (
     output logic USR_RSTN
 );
   initial begin
     USR_RSTN = 1'b0;
-    #100_000;
+    #100ns;
     USR_RSTN = 1'b1;
   end
 endmodule: CC_USR_RSTN

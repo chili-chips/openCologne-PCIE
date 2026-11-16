@@ -43,8 +43,6 @@
 //   and the host on their own (make EP=model, the default for now).
 //==========================================================================
 
-`timescale 1ps/1ps
-
 module EPPIPEx1__pcieVHost_DUT
 #(parameter int DataWidth = 64  // 8, 16, 32 or 64 only
 )

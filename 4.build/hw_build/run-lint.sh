@@ -208,13 +208,13 @@ lint_off -rule UNDRIVEN -file "*2.rtl/top.sv" -match "*'ser_rx?'*"
 lint_off -rule UNUSEDSIGNAL -file "*2.rtl/top.sv" -match "*'ser_tx?'*"
 VLT
   # --timescale: the Cologne Chip code sets one, our RTL does not (no delays)
-  "$VERILATOR" --lint-only -Wall -Wno-fatal --timing --timescale 1ns/1ps --top-module $TOP $VL_DEFS \
+  "$VERILATOR" --lint-only -Wall -Wno-fatal --timing --timescale 1ns/10ps --top-module $TOP $VL_DEFS \
     waive.vlt bb.v $SV > verilator.log 2>&1
   local rc=$?
   # trn_compat is not under top (it is for user logic written for TRN; the TL
   # bench uses it): lint it as its own top and keep its own findings, the
   # packages and interfaces are linted in the design above
-  "$VERILATOR" --lint-only -Wall -Wno-fatal --timing --timescale 1ns/1ps --top-module trn_compat \
+  "$VERILATOR" --lint-only -Wall -Wno-fatal --timing --timescale 1ns/10ps --top-module trn_compat \
     $VL_DEFS waive.vlt bb.v $SV 2.rtl/5.tlp/trn_compat.sv > verilator-compat.log 2>&1
   local rc2=$?
   found verilator < <(grep -E '^%(Warning|Error)' verilator.log

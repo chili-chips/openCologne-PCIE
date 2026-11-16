@@ -37,8 +37,6 @@
 //              https://opensource.org/license/bsd-3-clause
 //==========================================================================
 
-`timescale 1ns/100fs
-
 module pcie_stack
   import pipe_pkg::*;
 #(

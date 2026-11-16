@@ -54,7 +54,8 @@
  `include "disciplines.vams"
 `endif
 
-`timescale 1ns/100fs
+// No `timescale: 1ns/10ps from the simulator command line (run-phy.sh); every
+// delay carries its unit.
 
 `ifdef TB_PHY_EQUIV
 
@@ -105,19 +106,19 @@ module tb_phy;
    logic  reset_n, reset_reg_n;
 
    initial clk_ref = 1'b1;
-   always #(CLKPERIOD_REF/2.0) clk_ref = ~clk_ref;
+   always #(CLKPERIOD_REF/2.0 * 1ns) clk_ref = ~clk_ref;
    initial clk_aon = 1'b1;
-   always #(CLKPERIOD_REG/2.0) clk_aon = ~clk_aon;
+   always #(CLKPERIOD_REG/2.0 * 1ns) clk_aon = ~clk_aon;
    initial clk_cfg = 1'b1;
-   always #(CLKPERIOD_CFG/2.0) clk_cfg = ~clk_cfg;
+   always #(CLKPERIOD_CFG/2.0 * 1ns) clk_cfg = ~clk_cfg;
 
    initial begin
       reset_n = 1'b0;
-      #(CLKPERIOD_REF*10 + 1) reset_n = 1'b1;
+      #((CLKPERIOD_REF*10 + 1) * 1ns) reset_n = 1'b1;
    end
    initial begin
       reset_reg_n = 1'b0;
-      #(CLKPERIOD_REG*10 + 1) reset_reg_n = 1'b1;
+      #((CLKPERIOD_REG*10 + 1) * 1ns) reset_reg_n = 1'b1;
    end
 
    logic        regfile_we, regfile_en;
@@ -136,28 +137,28 @@ module tb_phy;
 
    task writeCfg(input [7:0] addr, input [15:0] data);
       begin
-         @(posedge clk_cfg); #1; cfg_en = 1'b1;
-         @(posedge clk_cfg); #1;
-         @(posedge clk_cfg); #1;
+         @(posedge clk_cfg); #1ns; cfg_en = 1'b1;
+         @(posedge clk_cfg); #1ns;
+         @(posedge clk_cfg); #1ns;
          cfgfile_valid = 1'b1; cfgfile_di = data; cfgfile_addr = addr;
-         @(posedge clk_cfg); #1;
+         @(posedge clk_cfg); #1ns;
          cfgfile_valid = 1'b0; cfgfile_di = 16'h0; cfgfile_addr = 8'h0;
-         @(posedge clk_cfg); #1;
-         @(posedge clk_cfg); #1; cfg_en = 1'b0;
+         @(posedge clk_cfg); #1ns;
+         @(posedge clk_cfg); #1ns; cfg_en = 1'b0;
       end
    endtask
 
    integer wr_i;
    task writeRegfile(input [7:0] addr, input [15:0] data, input [15:0] mask);
       begin
-         @(posedge clk_aon); #1.5;
+         @(posedge clk_aon); #1.5ns;
          regfile_en = 1'b1; regfile_we = 1'b1;
          regfile_addr = addr; regfile_mask = mask; regfile_di = data;
-         @(posedge clk_aon); #1.5;
+         @(posedge clk_aon); #1.5ns;
          regfile_en = 1'b0; regfile_we = 1'b0;
          regfile_addr = 8'h0; regfile_mask = 16'h0; regfile_di = 16'h0;
          for (wr_i = 0; wr_i < 40; wr_i = wr_i + 1) begin
-            @(posedge clk_aon); #1.5;
+            @(posedge clk_aon); #1.5ns;
          end
       end
    endtask
@@ -210,11 +211,11 @@ module tb_phy;
    logic         bhv_rx_comma_en, bhv_rx_mcomma, bhv_rx_pcomma;
 
 `ifdef CROSS_LINK
-   always @(ref_tx_p) bhv_rx_p <= #(WIRE_DELAY_NS) ref_tx_p;
-   always @(ref_tx_n) bhv_rx_n <= #(WIRE_DELAY_NS) ref_tx_n;
+   always @(ref_tx_p) bhv_rx_p <= #(WIRE_DELAY_NS * 1ns) ref_tx_p;
+   always @(ref_tx_n) bhv_rx_n <= #(WIRE_DELAY_NS * 1ns) ref_tx_n;
 `else
-   always @(bhv_tx_p) bhv_rx_p <= #(WIRE_DELAY_NS) bhv_tx_p;
-   always @(bhv_tx_n) bhv_rx_n <= #(WIRE_DELAY_NS) bhv_tx_n;
+   always @(bhv_tx_p) bhv_rx_p <= #(WIRE_DELAY_NS * 1ns) bhv_tx_p;
+   always @(bhv_tx_n) bhv_rx_n <= #(WIRE_DELAY_NS * 1ns) bhv_tx_n;
 `endif
 
    ccfpga_serdes #(
@@ -354,11 +355,11 @@ module tb_phy;
    logic         ref_rx_comma_en, ref_rx_mcomma, ref_rx_pcomma;
 
 `ifdef CROSS_LINK
-   always @(bhv_tx_p) ref_rx_p <= #(WIRE_DELAY_NS) bhv_tx_p;
-   always @(bhv_tx_n) ref_rx_n <= #(WIRE_DELAY_NS) bhv_tx_n;
+   always @(bhv_tx_p) ref_rx_p <= #(WIRE_DELAY_NS * 1ns) bhv_tx_p;
+   always @(bhv_tx_n) ref_rx_n <= #(WIRE_DELAY_NS * 1ns) bhv_tx_n;
 `else
-   always @(ref_tx_p) ref_rx_p <= #(WIRE_DELAY_NS) ref_tx_p;
-   always @(ref_tx_n) ref_rx_n <= #(WIRE_DELAY_NS) ref_tx_n;
+   always @(ref_tx_p) ref_rx_p <= #(WIRE_DELAY_NS * 1ns) ref_tx_p;
+   always @(ref_tx_n) ref_rx_n <= #(WIRE_DELAY_NS * 1ns) ref_tx_n;
 `endif
 
    ccfpga_serdes_ref #(
@@ -750,7 +751,7 @@ module tb_phy;
    integer trace_i;
    initial begin : bringup_trace
       for (trace_i = 0; trace_i < 40; trace_i = trace_i + 1) begin
-         #25_000;
+         #25us;
 `ifdef HAVE_VENDOR_SERDES
          if ((bhv_cap_n < N_PAYLOAD) || (ref_cap_n < N_PAYLOAD))
            $display("[%0t] trace BHV: pll_rst_n=%b txdone=%b rxdone=%b align=%b st=%0d cap=%0d | REF: pll_rst_n=%b txdone=%b rxdone=%b align=%b st=%0d cap=%0d",
@@ -789,9 +790,9 @@ module tb_phy;
 `endif
       $display("=============================================================");
 
-      #500;
+      #500ns;
       writeCfg(8'h5C, 16'h0001);
-      #100;
+      #100ns;
       writeRegfile(8'h50, 16'h0002, 16'h0007);
       writeRegfile(8'h50, 16'h0003, 16'h0003);
 
@@ -804,7 +805,7 @@ module tb_phy;
 `endif
          end
          begin
-            #2_000_000;
+            #2ms;
             timed_out = 1'b1;
          end
       join_any
@@ -820,7 +821,7 @@ module tb_phy;
          errors_bhv_exp = errors_bhv_exp + 1;
       end
 
-      #1000;
+      #1000ns;
 
       $display("");
       rule_off;
@@ -880,12 +881,14 @@ module tb_phy;
       $display("  LATENCY (TX parallel word in -> same word out at RX)");
       rule_off;
       $display("  BHV : marker tx @ %.1f ns, rx @ %.1f ns  ==>  %.1f ns",
-               bhv_marker_tx_t, bhv_marker_rx_t, bhv_marker_rx_t - bhv_marker_tx_t);
+               bhv_marker_tx_t / 1ns, bhv_marker_rx_t / 1ns,
+               (bhv_marker_rx_t - bhv_marker_tx_t) / 1ns);
 `ifdef HAVE_VENDOR_SERDES
       $display("  REF : marker tx @ %.1f ns, rx @ %.1f ns  ==>  %.1f ns",
-               ref_marker_tx_t, ref_marker_rx_t, ref_marker_rx_t - ref_marker_tx_t);
+               ref_marker_tx_t / 1ns, ref_marker_rx_t / 1ns,
+               (ref_marker_rx_t - ref_marker_tx_t) / 1ns);
       $display("  delta (BHV - REF) = %.1f ns",
-               (bhv_marker_rx_t - bhv_marker_tx_t) - (ref_marker_rx_t - ref_marker_tx_t));
+               ((bhv_marker_rx_t - bhv_marker_tx_t) - (ref_marker_rx_t - ref_marker_tx_t)) / 1ns);
 `endif
 
       $display("");
@@ -1532,27 +1535,27 @@ module tb_phy;
    parameter CLKPERIOD_CFG = 40.0;  // Config
 
    initial clk_ref = 1'b1;
-   always #(CLKPERIOD_REF / 2) clk_ref = ~clk_ref;  // 100 MHz
+   always #(CLKPERIOD_REF / 2 * 1ns) clk_ref = ~clk_ref;  // 100 MHz
 
    initial clk_aon = 1'b1;
-   always #(CLKPERIOD_REG / 2) clk_aon = ~clk_aon;  // 125 MHz
+   always #(CLKPERIOD_REG / 2 * 1ns) clk_aon = ~clk_aon;  // 125 MHz
 
    initial clk_cfg = 1'b1;
-   always #(CLKPERIOD_CFG / 2) clk_cfg = ~clk_cfg;  // 25 MHz
+   always #(CLKPERIOD_CFG / 2 * 1ns) clk_cfg = ~clk_cfg;  // 25 MHz
 
    // Reset Generation (SerDes and Regfile)
 
    initial  // ADPLL
      begin
         reset_n = 1'b0;
-        #(CLKPERIOD_REF * 10 + 1);
+        #((CLKPERIOD_REF * 10 + 1) * 1ns);
         reset_n = 1'b1;
      end
 
    initial  // Register
      begin
         reset_reg_n = 1'b0;
-        #(CLKPERIOD_REG * 10 + 1);
+        #((CLKPERIOD_REG * 10 + 1) * 1ns);
         reset_reg_n = 1'b1;
      end
 
@@ -1601,19 +1604,19 @@ module tb_phy;
    task writeCfg(input  [7:0] addr,
                  input [15:0] data);
       begin
-         @(posedge clk_cfg); #1;
+         @(posedge clk_cfg); #1ns;
          cfg_en = 1'b1;
-         @(posedge clk_cfg); #1;
-         @(posedge clk_cfg); #1;
+         @(posedge clk_cfg); #1ns;
+         @(posedge clk_cfg); #1ns;
          cfgfile_valid = 1'b1;
          cfgfile_di    = data;
          cfgfile_addr  = addr;
-         @(posedge clk_cfg); #1;
+         @(posedge clk_cfg); #1ns;
          cfgfile_valid = 1'b0;
          cfgfile_di    = 16'h0;
          cfgfile_addr  = 8'h0;
-         @(posedge clk_cfg); #1;
-         @(posedge clk_cfg); #1;
+         @(posedge clk_cfg); #1ns;
+         @(posedge clk_cfg); #1ns;
          cfg_en = 1'b0;
       end
    endtask // writeCfg
@@ -1623,13 +1626,13 @@ module tb_phy;
                      input [15:0] mask);
       integer cnt;
       begin
-         @(posedge clk_aon); #1.5;
+         @(posedge clk_aon); #1.5ns;
          regfile_en   = 1'b1;
          regfile_we   = 1'b1;
          regfile_addr = addr;
          regfile_mask = mask;
          regfile_di   = data;
-         @(posedge clk_aon); #1.5;
+         @(posedge clk_aon); #1.5ns;
          regfile_en   = 1'b0;
          regfile_we   = 1'b0;
          regfile_addr = 8'h0;
@@ -1637,7 +1640,7 @@ module tb_phy;
          regfile_di   = 16'h0;
          while ( regfile_rdy !== 1'b1 )
            begin
-              @(posedge clk_aon); #1.5;
+              @(posedge clk_aon); #1.5ns;
               cnt = cnt + 1;
               if ( cnt == 32 )
                 begin
@@ -1653,17 +1656,17 @@ module tb_phy;
                     output [15:0] data);
       integer cnt;
       begin
-         @(posedge clk_aon); #1;
+         @(posedge clk_aon); #1ns;
          regfile_en   = 1'b1;
          regfile_we   = 1'b0;
          regfile_addr = addr;
-         @(posedge clk_aon); #1;
+         @(posedge clk_aon); #1ns;
          regfile_en   = 1'b0;
          regfile_addr = 8'h0;
          cnt = 0;
          while ( regfile_rdy !== 1'b1 )
            begin
-              @(posedge clk_aon); #1;
+              @(posedge clk_aon); #1ns;
               cnt = cnt + 1;
               if ( cnt == 32 )
                 begin
@@ -1679,12 +1682,12 @@ module tb_phy;
    task writeCfgFile(input  [7:0] addr,
                      input [15:0] data);
      begin
-        @(posedge clk_cfg); #1;
+        @(posedge clk_cfg); #1ns;
         cfg_en          = 1'b1;
         cfgfile_valid = 1'b1;
         cfgfile_addr    = addr;
         cfgfile_di      = data;
-        @(posedge clk_cfg); #1;
+        @(posedge clk_cfg); #1ns;
         cfg_en          = 1'b0;
         cfgfile_valid = 1'b0;
         cfgfile_addr    = 1'b0;
@@ -1792,7 +1795,7 @@ module tb_phy;
               writeRegfile(8'h50, 16'h0000, 16'h0001);
               for ( i = 0; i < 100; i = i + 1 )
                 begin
-                   @(posedge clk_aon); #1;
+                   @(posedge clk_aon); #1ns;
                 end
            end
 
@@ -1833,14 +1836,14 @@ module tb_phy;
            begin
               for ( i = 0; i < 1000; i = i + 1 )
                 begin
-                   @(posedge clk_aon); #1;
+                   @(posedge clk_aon); #1ns;
                 end
               readSerIOADPLLStatus(status);
               if ( status[0] == 1'b0 )
                 $display("INFO: LCK: %1d   FTO: %1d   FTU: %1d   FT: %4d  SY: %3d  ST: %1d",
                          status[0], status[1], status[2],
                          status[12:3], status[23:16], status[14:13]);
-              if ( ( $realtime - start ) > 2000000 && status[0] == 1'b0 )
+              if ( ( $realtime - start ) > 2ms && status[0] == 1'b0 )
                 begin
                    checks_done = checks_done + 1;
                    $display("ERROR: Waiting for SerIO ADPLL lock timed out.");
@@ -1910,26 +1913,26 @@ end
 
 // Connect Tx and Rx Line (incl. Delay)
 
-//always @(TX_SERIO_P) RX_SERIO_P <= #10 TX_SERIO_P;
-//always @(TX_SERIO_N) RX_SERIO_N <= #10 TX_SERIO_N;
+//always @(TX_SERIO_P) RX_SERIO_P <= #10ns TX_SERIO_P;
+//always @(TX_SERIO_N) RX_SERIO_N <= #10ns TX_SERIO_N;
 
 logic S_FAULT_INJECTION  = 1'b0;
 
 always @(TX_SERIO_P) begin
 
  if ( S_FAULT_INJECTION == 1'b1 )
-    RX_SERIO_P <= #10 ~TX_SERIO_P;
+    RX_SERIO_P <= #10ns ~TX_SERIO_P;
  else 
-    RX_SERIO_P <= #10 TX_SERIO_P;
+    RX_SERIO_P <= #10ns TX_SERIO_P;
 
  end // always
 
 always @(TX_SERIO_N) begin
 
  if ( S_FAULT_INJECTION == 1'b1 )
-    RX_SERIO_N <= #10 ~TX_SERIO_N;
+    RX_SERIO_N <= #10ns ~TX_SERIO_N;
  else 
-    RX_SERIO_N <= #10 TX_SERIO_N;
+    RX_SERIO_N <= #10ns TX_SERIO_N;
 
  end // always
 
@@ -2044,7 +2047,7 @@ task find_latency (input integer bytes);
                                testdata[3], testdata[2], testdata[1], testdata[0]};
     lat_pclk = 0;
     while ((o_rx_data !== lat_word) && (lat_pclk < 200)) begin
-        @(posedge o_pclk); #1;
+        @(posedge o_pclk); #1ns;
         lat_pclk = lat_pclk + 1;
     end
     if (o_rx_data !== lat_word) begin
@@ -2065,7 +2068,7 @@ task send_testdata (input integer bytes);
 
         for ( k = 0; k < 40; k = k + 2 ) begin
        //     i = k + 1;
-            @(posedge o_pclk); #1;
+            @(posedge o_pclk); #1ns;
             i_tx_data   = {testdata[k], testdata[k+1]}; 
             i_tx_data_k  = {testdata_k[k], testdata_k[k+1]};
         end
@@ -2073,7 +2076,7 @@ task send_testdata (input integer bytes);
     else begin // PIPE 64-Bit
         for ( k = 0; k < 40; k = k + 8 ) begin
             //i = k + 1;
-            @(posedge o_pclk); #1;
+            @(posedge o_pclk); #1ns;
             i_tx_data   = { testdata[k+7],testdata[k+6],testdata[k+5],testdata[k+4],
                            testdata[k+3],testdata[k+2],testdata[k+1],testdata[k]}; 
             i_tx_data_k  = { testdata_k[k+7],testdata_k[k+6],testdata_k[k+5],testdata_k[k+4],
@@ -2081,7 +2084,7 @@ task send_testdata (input integer bytes);
         end
     end
 
-    @(posedge o_pclk); #1;
+    @(posedge o_pclk); #1ns;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
   end
@@ -2094,13 +2097,13 @@ task send_TS1_OS (input integer bytes);
 
     if ( bytes == 2) begin  // PIPE 16-Bit
         for ( k = 0; k < 1023; k = k + 1 ) begin // Create TS1 Ordered Set
-            @(posedge o_pclk); #1;
+            @(posedge o_pclk); #1ns;
 
             i_tx_data   = 16'h01BC; // TS1 first two bytes
             i_tx_data_k  = 2'b01;
 
             for ( j = 0; j < 15; j = j + 1 ) begin 
-                #8;
+                #8ns;
                 i_tx_data   = 16'h23CA;
                 i_tx_data_k  = 8'b00;
             end
@@ -2108,11 +2111,11 @@ task send_TS1_OS (input integer bytes);
     end
     else begin // PIPE 64-Bit
         for ( k = 0; k < 1024; k = k + 1 ) begin // Create TS1 Ordered Set
-            @(posedge o_pclk); #1;
+            @(posedge o_pclk); #1ns;
 
             i_tx_data   = 64'h0802_0100_012A_01BC; // TS1 first part
             i_tx_data_k  = 8'b0000_0001;
-            #32;
+            #32ns;
             i_tx_data   = 64'h162B_F45F_238A_0103; // TS1 second part
             i_tx_data_k  = 8'b00_00_00_00;
             end
@@ -2142,7 +2145,7 @@ task check_testdata (input integer bytes);
 
 
         for ( k = 0; k < 40; k = k + 2 ) begin
-            @(posedge o_pclk); #1;
+            @(posedge o_pclk); #1ns;
 
             testdata_16 = {testdata[k], testdata[k+1]};
 
@@ -2206,7 +2209,7 @@ task check_testdata (input integer bytes);
     else begin // PIPE 64-Bit
 
         for ( k = 0; k < 40; k = k + 8 ) begin
-            @(posedge o_pclk); #1;
+            @(posedge o_pclk); #1ns;
 
             testdata_64 = { testdata[k+7],testdata[k+6],testdata[k+5],
                             testdata[k+4],testdata[k+3],testdata[k+2],
@@ -2282,12 +2285,12 @@ task force_transm_err (input integer bit_error_cnt);
     integer i;
     begin
         for (i = 0; i < bit_error_cnt ; i = i + 1) begin
-            s_fault_flag_for_rx <= #10 1'b1;
+            s_fault_flag_for_rx <= #10ns 1'b1;
             S_FAULT_INJECTION <= 1'b1;
-            #0.4;
+            #0.4ns;
             S_FAULT_INJECTION <= 1'b0;
-            s_fault_flag_for_rx <= #10 1'b0;
-            #4.5;
+            s_fault_flag_for_rx <= #10ns 1'b0;
+            #4.5ns;
         end
   end // task
 endtask 
@@ -2312,7 +2315,7 @@ task check_err_detect (input integer checks, bytes);
         ////////////////////////////////////////////////////////////////////////////////////
 
         // Included Delay Time
-        #466;
+        #466ns;
 
         @(posedge o_pclk);
 
@@ -2324,7 +2327,7 @@ task check_err_detect (input integer checks, bytes);
             v_rx_disp_err     = rx_disp_err[m -: 2];
 
 
-            @(posedge o_pclk); #1;
+            @(posedge o_pclk); #1ns;
 
                     // Check 8b/10b Error
                     if ( o_rx_dec_err !=  v_rx_not_in_table) begin
@@ -2453,10 +2456,10 @@ task check_err_detect (input integer checks, bytes);
     else begin // PIPE 64-Bit
 
         // Included Delay Time
-        #450;
+        #450ns;
 
         for ( k = 0; k < checks; k = k + 1 ) begin
-            @(posedge o_pclk); #1;
+            @(posedge o_pclk); #1ns;
 
             // Check 8b/10b Error
             if ( o_rx_dec_err !=  rx_not_in_table) begin
@@ -2605,17 +2608,17 @@ initial
 
     i_rx_buf_reset       =  1'b0;
 
-    #20;
+    #20ns;
 
     i_reset =  1'b1;    // Release Reset
 
     // Wait for different Resets to be done.
 
-    #500;
+    #500ns;
 
     writeCfg(8'h5C, 16'h0001); // Enable Serdes
 
-    #100;
+    #100ns;
 
     writeRegfile(8'h50, 16'h0002, 16'h0007);  // Config Sel
     writeRegfile(8'h50, 16'h0003, 16'h0003);  // Config Sel + Adpll Enable
@@ -2626,9 +2629,9 @@ initial
 
     // Wait for PhyStatus 
 
-    #2000;
+    #2000ns;
 
-    #35200; // Lock Time PLL
+    #35200ns; // Lock Time PLL
 
     if (o_phy_status == 1'b1) begin
         checks_done = checks_done + 1;
@@ -2662,7 +2665,7 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
-    #128;
+    #128ns;
 
     // Transit to Powerstate P1
 
@@ -2676,7 +2679,7 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
-    #128;
+    #128ns;
 
     // Transit to Powerstate P0 (Normal Transmission)
 
@@ -2690,7 +2693,7 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
-    #128;
+    #128ns;
 
 
     // Transit to Powerstate P1
@@ -2705,7 +2708,7 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
-    #256;
+    #256ns;
 
     // Transit to Powerstate P0 (Loopback)
 
@@ -2719,7 +2722,7 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
-    #128;
+    #128ns;
 
     // Transit to Powerstate P1
 
@@ -2733,7 +2736,7 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
-    #384; 
+    #384ns;
 
     // End of Powerstate Transition Tests
 
@@ -2750,11 +2753,11 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
-    #128;
+    #128ns;
 
     // Transit to Powerstate P0 (Normal)
 
-    @(posedge o_pclk); #1;
+    @(posedge o_pclk); #1ns;
 
     i_power_down          =  2'b00;     // P0
     i_tx_detect_rx         =  1'b0;
@@ -2764,7 +2767,7 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
-    #128;
+    #128ns;
 
     // Send TS1 Ordered Sets for Word Alignment
 
@@ -2796,7 +2799,7 @@ status_flag_1 = 1'b1;
     i_tx_data             =  64'hB59C_A235_FBB5_F6D3;
     i_tx_data_k            =  8'b0100_1000;
 
-    #1000;
+    #1000ns;
 
     i_reset              =  1'b0;  // Low Active
     i_power_down          =  2'b10;
@@ -2807,16 +2810,16 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
-    #20;
+    #20ns;
     i_reset              =  1'b1;  // Release Reset
 
     // Wait for end of Reset
 
     while (o_phy_status == 1'b1) begin
-        @(posedge o_pclk); #1;
+        @(posedge o_pclk); #1ns;
     end
 
-    #128;
+    #128ns;
 
     // Transition to P0 (Normal Transmission)
 
@@ -2832,11 +2835,11 @@ status_flag_1 = 1'b1;
 
     // Reestablish Word Alignment
 
-    #155;
+    #155ns;
 
     send_TS1_OS(DATA_BYTES);
 
-    #50;
+    #50ns;
 
     // Error Detection Test
 
@@ -2845,14 +2848,14 @@ status_flag_1 = 1'b1;
     i_tx_data             =  64'hB5B5_B5B5_B5B5_B5B5;
     i_tx_data_k            =  8'b0000_0000;
 
-    #212;
+    #212ns;
 
     fork
         check_err_detect (50,DATA_BYTES);
         force_transm_err (400);
     join
 
-    #200;
+    #200ns;
 
     // Negative Disparity Test
 
@@ -2866,7 +2869,7 @@ status_flag_1 = 1'b1;
         i_tx_compliance       =  2'b11;
         end
 
-        #500;
+        #500ns;
 
         for (i = 0; i < 4; i = i + 1) begin
 
@@ -2885,7 +2888,7 @@ status_flag_1 = 1'b1;
         i_tx_data_k            =  8'b1111_1111;
         i_tx_compliance       =  8'b1111_1111;
 
-        #500;
+        #500ns;
 
         @(posedge o_pclk);
         i_tx_data             =  64'hBCBC_BCBC_BCBC_BCBC;
@@ -2894,7 +2897,7 @@ status_flag_1 = 1'b1;
 
     end
 
-    #300;
+    #300ns;
 
 
 
@@ -2910,7 +2913,7 @@ status_flag_1 = 1'b1;
     i_tx_data_k            =  8'b0000_0000;
     i_tx_compliance       =  {DATA_BYTES{1'b0}};
 
-    #1000;
+    #1000ns;
 
     // Activate Loopback Mode
 
@@ -2922,7 +2925,7 @@ status_flag_1 = 1'b1;
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
     i_rx_polarity         =  1'b0;
 
-    #1500;
+    #1500ns;
 
     // Deactivate Loopback Mode
 
@@ -2934,7 +2937,7 @@ status_flag_1 = 1'b1;
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
     i_rx_polarity         =  1'b0;
 
-    #500;
+    #500ns;
 /*
     // Receiver Detection Test
 
@@ -2948,7 +2951,7 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 
-    #256;
+    #256ns;
 
     // Start Detection
 
@@ -2963,7 +2966,7 @@ status_flag_1 = 1'b1;
     i_tx_data             =  {DATA_WIDTH{1'b0}};
     i_tx_data_k            =  {DATA_BYTES{1'b0}};
 */
-    #30000;
+    #30000ns;
 
     finalize;
 
