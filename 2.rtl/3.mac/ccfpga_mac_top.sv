@@ -19,8 +19,7 @@ module ccfpga_mac_top
     // bench of two of these MACs may shorten it: both start electrically idle,
     // so neither leaves Detect.Quiet before the timeout.
     parameter int DETECT_TIMEOUT_US = 12000
-)
-(
+) (
     input  logic i_reset_n,  // Asynchronous Reset
 
     pipe_if.mac  pipe,       // PIPE, MAC side (Reset# comes from the parent)
