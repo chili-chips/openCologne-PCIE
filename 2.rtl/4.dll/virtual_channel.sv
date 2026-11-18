@@ -360,7 +360,7 @@ module virtual_channel
 
   logic  updatefc_clear;  // the UpdateFC timer runs only while the link is active
   logic  updatefc_req;
-  assign updatefc_clear = !link_active;
+  assign updatefc_clear = ~link_active;
   assign updatefc_req   = updatefc_counter_flag & link_active;
 
   dll_clk_counter #(

@@ -117,8 +117,8 @@ module trn_tx_throttle
 
   assign axi_busy       = s_axis_tx_tvalid | axi_pkt_started;
   assign axi_pkt_ending = s_axis_tx_tvalid & s_axis_tx_tlast;
-  assign axi_paused     = !s_axis_tx_tready;
-  assign axi_pause_ok   = !axi_busy | axi_pkt_ending | axi_paused;
+  assign axi_paused     = ~s_axis_tx_tready;
+  assign axi_pause_ok   = ~axi_busy | axi_pkt_ending | axi_paused;
 
   assign any_trig       = free_low_trig;
 

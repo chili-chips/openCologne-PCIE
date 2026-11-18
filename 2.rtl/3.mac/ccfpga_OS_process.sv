@@ -150,21 +150,21 @@ module ccfpga_OS_process
   assign rx_valid = rx_os & link_lane_ok;
   // TS1 with PAD-Lane and PAD-Link, COM not compared
   assign rx_timeout = (i_data.id == {10{TS1_ID}}) & (i_data.lane == K_PAD) & (i_data.link == K_PAD);
-  assign rx_rec_cfg = ts1 & !link_lane_ok;  // TS1 with non-matched Link/Lane
+  assign rx_rec_cfg = ts1 & ~link_lane_ok;  // TS1 with non-matched Link/Lane
   assign rx_rec_idl = ts1 & (i_data.lane == K_PAD);  // TS1 with PAD-Lane
 
   // Rx Ordered Set counting signals
   assign o_inc_count_os = (i_com_detected == 1'b1) & rx_valid;
-  assign o_clear_count_os = (i_com_detected == 1'b1) & !rx_valid;
+  assign o_clear_count_os = (i_com_detected == 1'b1) & ~rx_valid;
   // Rx Timeout counting signals
   assign o_inc_count_timeout = (i_com_detected == 1'b1) & rx_timeout;
-  assign o_clear_count_timeout = (i_com_detected == 1'b1) & !rx_timeout;
+  assign o_clear_count_timeout = (i_com_detected == 1'b1) & ~rx_timeout;
   // Recovery.RcvrCfg counting signals
   assign o_inc_count_rec_cfg = (i_com_detected == 1'b1) & rx_rec_cfg;
-  assign o_clear_count_rec_cfg = (i_com_detected == 1'b1) & !rx_rec_cfg;
+  assign o_clear_count_rec_cfg = (i_com_detected == 1'b1) & ~rx_rec_cfg;
   // Recovery.Idle counting signals
   assign o_inc_count_rec_idle = (i_com_detected == 1'b1) & rx_rec_idl;
-  assign o_clear_count_rec_idle = (i_com_detected == 1'b1) & !rx_rec_idl;
+  assign o_clear_count_rec_idle = (i_com_detected == 1'b1) & ~rx_rec_idl;
 
 endmodule
 

@@ -67,7 +67,7 @@ module ccfpga_rx_MAC_IDLE
   // IDLE counting signals
   //assign inc_count_idle = ( rx_data_shift[NUMBER_OF_STEPS] == { DATA_WIDTH{1'b0} } );
   assign inc_count_idle   = i_com_detected == 1'b0;
-  assign clear_count_idle = !inc_count_idle;
+  assign clear_count_idle = ~inc_count_idle;
 
 endmodule
 

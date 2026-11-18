@@ -112,18 +112,18 @@ module tlp_tx_arbiter
                     | (app_kind == K_IORD)
                     | (app_kind == K_IOWR)
                     | (app_kind == K_ATOMIC);
-  assign app_allowed = !app_is_req | bus_master_enable;
+  assign app_allowed = ~app_is_req | bus_master_enable;
   assign app_head = app_tx.valid & app_tx.first & app_allowed;
   assign app_ok = app_head & credit_ok(tx_fc[app_class], app_credits);
   assign int_head = int_src.valid & int_src.first;
-  assign int_blocked = (int_src.fc_class == FC_CPL) & app_head & (app_class == FC_P) & !app_ok;
+  assign int_blocked = (int_src.fc_class == FC_CPL) & app_head & (app_class == FC_P) & ~app_ok;
   assign int_ok = int_head
                 & credit_ok(tx_fc[int_src.fc_class], int_src.data_credits)
-                & !int_blocked;
+                & ~int_blocked;
 
   assign can_start = (state == IDLE) & tx_ready;
-  assign pick_app = app_ok & (!int_ok | last_sel == SRC_INT);
-  assign pick_int = int_ok & !pick_app;
+  assign pick_app = app_ok & (~int_ok | last_sel == SRC_INT);
+  assign pick_int = int_ok & ~pick_app;
 
   assign src_valid = (sel == SRC_APP) ? app_tx.valid : int_src.valid;
   assign src_last = (sel == SRC_APP) ? app_tx.last : int_src.last;

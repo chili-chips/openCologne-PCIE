@@ -53,9 +53,10 @@
 //   DL_Active. TLPs flow only in DL_Active.
 //==========================================================================
 
-interface dll_if;
+interface dll_if
   import pipe_pkg::*;
   import dll_pkg::*;
+();
 
   // TL -> DLL: TLPs
   tlp_beat_t tx_tlp;

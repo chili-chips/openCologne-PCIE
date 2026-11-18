@@ -45,8 +45,9 @@
 //   PCLK is a PHY output, and the MAC side runs on it.
 //==========================================================================
 
-interface pipe_if;
+interface pipe_if
   import pipe_pkg::*;
+();
 
   // MAC -> PHY
   logic         reset_n;  // PIPE Reset#

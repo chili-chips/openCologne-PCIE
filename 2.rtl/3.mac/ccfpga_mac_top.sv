@@ -35,7 +35,7 @@ module ccfpga_mac_top
   // -----------------------------------------------------------------------------------------------
   // Reset
   logic       reset;
-  assign      reset = !i_reset_n;
+  assign      reset = ~i_reset_n;
   // L0 flags
   logic       l0_enabled;  // L0 state
   // -----------------------------------------------------------------------------------------------
@@ -110,11 +110,11 @@ module ccfpga_mac_top
   logic idle_state;
   // CONFIG_IDLE or RECOVERY.IDLE
   assign idle_state = s_fsm_state == CONFIG_IDLE | s_fsm_state == RECOVERY_IDLE;
-  assign s_rx_os_flag_rst = !idle_state ? s_rx_rst : 1'b1;  // Rx OS counting when not in IDLE state
+  assign s_rx_os_flag_rst = ~idle_state ? s_rx_rst : 1'b1;  // Rx OS counting when not in IDLE state
   assign s_rx_idle_flag_rst = idle_state ? s_rx_rst : 1'b1;  // Rx IDLE counting when in IDLE state
 
   // Tx OS counting when not in IDLE state
-  assign s_tx_os_flag_rst = !idle_state ? s_tx_flag_rst : 1'b1;
+  assign s_tx_os_flag_rst = ~idle_state ? s_tx_flag_rst : 1'b1;
   // Tx IDLE counting when in IDLE state
   assign s_tx_idle_flag_rst = idle_state ? s_tx_flag_rst : 1'b1;
   always_comb begin
@@ -132,8 +132,8 @@ module ccfpga_mac_top
       default: mac.link_up = 1'b0;
     endcase
   end
-  assign s_rx_flag = ((s_rx_os_flag & !idle_state) | (s_rx_idle_flag & idle_state));  // Rx flag
-  assign s_tx_flag = (s_tx_os_flag & !idle_state) | (s_tx_idle_flag & idle_state);  // Tx flag
+  assign s_rx_flag = ((s_rx_os_flag & ~idle_state) | (s_rx_idle_flag & idle_state));  // Rx flag
+  assign s_tx_flag = (s_tx_os_flag & ~idle_state) | (s_tx_idle_flag & idle_state);  // Tx flag
   // Rx reset when:
   // - Link number detection in CONFIG_LINKWIDTH_START_LINKNUM state (substate of
   // CONFIG_LINKWIDTH_START, waiting for link number)

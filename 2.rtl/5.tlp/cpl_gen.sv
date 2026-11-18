@@ -81,9 +81,9 @@ module cpl_gen
 
   assign pending          = pending_nonfatal | pending_fatal;
   assign start_cpl        = (state == IDLE) & cpl_req;
-  assign start_msg        = (state == IDLE) & !cpl_req & !cpl_hold & pending;
+  assign start_msg        = (state == IDLE) & ~cpl_req & ~cpl_hold & pending;
 
-  assign cpl_ready        = (state == IDLE) & !cpl_req;
+  assign cpl_ready        = (state == IDLE) & ~cpl_req;
   assign src.valid        = (state == WORD0) | (state == WORD1);
   assign src.first        = (state == WORD0);
   assign src.last         = (state == WORD1);

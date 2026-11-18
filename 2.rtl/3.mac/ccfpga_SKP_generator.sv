@@ -165,9 +165,9 @@ module ccfpga_SKP_generator
 
   assign skp_count_inc = s_count == COUNT_MIN;
   assign skp_send_enable = ((number_of_queued_skp != 4'b0) | skp_count_inc)
-                         & !i_sending_data
-                         & !i_sending_os
-                         & !i_sending_idle;
+                         & ~i_sending_data
+                         & ~i_sending_os
+                         & ~i_sending_idle;
   assign o_skp_in_queue = (number_of_queued_skp != 4'b0);
 
 endmodule

@@ -95,7 +95,7 @@ module trn_rx
     end
   end
 
-  assign data_hold = (!m_axis_rx.tready & m_axis_rx.tvalid);
+  assign data_hold = (~m_axis_rx.tready & m_axis_rx.tvalid);
 
   always_ff @(posedge clk or negedge core_rst_n) begin
     if (!core_rst_n) begin

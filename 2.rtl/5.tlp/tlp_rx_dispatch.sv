@@ -264,7 +264,7 @@ module tlp_rx_dispatch
                & np_ready
                & action_ready(np_act, app_rx_ready, cpl_ready);
   assign p_go = (state == IDLE)
-              & !np_go
+              & ~np_go
               & p_rd.avail
               & action_ready(p_act, app_rx_ready, cpl_ready);
 
@@ -275,7 +275,7 @@ module tlp_rx_dispatch
   assign take = (state == XFER) & cur_valid & ((act != A_APP) | app_rx_ready);
   assign finish = take & cur_last;
 
-  assign p_pop = take & !sel_np;
+  assign p_pop = take & ~sel_np;
   assign np_pop = take & sel_np;
 
   assign app_rx.valid = to_app;

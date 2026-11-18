@@ -40,6 +40,8 @@
 module soc_top
   import tl_pkg::*;
   import axis_pkg::*;
+  import edubos5_pkg::*;
+  import csr_pkg::*;
 (
     input  logic   clk,
     input  logic   resetn,
@@ -146,11 +148,11 @@ module soc_top
   // ready, so the ready a store gets back, one cycle later, must not reach it:
   // eduBOS5 would take it for the data of a load that follows. Only the ready
   // of a load still waiting for its data goes through.
-  edubos5_pkg::cpu_pc_t        imem_addr;
-  logic                 [18:0] NC_imem_addr_hi;  // the RAM decodes [12:2]
-  logic                 [31:0] imem_rdat;
-  logic                        load_wait;
-  logic                        edubos5_rdy;
+  cpu_pc_t        imem_addr;
+  logic    [18:0] NC_imem_addr_hi;  // the RAM decodes [12:2]
+  logic    [31:0] imem_rdat;
+  logic           load_wait;
+  logic           edubos5_rdy;
 
   // NC_imem_addr_hi is here only for lint; without it, Verilator reports
   //   %Warning-UNUSEDSIGNAL: Bits of signal are not used: 'imem_addr'[31:13]
@@ -305,13 +307,13 @@ module soc_top
     RX_HDR2 = 2'd1,  // next beat: DW2 and the payload DW (or DW3)
     RX_REST = 2'd2   // later beats: taken and dropped
   } rx_phase_e;
-  rx_phase_e          rx_phase;
+  rx_phase_e rx_phase;
 
   // PeakRDL-generated CSR ports (u_soc_csr below)
-  csr_pkg::csr__in_t  csr_in;
-  csr_pkg::csr__out_t csr_out;
+  csr__in_t  csr_in;
+  csr__out_t csr_out;
 
-  dw0_t               tx_dw0;
+  dw0_t      tx_dw0;
 
   assign tx_dw0 = csr_out.tx.header0.hdr.value;
 
@@ -537,7 +539,7 @@ module soc_top
     end
   end
 
-  assign rx_pl_rd   = csr_out.rx_payload.req & !csr_out.rx_payload.req_is_wr;
+  assign rx_pl_rd   = csr_out.rx_payload.req & ~csr_out.rx_payload.req_is_wr;
   assign rx_pl_ridx = csr_out.rx_payload.addr[7:3];
 
   // the two banks: even entries 0, 2, 4 ..., odd entries 1, 3, 5 ...
@@ -598,7 +600,7 @@ module soc_top
   assign fw_result        = csr_out.status.result.marker.value;
   assign fw_pass          = (fw_result == FW_RESULT_PASS);
 
-  assign m_axis_rx.tready = !rx_valid;
+  assign m_axis_rx.tready = ~rx_valid;
 
   // Per-packet transmit qualifiers (tx_tuser_t, UG477 table 2-9), none
   // of which this design uses. Left undriven they are X in simulation, and

@@ -76,7 +76,7 @@ module tlp_queue
   logic                   fetch;
 
   assign wr_ptr_next = wr_ptr + 1'b1;
-  assign write       = wr.en & !wr.drop & !wr_full;
+  assign write       = wr.en & ~wr.drop & ~wr_full;
   assign commit      = write & wr.word.last;
   assign take        = pop & out0_valid;
   assign done        = take & out0.last;

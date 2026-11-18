@@ -135,9 +135,9 @@ module trn_compat
   assign rx_kind          = tlp_kind(rx_dw0);
 
   assign trn_rd           = trn_rx.dat;
-  assign trn_rsof         = !rx_mid;
+  assign trn_rsof         = ~rx_mid;
   assign trn_reof         = trn_rx.eof;
-  assign trn_rrem         = !(trn_rx.eof & tlp_last_half(rx_dw0));
+  assign trn_rrem         = ~(trn_rx.eof & tlp_last_half(rx_dw0));
   assign trn_rsrc_rdy     = trn_rx.vld;
   assign trn_rx.rdy       = trn_rdst_rdy;
   assign trn_rsrc_dsc     = 1'b0;

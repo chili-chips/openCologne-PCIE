@@ -40,6 +40,7 @@
 module dll_top
   import pipe_pkg::*;
   import dll_pkg::*;
+  import mac_pkg::*;
 #(
     parameter int NUMBER_OF_VIRTUAL_CHANNELS = 1,
     parameter int RETRY_ADDR_WIDTH           = 9
@@ -60,7 +61,7 @@ module dll_top
       phy_linkup <= 1'b0;
     end
     else begin
-      phy_linkup <= mac.link_up & (phy_linkup | (mac.ltssm_state == mac_pkg::L0));
+      phy_linkup <= mac.link_up & (phy_linkup | (mac.ltssm_state == L0));
     end
   end
 

@@ -177,7 +177,7 @@ module tl_top
 
   // room for a whole TLP at its first beat: free after this clock's write,
   // without the beats the queue reads out (an underestimate, never over)
-  assign app_q_mid_next     = app_q_wr.en ? !trn_tx.eof : app_q_mid;
+  assign app_q_mid_next     = app_q_wr.en ? ~trn_tx.eof : app_q_mid;
   assign app_q_free_next    = app_q_free - trn_words_t'(app_q_wr.en);
   assign tx_room            = app_q_mid_next | (app_q_free_next >= trn_words_t'(TRN_TLP_MAX_BEATS));
 
@@ -202,7 +202,7 @@ module tl_top
   end
 
   assign app_tx.valid      = app_tx_mid ? app_q_rd.valid : app_q_rd.avail;
-  assign app_tx.first      = !app_tx_mid;
+  assign app_tx.first      = ~app_tx_mid;
   assign app_tx.last       = app_q_rd.head.last;
   assign app_tx.data       = app_q_rd.head.data;
 

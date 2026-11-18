@@ -60,7 +60,7 @@ module trn_tx
 
   assign trn_tx.dat    = trn_dw_swap(beat_tdata);
 
-  assign trn_tx.sof    = beat_tvalid & !trn_pkt_started;
+  assign trn_tx.sof    = beat_tvalid & ~trn_pkt_started;
 
   always_ff @(posedge clk or negedge core_rst_n) begin
     if (!core_rst_n) begin

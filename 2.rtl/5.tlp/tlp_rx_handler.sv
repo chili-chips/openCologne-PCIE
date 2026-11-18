@@ -175,13 +175,13 @@ module tlp_rx_handler
   assign credit_ovf = (cur.fc_class != FC_CPL) & past_alloc;
 
   assign overflow = credit_ovf | full_now;
-  assign malformed = !cur.known | (cur_seen != cur.words) | cur.static_bad;
-  assign accept = last_word & cur.known & !overflow & !malformed;
-  assign counted = last_word & cur.known & !overflow & (cur.fc_class != FC_CPL);
-  assign drop = last_word & !accept;
+  assign malformed = ~cur.known | (cur_seen != cur.words) | cur.static_bad;
+  assign accept = last_word & cur.known & ~overflow & ~malformed;
+  assign counted = last_word & cur.known & ~overflow & (cur.fc_class != FC_CPL);
+  assign drop = last_word & ~accept;
 
-  assign p_wr.en = write & !cur_np;
-  assign p_wr.drop = drop & !cur_np;
+  assign p_wr.en = write & ~cur_np;
+  assign p_wr.drop = drop & ~cur_np;
   assign p_wr.word.last = rx.last;
   assign p_wr.word.data = rx.data;
 

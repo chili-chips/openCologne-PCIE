@@ -142,7 +142,7 @@ module fc_credit
   end
 
   assign send_p  = update_pending[0];
-  assign send_np = !update_pending[0] & update_pending[1];
+  assign send_np = ~update_pending[0] & update_pending[1];
 
   always_ff @(posedge clk or negedge rx_rst_n) begin
     if (!rx_rst_n) begin

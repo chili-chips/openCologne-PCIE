@@ -37,8 +37,9 @@
 //              https://opensource.org/license/bsd-3-clause
 //--------------------------------------------------------------------------
 
-interface cfg_if;
+interface cfg_if
   import tl_pkg::*;
+();
 
   // Status sideband from the PCIE core (TL) to the SOC CSRs.
   logic           msg_err_fatal;  // ERR_FATAL message received

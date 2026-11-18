@@ -40,8 +40,9 @@
 // TLPs from the TL to trn_bridge (the SOC), in 64-bit beats, header DW0 in
 // [63:32]: MWr and MRd that hit BAR0, and all completions. Derived from the
 // PCIE_2_1 TRN RX bus (UG477), see trn_compat
-interface trn_rx_if;
+interface trn_rx_if
   import trn_pkg::*;
+();
 
   trn_dat_t dat;  // one beat of a TLP
 

@@ -44,9 +44,10 @@
 //   link state; the parent decides from it when the DLL may start.
 //==========================================================================
 
-interface mac_if;
+interface mac_if
   import pipe_pkg::*;
   import mac_pkg::*;
+();
 
   pipe_sym_t    tx;  // DLL -> MAC
   pipe_sym_t    rx;  // MAC -> DLL

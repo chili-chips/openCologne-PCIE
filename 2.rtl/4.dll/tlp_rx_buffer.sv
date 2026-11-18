@@ -151,7 +151,7 @@ module tlp_rx_buffer
     for (i = 0; i < DATA_BYTES; i = i + 1) begin : g_crc_bytes
       // the half-word end of a TLP: the upper DW is no part of the CRC
       logic  byte_en;
-      assign byte_en = crc_en & (i < DATA_BYTES / 2 | !tlp_half);
+      assign byte_en = crc_en & (i < DATA_BYTES / 2 | ~tlp_half);
 
       lcrc_byte u_crc_byte (
           .data_in (data_tl_in[i*8+:8]),

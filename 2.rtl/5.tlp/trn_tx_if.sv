@@ -39,8 +39,9 @@
 
 // TLPs from trn_bridge (the SOC) to the TL, in 64-bit beats, header DW0 in
 // [63:32]. Derived from the PCIE_2_1 TRN TX bus (UG477), see trn_compat
-interface trn_tx_if;
+interface trn_tx_if
   import trn_pkg::*;
+();
 
   trn_dat_t   dat;  // one beat of a TLP
 
