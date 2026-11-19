@@ -86,7 +86,7 @@ Proprietary PCIE Core for Xilinx 7Series FPGA devices
 > - [Alex's wrappers for Xilinx and Altera PCIE HMs, with DMA](https://github.com/alexforencich/verilog-pcie)
 > - [LitePCIE wrappers for vendor (Xilinx, Gowin, Lattice, ...) PCIE HMs](https://github.com/enjoy-digital/litepcie)
 >
-> A common misconception: these are not open-source PCIE cores, but examples of how to use proprietary ones. Ours is currently the only open-source work creating a PCIE EP core itself.
+> A common misconception: these are not open-source PCIE cores, but examples of how to use proprietary ones. Ours is the first open-source PCIE EP core for GateMate, and the only one built from scratch. It has also set off parallel work on the same theme, such as the recent [regymm pci_eerie](https://github.com/regymm/pci_eerie): plug-and-play compatible with the Xilinx `PCIE_2_1` HM, and its [GateMate port](https://github.com/goran-mahovlic/pci_eerie/tree/gatemate-w8/gatemate).
 
 ---
 # PIO MemWr/Rd signalling flow: a walkthrough

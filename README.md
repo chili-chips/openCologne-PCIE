@@ -357,6 +357,7 @@ This project was funded through the NGI0 Commons Fund, a fund established by NLn
 A project the community does not know about is not finished work. We spread the word through posts, presentations and conferences.
 
 Our posts so far:
+- [2026-11-19, LinkedIn (Space Tech Expo)](https://lnkd.in/p/gEWy4Gix)
 - [2026-11-04, LinkedIn (JanusHDL)](https://lnkd.in/p/geXDYbsq)
 - [2026-10-20, LinkedIn (Ferrite)](https://lnkd.in/p/g-yGBEU8)
 - [2026-10-17, LinkedIn (WaveCrux)](https://www.linkedin.com/posts/chili-chips_having-too-much-fun-cracking-ones-and-zeros-activity-7517129808020074496-Rmev?utm_source=share&utm_medium=member_desktop&rcm=ACoAAAJv-TcBSi_5ff0VNMrInrT-xg44YF3jnyU)
