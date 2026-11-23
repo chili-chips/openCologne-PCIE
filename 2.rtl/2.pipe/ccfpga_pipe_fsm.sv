@@ -182,6 +182,7 @@ module ccfpga_pipe_fsm
       PS_P1_PRE_IDLE: begin
         s_next_state = PS_P1_IDLE;
       end
+      default: s_next_state = PS_RESET;
     endcase
   end
 

@@ -328,7 +328,7 @@ IEEE 1800-2009 SystemVerilog, the same rules as on [openPCIE](https://github.com
 - **No macros for code:** a `` `define`` with arguments or a body over several lines stands in for code: write the code (a loop, function, struct or interface). Flags (`` `ifdef``), include guards and value macros are fine; eduBOS5 keeps its own. `run-format.sh --check` reports them.
 - **Case:** signals and ports lower case; constants (parameters, localparams, enum values, macros) UPPER CASE. Only vendor hard-macro and primitive pins (`CC_SERDES`, `CC_BUFG`, `CC_USR_RSTN`, ...) keep vendor names.
 - **Descriptor names:** a signal of a `tl_pkg` header or sideband type is named `*_dw0` ... `*_dw3`, `*_hdr_*` or `*_tuser` (e.g. `rx_hdr_dw0`, `tx_cfg_dw2`). It reads only the fields it needs; `run-lint.sh` waives the unread fields by that name.
-- **Procedural blocks:** `always_ff` for flip-flops, `always_comb` for combinational logic, never plain `always`. `unique case` for parallel muxes covering every value, `unique0 case` where no item may match, `priority case` for priority encoders; never plain `case`. A `unique case` has no `default`.
+- **Procedural blocks:** `always_ff` for flip-flops, `always_comb` for combinational logic, never plain `always`. `unique case` for parallel muxes covering every value, `unique0 case` where no item may match, `priority case` for priority encoders; never plain `case`. Every `unique` and `priority case` has a sensible `default`, also one whose items cover every value (slang's case-redundant-default is waived for it; `run-lint.sh` checks it); only a `unique0 case` has none.
 
   | Keyword | Several items match | No item matches | Synthesis meaning |
   |---|---|---|---|
