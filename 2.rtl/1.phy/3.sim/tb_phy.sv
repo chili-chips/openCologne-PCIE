@@ -2681,6 +2681,48 @@ status_flag_1 = 1'b1;
 
     #128ns;
 
+    // Receiver detection in P1, twice back to back. The SerDes holds DONE
+    // from the first until the second request reaches it (about 130 ns), so
+    // the second must take as long as the first: its own result, not the
+    // old DONE. One loop on PCLK owns the wait and its timeout.
+    begin : detect_twice
+      // RxStatus 3 (detected) on the open model, 0 on the vendor model (its
+      // comparator never sees a far end): the second must match the first
+      real        t0, td [1:2];
+      logic [2:0] st [1:2];
+      for (int d = 1; d <= 2; d++) begin
+        @(posedge o_pclk);
+        i_tx_detect_rx = 1'b1;
+        t0 = $realtime;
+        @(posedge o_pclk);
+        while ((o_phy_status !== 1'b1) && ($realtime - t0 < 10000.0)) @(posedge o_pclk);
+        td[d] = $realtime - t0;
+        st[d] = o_rx_status;
+        checks_done = checks_done + 1;
+        if ((o_phy_status === 1'b1) && ((st[d] === 3'b011) || (st[d] === 3'b000)) && (st[d] === st[1])) begin
+            $display("INFO: receiver detection %0d: RxStatus %b after %0.1f ns", d, st[d], td[d]);
+        end
+        else begin
+            $display("ERROR: receiver detection %0d: PhyStatus %b, RxStatus %b after %0.1f ns",
+                     d, o_phy_status, st[d], td[d]);
+            errors = errors + 1;
+        end
+        @(posedge o_pclk);
+        i_tx_detect_rx = 1'b0;
+        repeat (4) @(posedge o_pclk);
+      end
+      checks_done = checks_done + 1;
+      if (td[2] >= 0.9 * td[1]) begin
+          $display("INFO: receiver detection 2 waited for its own result (%0.1f ns, first %0.1f ns)",
+                   td[2], td[1]);
+      end
+      else begin
+          $display("ERROR: receiver detection 2 took the old DONE: %0.1f ns, first %0.1f ns",
+                   td[2], td[1]);
+          errors = errors + 1;
+      end
+    end
+
     // Transit to Powerstate P0 (Normal Transmission)
 
     @(posedge o_pclk); 

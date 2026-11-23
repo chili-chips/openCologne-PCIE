@@ -356,7 +356,7 @@ This project was funded through the NGI0 Commons Fund, a fund established by NLn
 
 A project the community does not know about is not finished work. We spread the word through posts, presentations and conferences.
 
-Our posts so far:
+A sampler of relevant posts:
 - [2026-11-19, LinkedIn (Space Tech Expo)](https://lnkd.in/p/gEWy4Gix)
 - [2026-11-04, LinkedIn (JanusHDL)](https://lnkd.in/p/geXDYbsq)
 - [2026-10-20, LinkedIn (Ferrite)](https://lnkd.in/p/g-yGBEU8)

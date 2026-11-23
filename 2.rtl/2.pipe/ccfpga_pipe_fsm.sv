@@ -69,13 +69,20 @@ module ccfpga_pipe_fsm
   assign s_transit   = {i_power_down, i_tx_elec_idle, i_tx_detect_rx};
   assign o_fsm_state = s_state;
 
+  // Receiver detection: the SerDes holds DONE from the last detection until
+  // a new request reaches it (about 130 ns), so take its rise, not its level
+  logic s_det_done_q, s_det_done_rise;
+  assign s_det_done_rise = i_rx_detect_done & ~s_det_done_q;
+
   // State Register
   always_ff @(posedge i_clk, posedge i_reset) begin
     if (i_reset == 1'b1) begin
-      s_state <= PS_RESET;
+      s_state      <= PS_RESET;
+      s_det_done_q <= 1'b0;
     end
     else begin
-      s_state <= s_next_state;
+      s_state      <= s_next_state;
+      s_det_done_q <= i_rx_detect_done;
     end
   end
 
@@ -128,10 +135,10 @@ module ccfpga_pipe_fsm
         if (s_transit[0] == 1'b0) begin
           s_next_state = PS_P1_IDLE;
         end
-        else if (i_rx_detect_done == 1'b1 && i_rx_present == 1'b1) begin
+        else if (s_det_done_rise == 1'b1 && i_rx_present == 1'b1) begin
           s_next_state = PS_P1_DET_GOOD;
         end
-        else if (i_rx_detect_done == 1'b1 && i_rx_present == 1'b0) begin
+        else if (s_det_done_rise == 1'b1 && i_rx_present == 1'b0) begin
           s_next_state = PS_P1_DET_BAD;
         end
         else begin
