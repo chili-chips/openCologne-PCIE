@@ -24,7 +24,7 @@ fails=0
 
 # the runs that fail today, and why
 declare -A KNOWN=(
-    [rtl-tester]="#3 #4 #6 #13 #9"
+    [rtl-tester]="#3 #4 #6 #13"
     [rtl-serial]="#6"
     [dll-stp]="#3"
     [dll-end]="#3"
@@ -32,7 +32,7 @@ declare -A KNOWN=(
 )
 # ... and what the log of each must show: another failure is not the known one
 declare -A KNOWN_SIG=(
-    [rtl-tester]="still in RcvrLock at Gen1"   # #9; SVA #3 comes before it
+    [rtl-tester]="no Completion for a read whose Completion is lost once"   # #3: the host's lost TLP never replayed; the 10 ms limit comes before Recovery (#9)
     [rtl-serial]="SVA #6"
     [dll-stp]="stp corrupted: EP did not replay"
     [dll-end]="end corrupted: EP did not replay"
@@ -94,8 +94,8 @@ if diff -q <(grep -a '===>' $LOG/serial.log) <(grep -a '===>' $LOG/serial-icarus
 else
     report sim-match 0 0 "Verilator = Icarus, serial" "diff the ===> lines of serial.log and serial-icarus.log"
 fi
-# SVA #3 stops the run at 6.03 ms; going on, it reaches the TL issues, then
-# hangs from the first Recovery (#9) to the 10 ms limit
+# Going on past the SVAs, it reaches the host's faults: the lost TLP is never
+# replayed (#3), and the 10 ms limit comes before the Recovery stage (#9)
 run rtl-tester     EP=rtl SIM_ARGS=+verilator+error+limit+100 "$@"
 run rtl-serial     EP=rtl IFACE=serial A7RC=1 "$@"
 # Sustained load, as the hardware BAR0 test: 1000 mix requests to the EP model
