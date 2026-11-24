@@ -92,9 +92,11 @@ if diff -q <(grep -a '===>' $LOG/serial.log) <(grep -a '===>' $LOG/serial-icarus
 else
     report sim-match 0 0 "Verilator = Icarus, serial" "diff the ===> lines of serial.log and serial-icarus.log"
 fi
-# Going on past the SVAs, it reaches the host's faults: the lost TLP is never
-# replayed (#3), and the 10 ms limit comes before the Recovery stage (#9)
-run rtl-tester     EP=rtl SIM_ARGS=+verilator+error+limit+100 "$@"
+# Going on past the SVAs (#4 alone fires over 100 times), it reaches the
+# host's faults: the lost TLP is never replayed (#3), and the time limit comes
+# before the Recovery stage (#9). 20 ms: the tester's later stages need it
+# for the #3 message
+run rtl-tester     EP=rtl SIM_ARGS=+verilator+error+limit+100000 USRSIMFLAGS=-GRUN_SIM_US=20000 "$@"
 run rtl-serial     EP=rtl IFACE=serial A7RC=1 "$@"
 # Sustained load, as the hardware BAR0 test: 1000 mix requests to the EP model
 run load           MIX=1000 "$@"
