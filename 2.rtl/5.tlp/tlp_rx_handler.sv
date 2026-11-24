@@ -200,7 +200,7 @@ module tlp_rx_handler
     else if (rx.valid && in_tlp) begin
       ctx_r        <= cur;
       words_seen_r <= cur_seen;
-      full_r       <= full_now & !rx.last;
+      full_r       <= full_now & ~rx.last;
       state        <= rx.last ? IDLE : RECEIVE;
     end
   end
@@ -230,7 +230,7 @@ module tlp_rx_handler
       rel.valid     <= counted & malformed;
       rel.fc_class  <= cur.fc_class;
       rel.data      <= cur.need_data;
-      err_malformed <= last_word & malformed & !(cur.known & overflow);
+      err_malformed <= last_word & malformed & ~(cur.known & overflow);
       err_overflow  <= last_word & cur.known & overflow;
     end
   end

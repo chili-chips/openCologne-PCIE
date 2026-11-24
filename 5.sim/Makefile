@@ -28,8 +28,9 @@
 # ---- simulator ------------------------------------------------------------------
 #   verilator  (default) compiled to a native executable; the models talk DPI-C
 #   icarus     Icarus Verilog; the same C/C++ models talk VPI
-#   janushdl   JanusHDL (jhdl, 0.17 or later); it loads the Icarus build of the
-#              VPI models, so it needs Icarus too (vpi_user.h). EP=model only
+#   janushdl   JanusHDL (jhdl, 0.22 or later); it loads the Icarus build of the
+#              VPI models, so it needs Icarus too (vpi_user.h). EP=rtl stops on a
+#              JanusHDL issue (openCologne-PCIE#24)
 SIM           ?= verilator
 
 # ---- EP and IFACE: what the endpoint is, and where the host meets it ---------
@@ -59,12 +60,14 @@ IFACE         ?= pipe
 ifeq ($(EP),model)
   USER_C      ?= VUserMain1.cpp
 else ifeq ($(EP),rtl)
-  ifneq ($(SIM),verilator)
-    $(error EP=rtl needs SIM=verilator: Icarus 13 parsed neither our interface ports nor the generated csr_pkg.sv; not retried on 14. JanusHDL 0.17 has no assertions yet)
+  ifeq ($(filter verilator janushdl,$(SIM)),)
+    $(error EP=rtl needs SIM=verilator or janushdl: Icarus 13 parsed neither our interface ports nor the generated csr_pkg.sv; not retried on 14)
   endif
   A7RC_EXPECT  = -DA7RC_EP_EXPECT='"a7rc_ep.h"' -DA7RC_PIPE_SCRAMBLE  # our EP scrambles at the PIPE too
   EP_FILES     = rtl.f
   EP_VLT       = +define+EP_RTL -F rtl.f --assert models/ep_sva.sv
+  EP_JHDL      = -DEP_RTL                # JanusHDL: the same define, and ep_sva.sv in the list
+  EP_JHDL_SV   = models/ep_sva.sv
   EP_OBJ       = _rtl
   FW_IN        = cp $(CURDIR)/../4.build/sw_build/firmware.hex firmware.hex &&
   FW_OUT       = rm -f firmware.hex;
@@ -351,7 +354,8 @@ $(VPROC_SO): $(USERLIB) $(RV32LIB)
 # JanusHDL reads the list at each run, also from obj/regress/<seed>/: full paths
 $(ICA_FILES): tb.f $(EP_FILES) FORCE | $(OBJDIR)
 	@{ echo '+timescale+1ns/10ps'; sed -e 's#$$VIP_DIR#$(VIP_DIR)#g' -e '/mem_model\.sv/d' \
-	    $(if $(filter janushdl,$(SIM)),-e 's#^[A-Za-z0-9_.]#$(CURDIR)/&#') $(EP_FILES) tb.f; } > $@
+	    $(if $(filter janushdl,$(SIM)),-e 's#^[A-Za-z0-9_.]#$(CURDIR)/&#') $(EP_FILES) tb.f; \
+	  $(if $(filter janushdl,$(SIM)),$(foreach f,$(EP_JHDL_SV),echo $(CURDIR)/$(f);)) } > $@
 
 ifeq ($(SIM),icarus)
 $(SIMEXE): $(VPROC_SO) $(ICA_FILES) FORCE
@@ -366,8 +370,8 @@ SIM_CMD        = $(SIMEXE) $(SIM_ARGS)
 else ifeq ($(SIM),icarus)
 SIM_CMD        = $(VVP) -n -M $(OBJDIR) -m VProc $(SIMEXE) $(VVPDUMP)
 else
-# DUMP=1: JanusHDL's own --fst, every signal ($dumpfile would write a VCD)
-SIM_CMD        = $(JHDL) --top tb $(patsubst -D%,+define+%,-DVPROC_BYTE_ENABLE $(ICA_IFACE)) -f $(ICA_FILES) \
+# DUMP=1: JanusHDL's own --fst, every signal
+SIM_CMD        = $(JHDL) --top tb $(patsubst -D%,+define+%,-DVPROC_BYTE_ENABLE $(ICA_IFACE) $(EP_JHDL)) -f $(ICA_FILES) \
                  --vpi $(VPROC_SO) $(if $(filter 1,$(DUMP)),--fst $(WCX_FST)) $(USRSIMFLAGS)
 endif
 
@@ -395,7 +399,7 @@ wavecrux_run: all
 	$(if $(filter 1,$(WCX_OPEN)),python3 $(BFM)/4.build/wavecrux.py $$d/$(WCX_FST) $$d/run.log $(WCX_SIGNALS),echo "  open it: make wavecrux SEED=$(SEED)")
 
 help:
-	@echo "make [SIM=verilator|icarus|janushdl] [EP=model|rtl] [IFACE=pipe|serial|phy]   build the models and the simulation (EP=rtl, IFACE=phy: Verilator only)"
+	@echo "make [SIM=verilator|icarus|janushdl] [EP=model|rtl] [IFACE=pipe|serial|phy]   build the models and the simulation (EP=rtl: Verilator, JanusHDL once #24 is fixed; IFACE=phy: Verilator only)"
 	@echo "make IFACE=phy run                 the EP model behind our PHY (phy_top, PIPE logic, SerDes BFM), the host on the serial line"
 	@echo "make A7RC=1 run                    literal host: only what the lab RC sends (default: the tester, also back to back)"
 	@echo "make DMA=1 run                     the tester also runs its EP DMA stage (off by default: our EP has no DMA, #14)"

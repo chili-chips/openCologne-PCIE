@@ -36,9 +36,9 @@ The versions this repo has been run with so far. "Runs" means the step completes
 | GCC | 15.2 | co-sim C/C++: VProc, pcieVHost, the RC model; `-O0`/`-O2`, UBSan, ASan | builds |
 | Yosys | 0.70, with `read_slang` | 8b/10b proofs, standalone SerDes test synthesis, `run-synth.sh`, `run-lint.sh`, `run-leq.sh` | runs |
 | Verible | v0.0-4296-g0f262651 | `run-lint.sh`, `run-format.sh` | runs |
-| Icarus Verilog | 14.0 (devel, master `7025c6613`, 2026-11-13) | PHY and DLL-over-PHY simulations, co-sim (`make SIM=icarus run`); 14 or later for the PIPE, MAC and DLL interface ports | runs |
+| Icarus Verilog | 14.0 (devel, master `addeab31d`, 2026-11-23) | PHY and DLL-over-PHY simulations, co-sim (`make SIM=icarus run`); 14 or later for the PIPE, MAC and DLL interface ports | runs |
 | Verilator | 5.055 (devel, `v5.054-260-gb9f22851`) | co-sim (`make run`, default), SOC lint; its FST writer needs `liblz4-dev` | runs, checks |
-| JanusHDL | 0.17.0 (preview) | co-sim (`make SIM=janushdl run`), EP model only: it has no assertions yet, which the EP RTL uses; free, closed source | runs |
+| JanusHDL | 0.22.0 | co-sim (`make SIM=janushdl run`): `EP=model`; `EP=rtl` waits on [#24](https://github.com/chili-chips/openCologne-PCIE/issues/24); free, closed source | runs |
 | OSS CAD Suite | 2026-11-12 | Cologne Chip's toolchain package ([UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf)): nextpnr-himbaechel `nextpnr-0.11.1-91-gf934534a`, GateMate, for `run-pnr.sh` (`NEXTPNR=`); its Yosys is a development build, not used | places and routes; timing fails |
 | gmpack | OSS CAD Suite, or Project Peppercorn v1.14 | bitstream (`run-pnr.sh`) | not yet run: P&R stops on timing |
 | openFPGALoader | 1.1.1 | loading the bitstream over JTAG | not yet used on the board |

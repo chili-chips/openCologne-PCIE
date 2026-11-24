@@ -124,6 +124,7 @@ module ccfpga_rx_MAC
   // Instantiation of Rx MAC data processing module
   ccfpga_rx_MAC_data u_rx_mac_data (
       .i_clk        (i_clk),
+      .i_reset      (i_reset),
       .i_l0_enabled (i_l0_enabled),
       .i_rx_sym     (assembled_sym),
 

@@ -123,7 +123,7 @@ module trn_compat
       rx_hdr0 <= '0;
     end
     else if (trn_rx.vld && trn_rx.rdy) begin
-      rx_mid <= !trn_rx.eof;
+      rx_mid <= ~trn_rx.eof;
       if (!rx_mid) begin
         rx_hdr0 <= rx_dw0;
       end

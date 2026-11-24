@@ -197,7 +197,7 @@ module tl_top
       app_tx_mid <= 1'b0;
     end
     else if (app_tx.valid && app_tx_ready) begin
-      app_tx_mid <= !app_tx.last;
+      app_tx_mid <= ~app_tx.last;
     end
   end
 

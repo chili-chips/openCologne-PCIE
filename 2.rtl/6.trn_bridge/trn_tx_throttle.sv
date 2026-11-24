@@ -134,14 +134,14 @@ module trn_tx_throttle
           next_state = PAUSE;
         end
         else begin
-          tready_mux = !(axi_pause_ok & any_trig);
+          tready_mux = ~(axi_pause_ok & any_trig);
           next_state = IDLE;
         end
       end
 
       PAUSE: begin
         if (!any_pause) begin
-          tready_mux = !any_trig;
+          tready_mux = ~any_trig;
           next_state = IDLE;
         end
         else begin

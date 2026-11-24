@@ -346,6 +346,11 @@ module tb_tl_top
         end
     endtask
 
+    // the UpdateFC values seen on the DLLP TX side (the always block further down)
+    reg  [7:0] upd_hdr  [0:2];
+    reg [11:0] upd_data [0:2];
+    integer    upd_cnt  [0:2];
+
     task check_updatefc;
         begin
             check("UpdateFC PH",  upd_hdr[FC_P],   exp_p_hdr % 256);
@@ -517,9 +522,6 @@ module tb_tl_top
         end
     end
 
-    reg  [7:0] upd_hdr  [0:2];
-    reg [11:0] upd_data [0:2];
-    integer    upd_cnt  [0:2];
     integer    k;
 
     always @(posedge clk) begin
@@ -922,13 +924,6 @@ module tb_tl_top
         end
     endtask
 
-    always @(posedge clk) begin
-        if (stress) begin
-            rnd_ready    = xorshift(rnd_ready);
-            app_rx_ready <= (rnd_ready % 3) != 0;
-        end
-    end
-
     task link_up(input [7:0] cplh, input [11:0] cpld);
         begin
             #1ns dl_state = DL_INITFC1;
@@ -966,6 +961,15 @@ module tb_tl_top
     integer rd_cnt;
     integer cpl_ok;
     reg     stress;
+
+    // after the declarations it reads (IEEE 1800-2023 6.5)
+    always @(posedge clk) begin
+        if (stress) begin
+            rnd_ready    = xorshift(rnd_ready);
+            app_rx_ready <= (rnd_ready % 3) != 0;
+        end
+    end
+
     reg [31:0] shadow    [0:1023];
     reg [31:0] exp_rd    [0:127][0:7];
     integer    exp_rdlen [0:127];

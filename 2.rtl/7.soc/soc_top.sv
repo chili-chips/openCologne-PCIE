@@ -158,8 +158,13 @@ module soc_top
   //   %Warning-UNUSEDSIGNAL: Bits of signal are not used: 'imem_addr'[31:13]
   assign NC_imem_addr_hi = imem_addr[31:13];
 
-  always_ff @(posedge clk) begin
-    load_wait <= mem.valid & (mem.wstrb == '0) & !mem.ready;
+  always_ff @(posedge clk or negedge resetn) begin
+    if (!resetn) begin
+      load_wait <= 1'b0;
+    end
+    else begin
+      load_wait <= mem.valid & (mem.wstrb == '0) & ~mem.ready;
+    end
   end
 
   generate
@@ -258,11 +263,9 @@ module soc_top
 `endif
 
   always_ff @(posedge clk) begin
-    ram_ready <= 1'b0;
     if (mem.valid && !addr.bridge) begin
       if (mem.wstrb == '0) begin
         ram_rdata <= ram[addr.word];
-        ram_ready <= 1'b1;
       end
       else begin
         if (mem.wstrb[0]) begin
@@ -277,8 +280,17 @@ module soc_top
         if (mem.wstrb[3]) begin
           ram[addr.word][31:24] <= mem.wdata[31:24];
         end
-        ram_ready <= 1'b1;
       end
+    end
+  end
+
+  // the RAM answers every access, load or store, one clock later
+  always_ff @(posedge clk or negedge resetn) begin
+    if (!resetn) begin
+      ram_ready <= 1'b0;
+    end
+    else begin
+      ram_ready <= mem.valid & ~addr.bridge;
     end
   end
 
@@ -556,9 +568,18 @@ module soc_top
     if (rx_rest && (rx_k < 10'(PAYLOAD_DW / 2))) begin
       rx_pl_odd[5'(rx_k)] <= rx_data.pl.odd;
     end
-    rx_pl_even_q  <= rx_pl_even[rx_pl_ridx];
-    rx_pl_odd_q   <= rx_pl_odd[rx_pl_ridx];
-    rx_pl_odd_sel <= csr_out.rx_payload.addr[2];
+    rx_pl_even_q <= rx_pl_even[rx_pl_ridx];
+    rx_pl_odd_q  <= rx_pl_odd[rx_pl_ridx];
+  end
+
+  // the bank select of the read: a select, reset
+  always_ff @(posedge clk or negedge resetn) begin
+    if (!resetn) begin
+      rx_pl_odd_sel <= 1'b0;
+    end
+    else begin
+      rx_pl_odd_sel <= csr_out.rx_payload.addr[2];
+    end
   end
 
   always_ff @(posedge clk or negedge resetn) begin

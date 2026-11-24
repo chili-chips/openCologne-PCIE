@@ -13,6 +13,8 @@
 #              implicit nets, multiple drivers, blocking vs non-blocking, case
 #   yosys      Yosys check on the read_slang netlist: combinational loops,
 #              conflicting drivers, used-but-undriven wires, latches
+#   reset      Yosys netlist and run-lint-reset.py: a control flop or flag with
+#              no reset (data and address flops need none: waived by name)
 #   slang      read_slang -Wextra: strict IEEE parse, second opinion
 #   verible    Verible style rules (run-lint.verible) on all RTL (not the BFM, csr.sv, eduBOS5): our case
 #              rule -- signals and ports lower case, constants UPPER case --
@@ -78,7 +80,7 @@ case $VIEW in
 esac
 
 WAIVERS=${LINT_WAIVERS:-$HERE/run-lint-waivers.txt}
-PHASES=${*:-tags verilator yosys slang verible}
+PHASES=${*:-tags verilator yosys reset slang verible}
 W=${LINT_WORK:-$(mktemp -d)}
 mkdir -p "$W"
 
@@ -157,7 +159,7 @@ for t in text.values():
     for m in re.finditer(r'\bmodule\s+(\w+)(.*?)\bendmodule', t, flags=re.S):
         d = dirs.setdefault(m.group(1), {})
         for p in re.finditer(r'\b(input|output|inout)\b(.*?)(?=\b(?:input|output|inout)\b|[;()]|$)',
-                             m.group(2), flags=re.S):
+                             re.sub(r'\[[^\]]*\]', ' ', m.group(2)), flags=re.S):
             for part in re.sub(r'\[[^\]]*\]', ' ', p.group(2)).split(','):
                 w = [x for x in re.findall(r'[A-Za-z_]\w*', part) if x not in types]
                 if w:
@@ -263,6 +265,23 @@ run_yosys() {
   found yosys < <(awk '/Executing CHECK pass/ { c = 1 } c && /^Warning:/' yosys.log)
 }
 
+# Our rule: every control flop and flag has a reset; data and address flops
+# need none. A flop with no reset that reaches an enable, a select or a reset
+# starts at X in a 4-state simulator and can lock the design up (eduBOS5
+# dmem_vld). One finding per flop, at its source line; the rules are in
+# run-lint-reset.py.
+run_reset() {
+  [ -z "$SIM" ] || { skip reset "sim view: the SerDes BFM is behavioural, not for synthesis tools"; return; }
+  have "$YOSYS" || { skip reset "$YOSYS not found"; return; }
+  bb || { skip reset "no GateMate stubs"; return; }
+  "$YOSYS" $YOSYS_ARGS -q -l reset.log -p "read_slang $SL_DEFS --top $TOP bb.v $SV;       hierarchy -check -top $TOP; proc; flatten; opt_expr; opt_clean; opt_dff; opt_clean;       write_json reset.json" >/dev/null 2>&1
+  local rc=$?
+  [ $rc -eq 0 ] && [ -s reset.json ] || { failed reset "exit $rc, no netlist"; return; }
+  "$PYTHON" "$HERE/run-lint-reset.py" reset.json > reset.out 2>> reset.log ||
+    { failed reset "netlist check failed"; return; }
+  found reset < reset.out
+}
+
 run_slang() {
   [ -z "$SIM" ] || { skip slang "sim view: the SerDes BFM is behavioural, not for synthesis tools"; return; }
   have "$YOSYS" || { skip slang "$YOSYS not found"; return; }
@@ -292,8 +311,8 @@ run_verible() {
 
 for ph in $PHASES; do
   case $ph in
-    tags|verilator|yosys|slang|verible) echo "== $ph"; run_$ph ;;
-    *) echo "unknown phase: $ph (tags verilator yosys slang verible)"; exit 2 ;;
+    tags|verilator|yosys|reset|slang|verible) echo "== $ph"; run_$ph ;;
+    *) echo "unknown phase: $ph (tags verilator yosys reset slang verible)"; exit 2 ;;
   esac
 done
 

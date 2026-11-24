@@ -35,7 +35,13 @@ def paren_spans(code, keywords):
 
 
 def skip_spans(code):
-    out = paren_spans(code, 'if|while|for|wait|case|casez|casex')
+    out = paren_spans(code, 'if|while|for|wait|case|casez|casex|iff')
+    for m in re.finditer(r'@\s*\(', code):  # an event control: @(posedge clk iff a && b)
+        i, d = m.end(), 1
+        while i < len(code) and d:
+            d += {'(': 1, ')': -1}.get(code[i], 0)
+            i += 1
+        out.append((m.end(), i))
     for kw in ('property', 'sequence'):
         for m in re.finditer(r'\b%s\b' % kw, code):
             e = re.compile(r'\bend%s\b' % kw).search(code, m.end())
@@ -77,3 +83,10 @@ for f in sys.argv[2:]:
         print('%d %s' % (len(hits), f))
 if mode == '--fix':
     print('%d replaced' % total)
+
+# -----------------------------------------------------------------------------
+# Project:     openCologne-PCIE
+# Description: NLnet-sponsored open-source implementation
+# Version:     1.0
+# Date:        Oct 18, 2026
+# -----------------------------------------------------------------------------

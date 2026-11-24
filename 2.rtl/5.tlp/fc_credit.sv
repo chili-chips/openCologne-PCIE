@@ -168,8 +168,8 @@ module fc_credit
         tx_dllp.cred.hdr    <= (INIT_NPH == 8'd0) ? 8'd0 : np_alloc.hdr;
         tx_dllp.cred.data   <= (INIT_NPD == 12'd0) ? 12'd0 : np_alloc.data;
       end
-      update_pending[0] <= (update_pending[0] & !send_p) | (P_FINITE & (rel_a_p | rel_b_p));
-      update_pending[1] <= (update_pending[1] & !send_np) | (NP_FINITE & (rel_a_np | rel_b_np));
+      update_pending[0] <= (update_pending[0] & ~send_p) | (P_FINITE & (rel_a_p | rel_b_p));
+      update_pending[1] <= (update_pending[1] & ~send_np) | (NP_FINITE & (rel_a_np | rel_b_np));
     end
   end
 

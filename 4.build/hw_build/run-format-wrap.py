@@ -152,3 +152,10 @@ for f in sys.argv[1 + check:]:
             print(f)
         else:
             open(f, 'w').write(n)
+
+# -----------------------------------------------------------------------------
+# Project:     openCologne-PCIE
+# Description: NLnet-sponsored open-source implementation
+# Version:     1.0
+# Date:        Oct 18, 2026
+# -----------------------------------------------------------------------------

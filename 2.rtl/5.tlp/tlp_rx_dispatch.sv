@@ -91,7 +91,7 @@ module tlp_rx_dispatch
     logic [31:0] addr_lo;
     addr_lo = four_dw ? addr_hdr_dw23.dw3.addr_lo : addr_hdr_dw23.dw2.addr_lo;
     return mem_en
-         & (!four_dw | (addr_hdr_dw23.dw2.addr_hi == '0))
+         & (~four_dw | (addr_hdr_dw23.dw2.addr_hi == '0))
          & (((addr_lo ^ base) & BAR0_MASK) == 32'h0000_0000);
   endfunction
 
@@ -121,9 +121,9 @@ module tlp_rx_dispatch
     act = A_UR_CPL;
     unique0 case (kind)
       K_MRD:    act = bar_hit ? A_APP : A_UR_CPL;
-      K_MWR:    act = (bar_hit & !poisoned) ? A_APP : A_UR_DROP;
+      K_MWR:    act = (bar_hit & ~poisoned) ? A_APP : A_UR_DROP;
       K_CFGRD0: act = func0 ? A_CFG_RD : A_UR_CPL;
-      K_CFGWR0: act = (func0 & !poisoned) ? A_CFG_WR : A_UR_CPL;
+      K_CFGWR0: act = (func0 & ~poisoned) ? A_CFG_WR : A_UR_CPL;
       K_MSG:    act = msg_action(code, 1'b0, poisoned);
       K_MSGD:   act = msg_action(code, 1'b1, poisoned);
       K_CPL:    act = A_APP;

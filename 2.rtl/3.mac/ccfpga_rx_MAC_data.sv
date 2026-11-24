@@ -17,6 +17,7 @@ module ccfpga_rx_MAC_data
   import mac_pkg::*;
 (
     input  logic      i_clk,         // Clock
+    input  logic      i_reset,       // Asynchronous reset
     input  logic      i_l0_enabled,  // L0 state enable signal
     input  pipe_sym_t i_rx_sym,      // Rx data and K flags
 
@@ -34,8 +35,12 @@ module ccfpga_rx_MAC_data
   // Forwarding data to DLL when STP or SDP detected
   // Stop when END detected
   // No alignment support for now - the whole datapath is forwarded
-  always_ff @(posedge i_clk) begin
-    if (i_l0_enabled == 1'b0) begin
+  always_ff @(posedge i_clk or posedge i_reset) begin
+    if (i_reset) begin
+      receiving_data <= 1'b0;
+      o_rx_sym_dll   <= '0;
+    end
+    else if (i_l0_enabled == 1'b0) begin
       receiving_data <= 1'b0;
       o_rx_sym_dll   <= '0;
     end

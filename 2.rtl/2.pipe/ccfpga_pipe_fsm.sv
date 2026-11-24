@@ -71,7 +71,7 @@ module ccfpga_pipe_fsm
 
   // Receiver detection: the SerDes holds DONE from the last detection until
   // a new request reaches it (about 130 ns), so take its rise, not its level
-  logic s_det_done_q, s_det_done_rise;
+  logic  s_det_done_q, s_det_done_rise;
   assign s_det_done_rise = i_rx_detect_done & ~s_det_done_q;
 
   // State Register

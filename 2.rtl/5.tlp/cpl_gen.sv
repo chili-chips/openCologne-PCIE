@@ -136,7 +136,7 @@ module cpl_gen
             word0_hdr_dw01.dw0      <= cpl_dw0;
             word1_hdr_dw23.dw3.data <= cpl.with_data ? dw_byte_swap(cpl.data) : 32'h0000_0000;
             word1_hdr_dw23.dw2.cpl  <= cpl_dw2;
-            half                    <= !cpl.with_data;
+            half                    <= ~cpl.with_data;
             src_class               <= FC_CPL;
             src_credits             <= cpl.with_data ? 12'd1 : 12'd0;
             state                   <= WORD0;
