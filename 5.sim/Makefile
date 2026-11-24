@@ -77,7 +77,7 @@ endif
 ifeq ($(IFACE),serial)
   ifeq ($(EP),rtl)
     EP_FILES  += phy.f
-    EP_VLT    += +define+CDR_MODEL=FAST ../2.rtl/top.sv -F phy.f
+    EP_VLT    += +define+CDR_MODEL=$(CDR) ../2.rtl/top.sv -F phy.f
   endif
   EP_VLT      += +define+IFACE_SERIAL
   ICA_IFACE    = -DIFACE_SERIAL
@@ -91,7 +91,7 @@ else ifeq ($(IFACE),phy)
   endif
   # the host scrambles on the line; the EP model scrambles at the PIPE, our
   # PHY does 8b/10b (usercode/VUserMain1.cpp)
-  EP_VLT      += +define+IFACE_SERIAL +define+IFACE_PHY +define+CDR_MODEL=FAST \
+  EP_VLT      += +define+IFACE_SERIAL +define+IFACE_PHY +define+CDR_MODEL=$(CDR) \
                  --assert -F ep_phy.f
   EP_FILES     = ep_phy.f phy.f
   IFACE_DEFS   = -DIFACE_PHY
@@ -125,11 +125,21 @@ DMA           ?= 0
 SEED          ?= 1
 MIX           ?= 64
 export A7RC_MIX = $(MIX)
+BURST         ?= 64
+export A7RC_BURST = $(BURST)
 # SIM_FAULT (EP=model): none (default), or the EP model misbehaves, to drive
 # the RC model's error paths: crs (CRS to the first 3 Configuration
 # Requests), nocpl (no Completion for the request after the BAR0 write), late
 # (electrically idle for 200 us after reset); usercode/VUserMain1.cpp
 SIM_FAULT     ?= none
+# PPM (IFACE=phy, EP=rtl IFACE=serial): the EP's REFCLK PPM off the host's
+# clocks (default 0; + faster), as with separate reference clocks (SRNS).
+# RETIME: the host's receiver for a partner on its own clock (default 1;
+# 0: it samples on its own clock). CDR: the SerDes BFM's receiver, FAST
+# (default) or ACCURATE, which tracks a frequency offset (use it with PPM)
+PPM           ?= 0
+RETIME        ?= 1
+CDR           ?= FAST
 SEEDS         ?= 10
 REGRESS_S     ?= 900
 REGRESS_TRIES ?= 3
@@ -146,6 +156,14 @@ WCX_SIGNALS    = $(if $(filter serial phy,$(IFACE)),tb.ser_dn_line tb.ser_up_lin
                  tb.u_rc.tx_tlp_valid tb.u_rc.tx_tlp_data tb.u_rc.rx_tlp_valid tb.u_rc.rx_tlp_data)
 ifeq ($(filter 0 1,$(A7RC)),)
   $(error A7RC must be 0 or 1 (got "$(A7RC)"))
+endif
+ifeq ($(filter FAST ACCURATE,$(CDR)),)
+  $(error CDR must be FAST or ACCURATE (got "$(CDR)"))
+endif
+ifneq ($(PPM),0)
+  ifeq ($(if $(filter phy,$(IFACE)),1,$(if $(filter rtlserial,$(EP)$(IFACE)),1)),)
+    $(error PPM needs our PHY on the line: IFACE=phy, or EP=rtl IFACE=serial)
+  endif
 endif
 ifeq ($(filter none crs nocpl late,$(SIM_FAULT)),)
   $(error SIM_FAULT must be none, crs, nocpl or late (got "$(SIM_FAULT)"))
@@ -220,7 +238,7 @@ JHDL          ?= jhdl
 
 CPPSTD         = -std=c++20
 INCLPATHS      = -I$(USRCODEDIR) -I$(A7RC_DIR) -I$(VIP_DIR)/include
-OBJDIR         = $(CURDIR)/obj/$(SIM)$(EP_OBJ)$(if $(filter 1,$(A7RC)),_a7rc)$(if $(filter 1,$(DMA)),_dma)$(if $(filter 1,$(DUMP)),_dump)$(if $(filter-out none,$(SIM_FAULT)),_fault-$(SIM_FAULT))
+OBJDIR         = $(CURDIR)/obj/$(SIM)$(EP_OBJ)$(if $(filter 1,$(A7RC)),_a7rc)$(if $(filter 1,$(DMA)),_dma)$(if $(filter 1,$(DUMP)),_dump)$(if $(filter-out none,$(SIM_FAULT)),_fault-$(SIM_FAULT))$(if $(filter-out 0,$(PPM)),_ppm$(PPM))$(if $(filter-out 1,$(RETIME)),_rt$(RETIME))$(if $(filter-out FAST,$(CDR)),_$(CDR))
 USERLIB        = $(OBJDIR)/libuser.a
 
 USER_ALL       = $(USER_C) VUserMain2.cpp a7rc_check.cpp ltssm.c
@@ -283,6 +301,7 @@ endif
 VLTFLAGS       = --binary -sv --timing --timescale 1ns/10ps --top-module tb -Mdir $(OBJDIR) $(VLTDUMP) \
                  -Wno-fatal -Wno-WIDTH -Wno-lint -Wno-style                     \
                  +define+VPROC_SV +define+VPROC_BYTE_ENABLE                      \
+                 +define+SIM_PPM=$(PPM) +define+SIM_RX_RETIME=$(RETIME)         \
                  $(EP_VLT) $(VLTVIEWS) -F tb.f $(USRSIMFLAGS)                  \
                  -MAKEFLAGS "--quiet CFG_LDFLAGS_VERILATED="                    \
                  -CFLAGS "$(CPPSTD) -Wno-attributes"                            \
@@ -293,7 +312,7 @@ VLTFLAGS       = --binary -sv --timing --timescale 1ns/10ps --top-module tb -Mdi
 # this test bench does not instantiate it. Its first line is the default
 # timescale, for files without one (no `timescale in RTL)
 ICA_FILES      = $(OBJDIR)/tb.icarus.f
-ICAFLAGS       = -g2012 -DVPROC_BYTE_ENABLE $(ICA_IFACE) $(ICADUMP) -s tb -c $(ICA_FILES) $(USRSIMFLAGS)
+ICAFLAGS       = -g2012 -DVPROC_BYTE_ENABLE -DSIM_PPM=$(PPM) -DSIM_RX_RETIME=$(RETIME) $(ICA_IFACE) $(ICADUMP) -s tb -c $(ICA_FILES) $(USRSIMFLAGS)
 
 # =============================================================================
 # TARGETS
@@ -390,7 +409,7 @@ else ifeq ($(SIM),icarus)
 SIM_CMD        = $(VVP) -n -M $(OBJDIR) -m VProc $(SIMEXE) $(VVPDUMP)
 else
 # DUMP=1: JanusHDL's own --fst, every signal
-SIM_CMD        = $(JHDL) --top tb $(patsubst -D%,+define+%,-DVPROC_BYTE_ENABLE $(ICA_IFACE) $(EP_JHDL)) -f $(ICA_FILES) \
+SIM_CMD        = $(JHDL) --top tb $(patsubst -D%,+define+%,-DVPROC_BYTE_ENABLE -DSIM_PPM=$(PPM) -DSIM_RX_RETIME=$(RETIME) $(ICA_IFACE) $(EP_JHDL)) -f $(ICA_FILES) \
                  --vpi $(VPROC_SO) $(if $(filter 1,$(DUMP)),--fst $(WCX_FST)) $(USRSIMFLAGS)
 endif
 

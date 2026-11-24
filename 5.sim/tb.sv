@@ -47,6 +47,17 @@
 // delay carries its unit. The periods below are in ps: a delay is
 // #(x * 1ns / 1000.0), as 1ps rounds to 0 at 10 ps precision.
 
+// On the serial line with our PHY (IFACE=phy, EP=rtl IFACE=serial): the EP's
+// REFCLK SIM_PPM off the host's clocks (make PPM; + faster), as boards with
+// their own reference clocks (SRNS); the host's receiver for a partner on its
+// own clock, SIM_RX_RETIME (make RETIME, default 1; openPCIE_BFM tb_serial)
+`ifndef SIM_PPM
+`define SIM_PPM 0
+`endif
+`ifndef SIM_RX_RETIME
+`define SIM_RX_RETIME 1
+`endif
+
 module tb #(
    parameter RUN_SIM_US     = 10000,
              PIPE_DATAWIDTH = 64   
@@ -185,12 +196,20 @@ module tb #(
   logic       refclk;
   logic       ser_up_n;
 
-  initial begin
-    refclk = 1'b0;
-    forever begin
-      #(HALF_REF_PERIOD_PS * 1ns / 1000.0) refclk = ~refclk;
+  // Edge k at k half periods from time 0: each edge rounds to the time
+  // precision on its own, so a PPM offset builds up at any precision
+  initial begin : _refclk
+    longint k;
+    real    half_ns;
+    half_ns = (HALF_REF_PERIOD_PS / 1000.0) / (1.0 + real'(`SIM_PPM) * 1.0e-6);
+    refclk  = 1'b0;
+    for (k = 1; ; k++) begin
+      /* verilator lint_off ZERODLY */  // never 0: k grows each edge
+      #((k * half_ns) * 1ns - $realtime);
+      /* verilator lint_on ZERODLY */
+      refclk = ~refclk;
     end
-  end
+  end : _refclk
 
   // The host's electrical idle is a constant 0 on ser_dn; the GateMate RX takes
   // idle from P = N. So N follows P once the line has stayed constant longer
@@ -359,7 +378,8 @@ module tb #(
     .LinkWidth                         (1),
     .NodeNum                           (HOST_NODE),
     .EndPoint                          (0),
-    .Gen2Clk                           (1)
+    .Gen2Clk                           (1),
+    .RX_RETIME                         (`SIM_RX_RETIME)
   ) u_rc
   (
     .Clk                               (pcieclk2),
