@@ -117,9 +117,19 @@ LTSSM_DIR      = $(BFM)/3.sw/ltssm
 # that limit or a crash, not after the test bench's own time limit;
 # REGRESS_JOBS at a time, each in
 # obj/regress/<seed>/, the packet display off (REGRESS_QUIET=0: kept)
+# MIX: the tester's random mix, N writes and reads (default 64), read at run
+# time (A7RC_MIX): sustained load, as the hardware BAR0 test. About 0.4 us a
+# request with the EP model
 A7RC          ?= 0
 DMA           ?= 0
 SEED          ?= 1
+MIX           ?= 64
+export A7RC_MIX = $(MIX)
+# SIM_FAULT (EP=model): none (default), or the EP model misbehaves, to drive
+# the RC model's error paths: crs (CRS to the first 3 Configuration
+# Requests), nocpl (no Completion for the request after the BAR0 write), late
+# (electrically idle for 200 us after reset); usercode/VUserMain1.cpp
+SIM_FAULT     ?= none
 SEEDS         ?= 10
 REGRESS_S     ?= 900
 REGRESS_TRIES ?= 3
@@ -137,11 +147,20 @@ WCX_SIGNALS    = $(if $(filter serial phy,$(IFACE)),tb.ser_dn_line tb.ser_up_lin
 ifeq ($(filter 0 1,$(A7RC)),)
   $(error A7RC must be 0 or 1 (got "$(A7RC)"))
 endif
+ifeq ($(filter none crs nocpl late,$(SIM_FAULT)),)
+  $(error SIM_FAULT must be none, crs, nocpl or late (got "$(SIM_FAULT)"))
+endif
+ifneq ($(SIM_FAULT)$(EP),none$(EP))
+  ifneq ($(EP),model)
+    $(error SIM_FAULT=$(SIM_FAULT) needs EP=model: the EP model misbehaves)
+  endif
+endif
 ifeq ($(filter 0 1,$(DMA)),)
   $(error DMA must be 0 or 1 (got "$(DMA)"))
 endif
 HOST_DEFS      = -DRC_GEN=2 -DA7RC_LITERAL=$(A7RC) $(A7RC_EXPECT) $(if $(filter serial phy,$(IFACE)),-DSIM_SERIAL) \
-                 $(if $(filter 0,$(DMA)),-DA7RC_NO_DMA) $(IFACE_DEFS)
+                 $(if $(filter 0,$(DMA)),-DA7RC_NO_DMA) $(IFACE_DEFS) \
+                 $(if $(filter-out none,$(SIM_FAULT)),-DSIM_FAULT_$(shell echo $(SIM_FAULT) | tr a-z A-Z))
 VIP_ENV        = VIP_PATCH=$(BFM)/1.upstream/patches/pcievhost-speed.patch \
                  VPROC_PATCH=$(BFM)/1.upstream/patches/vproc-coroutine.patch \
                  VIP_BUILD=$(HOME)/.cache/opencologne-pcie/vip
@@ -201,7 +220,7 @@ JHDL          ?= jhdl
 
 CPPSTD         = -std=c++20
 INCLPATHS      = -I$(USRCODEDIR) -I$(A7RC_DIR) -I$(VIP_DIR)/include
-OBJDIR         = $(CURDIR)/obj/$(SIM)$(EP_OBJ)$(if $(filter 1,$(A7RC)),_a7rc)$(if $(filter 1,$(DMA)),_dma)$(if $(filter 1,$(DUMP)),_dump)
+OBJDIR         = $(CURDIR)/obj/$(SIM)$(EP_OBJ)$(if $(filter 1,$(A7RC)),_a7rc)$(if $(filter 1,$(DMA)),_dma)$(if $(filter 1,$(DUMP)),_dump)$(if $(filter-out none,$(SIM_FAULT)),_fault-$(SIM_FAULT))
 USERLIB        = $(OBJDIR)/libuser.a
 
 USER_ALL       = $(USER_C) VUserMain2.cpp a7rc_check.cpp ltssm.c
@@ -280,7 +299,7 @@ ICAFLAGS       = -g2012 -DVPROC_BYTE_ENABLE $(ICA_IFACE) $(ICADUMP) -s tb -c $(I
 # TARGETS
 # =============================================================================
 
-.PHONY: all run regress wavecrux wavecrux_run clean help FORCE
+.PHONY: all run regress mutants wavecrux wavecrux_run clean help FORCE
 .DEFAULT_GOAL := all
 
 all: $(SIMEXE)
@@ -398,6 +417,13 @@ wavecrux_run: all
 	echo "seed $(SEED): $$(grep -a -m1 'RC MODEL RESULT' $$d/run.log), $$d/$(WCX_FST)"; \
 	$(if $(filter 1,$(WCX_OPEN)),python3 $(BFM)/4.build/wavecrux.py $$d/$(WCX_FST) $$d/run.log $(WCX_SIGNALS),echo "  open it: make wavecrux SEED=$(SEED)")
 
+# The checker against broken endpoint models (EP=model, at the PIPE), each in
+# obj/mutants/<name>/: each must fail the rule it breaks (openPCIE_BFM
+# 4.build/mutants.py). Our EP model is Gen1: the PL.EIOS mutants are n/a
+MUTANT_JOBS   ?= 3
+mutants:
+	@python3 $(BFM)/4.build/mutants.py --jobs $(MUTANT_JOBS) --out obj/mutants -- run EP=model IFACE=pipe SIM=$(SIM)
+
 help:
 	@echo "make [SIM=verilator|icarus|janushdl] [EP=model|rtl] [IFACE=pipe|serial|phy]   build the models and the simulation (EP=rtl: Verilator, JanusHDL once #24 is fixed; IFACE=phy: Verilator only)"
 	@echo "make IFACE=phy run                 the EP model behind our PHY (phy_top, PIPE logic, SerDes BFM), the host on the serial line"
@@ -405,6 +431,7 @@ help:
 	@echo "make DMA=1 run                     the tester also runs its EP DMA stage (off by default: our EP has no DMA, #14)"
 	@echo "make SEED=N run                    the tester's random stimulus with seed N (default 1), no rebuild"
 	@echo "make regress SEEDS=N               the tester over seeds 1 to N (default 10), in obj/regress/<seed>/"
+	@echo "make mutants                       the checker against broken EP models: each must fail its rule"
 	@echo "    REGRESS_JOBS=J                 J seeds side by side (default 1); REGRESS_QUIET=0 keeps the packet display"
 	@echo "    REGRESS_DUMP=fail              dump every failing seed (obj/wavecrux/<seed>/)"
 	@echo "make wavecrux SEED=N               seed N with its waveform, in WaveCrux at the first violation (--wcp-port 54321)"

@@ -6,7 +6,7 @@
 // (models/ep_model_phy.sv), the host on the serial line.
 
 // Packages and the PIPE interface (with EP=rtl, rtl.f has them)
-vip/openPCIE_BFM/2.rtl/pipe_sym_pkg.sv
+vip/openPCIE_BFM/2.rtl/openPCIE_BFM_pkg.sv
 ../2.rtl/2.pipe/pipe_pkg.sv
 ../2.rtl/2.pipe/pipe_if.sv
 

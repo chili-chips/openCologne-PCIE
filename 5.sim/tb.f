@@ -6,15 +6,10 @@
 // $VIP_DIR is the VIP that openPCIE_BFM's 4.build/build-vip.sh builds; the make
 // file sets it. The DUT here is the EP model, EPPIPEx1__pcieVHost_DUT.
 
-+incdir+$VIP_DIR/hdl/headers
-+incdir+$VIP_DIR/hdl
-
-// pcieVHost's macros (timescale, display flags, register map, `fatal) first,
-// so every model below sees them, whatever the simulator
-$VIP_DIR/hdl/headers/allheaders.svh
+// openPCIE_BFM's package first (the models import it); no include files
+vip/openPCIE_BFM/2.rtl/openPCIE_BFM_pkg.sv
 
 // Co-simulation models
-vip/openPCIE_BFM/2.rtl/mem_model.sv
 $VIP_DIR/hdl/f_VProc.sv
 $VIP_DIR/hdl/clkmux.sv
 $VIP_DIR/hdl/Serialiser.sv

@@ -71,6 +71,56 @@ static bool InReset(VProc *vp)
     return rst & 1;
 }
 
+// make SIM_FAULT=... (EP=model): the endpoint misbehaves, to drive the RC
+// model's error paths, as openPCIE's SIM_FAULT does for its RC firmware
+//   crs      the first FAULT_CRS_COUNT Configuration requests get CRS
+//   nocpl    no Completion for the request after the RC's BAR0 write
+//   late     the endpoint leaves electrical idle FAULT_LATE_TICKS after reset
+#define FAULT_CRS_COUNT       3
+#define FAULT_LATE_TICKS      50000   // 200 us at Gen1
+
+#if defined(SIM_FAULT_CRS) || defined(SIM_FAULT_NOCPL)
+static pcieModelClass *fault_pcie = NULL;     // set by VUserMain1()
+static int             fault_left = FAULT_CRS_COUNT;
+static bool            fault_on   = true;     // until the config space is handed back
+
+//-------------------------------------------------------------
+// FaultInput()
+//
+// make SIM_FAULT=crs/nocpl: while the model's own config space is off
+// (CONFIG_DISABLE_MEM), Configuration requests come here. Answers CRS,
+// or none; then hands the config space back. True when it took the packet.
+//-------------------------------------------------------------
+
+static bool FaultInput(pPkt_t pkt)
+{
+    int type = GET_TLP_TYPE(pkt->data);
+    int tag  = GET_TLP_TAG(pkt->data);
+
+    // After the fault, pcieVHost answers everything itself, and still hands
+    // unsupported TLPs here (a Cfg to a function it lacks): leave them alone
+    if (!fault_on || (type != TL_CFGRD0 && type != TL_CFGWR0))
+    {
+        return false;
+    }
+
+#ifdef SIM_FAULT_CRS
+    VPrint("===> EP fault: CRS for tag %d\n", tag);
+    fault_pcie->partCompletionDelay(0, NULL, CPL_CRS, 0, 0, 0, 0, tag, 0, GET_TLP_RID(pkt->data), false, false, true);
+    if (--fault_left == 0)
+#else
+    VPrint("===> EP fault: no Completion for tag %d\n", tag);
+#endif
+    {
+        fault_pcie->configurePcie(CONFIG_ENABLE_MEM);
+        fault_on = false;
+    }
+
+    DISCARD_PACKET(pkt);
+    return true;
+}
+#endif
+
 //-------------------------------------------------------------
 // VUserInput_1()
 //
@@ -80,6 +130,13 @@ static bool InReset(VProc *vp)
 static void VUserInput_1(pPkt_t pkt, int status, void* usrptr)
 {
     int idx;
+
+#if defined(SIM_FAULT_CRS) || defined(SIM_FAULT_NOCPL)
+    if (pkt->seq != DLLP_SEQ_ID && FaultInput(pkt))
+    {
+        return;
+    }
+#endif
 
     if (pkt->seq == DLLP_SEQ_ID)
     {
@@ -270,6 +327,12 @@ extern "C" void VUserMain1(int node)
 
     // Initialise PCIe VHost, with input callback function and no user pointer.
     pcie->initialisePcie(VUserInput_1, NULL);
+#if defined(SIM_FAULT_CRS) || defined(SIM_FAULT_NOCPL)
+    fault_pcie = pcie;
+#endif
+#ifdef SIM_FAULT_CRS
+    pcie->configurePcie(CONFIG_DISABLE_MEM);     // FaultInput() answers the first requests
+#endif
 
     // Make sure the link is out of electrical idle
     vp1->write(LINK_STATE, 0);
@@ -311,11 +374,29 @@ extern "C" void VUserMain1(int node)
     }
     while (InReset(vp1));
 
+#ifdef SIM_FAULT_LATE
+    VPrint("===> EP fault: electrically idle for %d ticks\n", FAULT_LATE_TICKS);
+    vp1->write(LINK_STATE, 0xffff);
+    pcie->sendIdle(FAULT_LATE_TICKS);
+    vp1->write(LINK_STATE, 0);
+#endif
+
     // Initialise the link for 1 lane
     InitLink(1, node);
 
     // Initialise DLLP flow control
     pcie->initFc();
+
+#ifdef SIM_FAULT_NOCPL
+    // make SIM_FAULT=nocpl: wait for the RC's BAR0 write, then FaultInput()
+    // drops the next request
+    const uint32_t bar0_reset = pcie->readConfigSpace(CFG_BAR_HDR_OFFSET);
+    while (pcie->readConfigSpace(CFG_BAR_HDR_OFFSET) == bar0_reset)
+    {
+        LinkIdle(1, node);
+    }
+    pcie->configurePcie(CONFIG_DISABLE_MEM);
+#endif
 
     // Idle forever, following the RC into Recovery (LinkIdle()); the DMA when
     // the RC model's tester asks (ep_dma.h)

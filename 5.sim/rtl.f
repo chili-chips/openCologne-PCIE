@@ -8,7 +8,7 @@
 // (models/phy_vproc_rc.sv).
 
 // Packages
-vip/openPCIE_BFM/2.rtl/pipe_sym_pkg.sv
+vip/openPCIE_BFM/2.rtl/openPCIE_BFM_pkg.sv
 ../2.rtl/2.pipe/pipe_pkg.sv
 ../2.rtl/3.mac/mac_pkg.sv
 ../2.rtl/4.dll/dll_pkg.sv

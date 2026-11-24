@@ -28,6 +28,7 @@ declare -A KNOWN=(
     [rtl-serial]="#6"
     [dll-stp]="#3"
     [dll-end]="#3"
+    [fault-nocpl]="by design"                  # SIM_FAULT=nocpl: the request is never completed
 )
 # ... and what the log of each must show: another failure is not the known one
 declare -A KNOWN_SIG=(
@@ -35,6 +36,7 @@ declare -A KNOWN_SIG=(
     [rtl-serial]="SVA #6"
     [dll-stp]="stp corrupted: EP did not replay"
     [dll-end]="end corrupted: EP did not replay"
+    [fault-nocpl]="never completed"
 )
 
 other_assert() {  # name: the first design assertion that is not an SVA of its
@@ -74,14 +76,14 @@ bench() {  # name, directory, command, pass pattern
 
 t0=$SECONDS
 make regress SEEDS=100 REGRESS_JOBS=8 DMA=1 "$@" > $LOG/regress.log 2>&1
-r=$(tail -1 $LOG/regress.log)
+r=$(grep -a 'seeds failed' $LOG/regress.log | tail -1)
 case "$r" in "0 of "*) ok=1;; *) ok=0;; esac
-report regress $((SECONDS - t0)) $ok "make regress SEEDS=100 REGRESS_JOBS=8 DMA=1" "$r; $(tail -2 $LOG/regress.log | head -1)"
+report regress $((SECONDS - t0)) $ok "make regress SEEDS=100 REGRESS_JOBS=8 DMA=1" "$r; $(grep -a 'rules checked in no seed' $LOG/regress.log | tail -1)"
 
 # the EP model behind our PHY, the host on the serial line (obj/regress/ again)
 t0=$SECONDS
 make regress SEEDS=20 REGRESS_JOBS=8 IFACE=phy "$@" > $LOG/phy-regress.log 2>&1
-r=$(tail -1 $LOG/phy-regress.log)
+r=$(grep -a 'seeds failed' $LOG/phy-regress.log | tail -1)
 case "$r" in "0 of "*) ok=1;; *) ok=0;; esac
 report phy-regress $((SECONDS - t0)) $ok "make regress SEEDS=20 REGRESS_JOBS=8 IFACE=phy" "$r"
 
@@ -96,6 +98,21 @@ fi
 # hangs from the first Recovery (#9) to the 10 ms limit
 run rtl-tester     EP=rtl SIM_ARGS=+verilator+error+limit+100 "$@"
 run rtl-serial     EP=rtl IFACE=serial A7RC=1 "$@"
+# Sustained load, as the hardware BAR0 test: 1000 mix requests to the EP model
+run load           MIX=1000 "$@"
+# The EP model misbehaves (SIM_FAULT): the host's error paths
+run fault-crs      SIM_FAULT=crs "$@"
+run fault-late     SIM_FAULT=late "$@"
+run fault-nocpl    SIM_FAULT=nocpl "$@"
+
+# The checker against broken EP models (openPCIE_BFM 4.build/mutants.py)
+if [ -f vip/openPCIE_BFM/4.build/mutants.py ]; then
+    t0=$SECONDS
+    make mutants MUTANT_JOBS=6 > $LOG/mutants.log 2>&1 && ok=1 || ok=0
+    report mutants $((SECONDS - t0)) $ok "make mutants" "$(grep -a 'mutants missed' $LOG/mutants.log)"
+else
+    echo "mutants: skipped, the openPCIE_BFM submodule has no 4.build/mutants.py yet"
+fi
 
 bench pipe64  ../2.rtl/1.phy/3.sim "run-phy.sh pipe64" '^ ####    ###    ####  ####  #####  ####'  # the PASSED banner
 bench equiv   ../2.rtl/1.phy/3.sim "run-phy.sh equiv"  'RESULT: PASSED'
