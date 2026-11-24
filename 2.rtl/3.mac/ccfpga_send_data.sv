@@ -15,10 +15,11 @@ module ccfpga_send_data
     input  logic      i_clk,
     input  logic      i_reset,
     input  logic      i_l0_enabled,
-    input  pipe_sym_t i_tx_sym_dll,   // from the DLL
+    input  pipe_sym_t i_tx_sym_dll,    // from the DLL
 
     output pipe_sym_t o_tx_sym,
-    output logic      o_sending_data
+    output logic      o_sending_data,
+    output logic      o_data_next      // o_sending_data after the next edge (#6)
 );
 
   logic        in_packet;
@@ -47,13 +48,18 @@ module ccfpga_send_data
     end
   end
 
+  // A packet word goes out at the next edge: the SKP generator must not
+  // release a SKP on that edge, or the output mux gives the cycle to the data
+  // and the SKP is lost (#6)
+  assign o_data_next = i_l0_enabled & (in_packet | (|i_tx_sym_dll.kcode));
+
   always_ff @(posedge i_clk or posedge i_reset) begin
     if (i_reset) begin
       o_tx_sym       <= '0;
       in_packet      <= 1'b0;
       o_sending_data <= 1'b0;
     end
-    else if (i_l0_enabled && (in_packet || |i_tx_sym_dll.kcode)) begin
+    else if (o_data_next) begin
       o_tx_sym       <= i_tx_sym_dll;
       in_packet      <= in_packet_next;
       o_sending_data <= 1'b1;

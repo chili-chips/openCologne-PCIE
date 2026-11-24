@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Chili.CHIPS
+#
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Pins for top (2.rtl/top.sv) on the Intergalaktik ULX5M-M2 card, v002: the
+# pinout of the published schematic (https://github.com/intergalaktik/ulx5m-m2,
+# ulx5m-m2.pdf). v001 boards are not supported (hardware problems). The SerDes
+# pins and its REFCLK are fixed by the chip and need no entry. Only the ports
+# top.sv has: nextpnr rejects a pin for a port the design does not have.
+# Use: BOARD=m2 bash run-pnr.sh (with ULX5M-M2.sdc: the board clock is 25 MHz)
+#
+# TODO: check the LED polarity on the board (taken as active high here).
+
+Pin_in  "clk_brd"  Loc = "IO_SB_A8" | SCHMITT_TRIGGER=true;  # CLK0, CLK_25MHz
+Pin_in  "perst_n"  Loc = "IO_SA_A1" | PULLUP=true;           # M.2 pin 50, PERST#
+Pin_out "clkreq_n" Loc = "IO_SA_B3";                         # M.2 pin 52, CLKREQ#: low, REFCLK requested
+Pin_out "link_up"  Loc = "IO_EB_A7";                         # LED0
+Pin_out "fw_pass"  Loc = "IO_EB_B6";                         # LED1

@@ -154,7 +154,7 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 | Ordered set | RX | TX | Notes |
 |---|---|---|---|
 | TS1, TS2 | ✅ | ✅ | Link and Lane numbers as numbers or PAD |
-| SKP | ✅ | partial | sent every 2360-2384 symbol times, not 1180-1538 ([#6](https://github.com/chili-chips/openCologne-PCIE/issues/6)); cuts a TS1 short in Polling ([#7](https://github.com/chili-chips/openCologne-PCIE/issues/7)); RX: not detected, may reach the DLL as data ([#8](https://github.com/chili-chips/openCologne-PCIE/issues/8)) |
+| SKP | ✅ | partial | sent every 1180-1538 symbol times; a SKP waits for a packet starting on the same edge ([#6](https://github.com/chili-chips/openCologne-PCIE/issues/6), fixed); cuts a TS1 short in Polling ([#7](https://github.com/chili-chips/openCologne-PCIE/issues/7)); RX: not detected, may reach the DLL as data ([#8](https://github.com/chili-chips/openCologne-PCIE/issues/8)) |
 | Logical idle | ✅ | ✅ | in Configuration.Idle and Recovery.Idle; RX counts any word without COM as idle |
 | Electrical Idle (EIOS) | ❌ | ❌ | no speed change, no low-power states |
 | FTS | ❌ | ❌ | no L0s |
@@ -169,7 +169,7 @@ The layers in the order of the [stack diagram](../0.doc/2.rtl/pcie-ep-top-stack.
 | Scrambling | ✅ | data symbols only, reset by COM; Disable Scrambling (TS Training Control bit 3) taken in Configuration.Complete, both ways ([3.mac](3.mac/README.md#scrambling)). RX in L0 also descrambles a received TS1/TS2 ([#9](https://github.com/chili-chips/openCologne-PCIE/issues/9)) |
 | Lane polarity inversion | ✅ | detected in Polling, `RxPolarity` to the PHY |
 | Lane reversal | — | x1 |
-| Clock tolerance compensation | ❌ | SerDes clock correction off; common REFCLK only |
+| Clock tolerance compensation | ❌ | common REFCLK only. The CC_SERDES built-in clock correction is inadequate for PCIe: it adds or drops whole datapath words, not single SKP symbols ([#26](https://github.com/chili-chips/openCologne-PCIE/issues/26)). Separate reference clocks would need a soft FIFO in the fabric |
 
 ## 3) DLL (dll_if)
 

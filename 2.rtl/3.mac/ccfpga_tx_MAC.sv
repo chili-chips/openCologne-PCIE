@@ -92,8 +92,12 @@ module ccfpga_tx_MAC
       .o_sending_os (o_sending_os)
   );
 
-  logic      sending_data;  // Sending Data indication
-  logic      sending_skp;  // Sending SKP indication
+  logic sending_data;  // Sending Data indication
+  logic data_next;  // ... after the next edge
+  logic skp_hold;  // a SKP waits for a data word going out now or next (#6)
+
+  assign skp_hold = sending_data | data_next;
+  logic  sending_skp;  // Sending SKP indication
 
   // Send IDLE module
   pipe_sym_t tx_sym_idle;
@@ -119,7 +123,8 @@ module ccfpga_tx_MAC
       .i_tx_sym_dll (i_tx_sym_dll),
 
       .o_tx_sym       (tx_sym_data),
-      .o_sending_data (sending_data)
+      .o_sending_data (sending_data),
+      .o_data_next    (data_next)
   );
 
   // SKP Generator
@@ -130,7 +135,7 @@ module ccfpga_tx_MAC
   ) u_skp_generator (
       .i_clk          (i_clk),
       .i_reset        (i_reset),
-      .i_sending_data (sending_data),
+      .i_sending_data (skp_hold),
       .i_sending_os   (o_sending_os),
       .i_sending_idle (sending_idle),
 

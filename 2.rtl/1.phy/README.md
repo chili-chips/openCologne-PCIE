@@ -43,11 +43,15 @@ Everything below the PIPE interface: [`phy_top.sv`](phy_top.sv), Cologne Chip's 
 | What | Spec | Note |
 |---|---|---|
 | No TX de-emphasis: full swing | 4.3.3 (-3.5 dB at 2.5 GT/s) | TODO in `phy_top`: `TX_SEL_POST`, `TX_BRANCH_EN_POST`; validate on the board |
-| No clock tolerance compensation: `phy_top` leaves `RX_CLKCOR_USE` at 0 (as Cologne Chip's wrapper), so the RX buffer adds or removes no SKP | 4.2.7 | fine with a common REFCLK, which most PCIe systems use: the slot's 100 MHz goes to both ends. Only two separate oscillators (up to 600 ppm apart) would over- or underflow the RX buffer |
+| No clock tolerance compensation: `phy_top` leaves `RX_CLKCOR_USE` at 0 (as Cologne Chip's wrapper), so the RX buffer adds or removes no SKP | 4.2.7 | fine with a common REFCLK, which most PCIe systems use: the slot's 100 MHz goes to both ends. Only two separate oscillators (up to 600 ppm apart) would over- or underflow the RX buffer: at +300 ppm the link goes deaf both ways (`5.sim`, `make IFACE=phy CDR=ACCURATE PPM=300`) |
 | RxStatus only 000, 011 (receiver detected), 100 (decode error), 111 (disparity error); no SKP added/removed, no buffer error | PIPE | the RX buffer error is not connected |
 | Power states P0 and P1 only | 4.2.6 | no L0s, L1, L2 |
 | 2.5 GT/s, x1 | 4.2.6.4.2 | no speed change |
 | Reference clock input (`PLL_REF_SEL`) | | to validate when the board schematics are out |
+
+**The CC_SERDES clock correction cannot do PCIe** ([#26](https://github.com/chili-chips/openCologne-PCIE/issues/26)). It adds or drops whole datapath words, removes only when two correction words come in a row, and inserts by repeating the word before. PCIe sends one SKP ordered set every 1180-1538 symbols, at any offset in the word, and needs single SKP symbols added or dropped inside it. So turning `RX_CLKCOR_USE` on would not help, at 16, 32 or 64 bits. Separate reference clocks would need a soft FIFO in the fabric: RX data on the recovered clock (`RX_CLK_O`), SKP added or dropped singly. This core supports a common REFCLK only.
+
+**Board requirement:** the SerDes reference is the connector's 100 MHz REFCLK (slot, M.2, OCuLink), not a local oscillator. To check on the board: its HCSL level and coupling into `CC_SERDES`, and that the PLL and CDR follow a host's spread spectrum (up to -5000 ppm at 30-33 kHz), with SSC on and off.
 
 --------------------
 ## Lane polarity: the P and N swaps

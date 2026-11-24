@@ -50,6 +50,10 @@ For better Signal Integrity (SI) FPGA is moved next to edge connector. Power fil
 </div>
 
 
+**Before using the SDRAM:** the IS42S16320D is a 3.3 V part; on Ver1 (v001) `SDRAM_VCC` is on 1.8 V. Check `SDRAM_VCC` on the board in hand.
+
+**Pins:** [`4.build/hw_build/ULX5M-M2.ccf`](../4.build/hw_build/ULX5M-M2.ccf), the published schematic's pinout (`BOARD=m2 bash run-pnr.sh`). Ver1 is not supported.
+
 For additional detail, check the source repo:
 - https://github.com/intergalaktik/ulx5m-m2
 

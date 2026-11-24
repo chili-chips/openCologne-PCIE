@@ -70,6 +70,15 @@ Out of 40,960 CPE_LT and CPE_FF, and 64 RAM_HALF.
 
 Neither Yosys nor nextpnr reports a flat build per block. These numbers come from a second build that keeps the three blocks (`read_slang --best-effort-hierarchy`, `keep_hierarchy`), packed by nextpnr and counted by cell name. Nothing is optimised across the block boundaries there, so it is 1.2% larger in CPE_LT (9% in Yosys LUTs), and its routing did not converge; a second build per change is not sustainable, so this table is a snapshot.
 
+## Porting to other FPGAs
+
+Everything above `pipe_if` is generic RTL: only `2.rtl/1.phy` and `2.rtl/2.pipe` are GateMate-specific. On another FPGA, put that vendor's SerDes behind a PIPE shim (receiver detection, PhyStatus, RxValid, electrical idle, reset sequencing) and feed the core 8 symbols per clock at 31.25 MHz (Gen1). A SerDes that gives 2 symbols at 125 MHz needs a 2-to-8 gearbox, with asynchronous FIFOs both ways, outside the core.
+
+On Lattice ECP5 with the OSS CAD Suite (Yosys `read_slang`, nextpnr-ecp5), two netlist fixes go into the build script:
+
+- memories without an initial value get `INITVAL = x`, which nextpnr-ecp5 cannot parse: `setundef -zero -params` on `TRELLIS_DPR16X4`;
+- the DCU's default parameters come out as `"DONTCARE"`, which nextpnr cannot parse either: remove them from the netlist.
+
 #### References:
 - [GateMate FPGA Toolchain Installation, UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf) by Cologne Chip, May 2026
 - GateMate pin lists, from the DS1001 attachment, September 2026: [CCGM1A1](../0.doc/4.build/gatemate-ccgm1a1-pinlist.csv), [CCGM1A2](../0.doc/4.build/gatemate-ccgm1a2-pinlist.csv)

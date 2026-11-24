@@ -8,9 +8,10 @@
 # are fixed by the chip and need no entry. Only the ports top.sv has: nextpnr
 # rejects a pin for a port the design does not have.
 #
-# TODO: align with Goran's board (1.pcb) once its pinout is final.
+# The card itself: ULX5M-M2.ccf (BOARD=m2 bash run-pnr.sh).
 
-Pin_in  "clk_brd" Loc = "IO_SB_A8" | SCHMITT_TRIGGER=true;  # CLK0, 10 MHz
-Pin_in  "perst_n" Loc = "IO_SB_B7" | PULLUP=true;           # FPGA_BUT, low when pressed: PERST#
-Pin_out "link_up" Loc = "IO_SB_B6";                         # FPGA_LED
-Pin_out "fw_pass" Loc = "IO_EA_A4";                         # PMOD pin 1
+Pin_in  "clk_brd"  Loc = "IO_SB_A8" | SCHMITT_TRIGGER=true;  # CLK0, 10 MHz
+Pin_in  "perst_n"  Loc = "IO_SB_B7" | PULLUP=true;           # FPGA_BUT, low when pressed: PERST#
+Pin_out "link_up"  Loc = "IO_SB_B6";                         # FPGA_LED
+Pin_out "fw_pass"  Loc = "IO_EA_A4";                         # PMOD pin 1
+Pin_out "clkreq_n" Loc = "IO_EA_B4";                         # a spare PMOD pin: CLKREQ# (mock)

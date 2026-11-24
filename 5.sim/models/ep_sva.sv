@@ -24,6 +24,10 @@
 //     FCINIT  when the DLL enters DL_Active, the TL holds the TX credit
 //             limits of P, NP and Cpl, taken in DL_Init: the DLL leaves
 //             FC_INIT1 only with an InitFC of each type (3.2.1, 3.3.1)
+//     RXBUSY  no STP while the DLL's RX buffer (tlp_rx_buffer) still checks,
+//             writes or forwards the TLP before: it looks for STP only in
+//             IDLE and STORE_TLP, so that TLP is lost, and the one after it
+//             Naked (#4)
 //==========================================================================
 
 module ep_sva (
@@ -37,7 +41,8 @@ module ep_sva (
     input logic tx_other,   // data, OS or IDLE its output mux puts first
     input logic buf_empty,  // the DLL's retry buffer
     input logic replay,     // the DLL replays the buffer
-    input logic [2:0] fc_init  // the TL's TX credit limits of P, NP, Cpl are set
+    input logic [2:0] fc_init,  // the TL's TX credit limits of P, NP, Cpl are set
+    input logic rx_stp_busy     // an STP while tlp_rx_buffer is past STORE_TLP
 );
 
   localparam int SKP_MAX    = (1538 + 128 + 28 + 7) / 8;     // PCLK
@@ -72,6 +77,10 @@ module ep_sva (
   else $error("**** SVA FCINIT: DL_Active, but the TL has not taken the InitFC credit limits (Cpl, NP, P: %b)",
               fc_init);
 
+  a_rx_stp_busy :
+  assert property (@(posedge pclk) disable iff (!rst_n) !rx_stp_busy)
+  else $error("**** SVA #4: an STP while the DLL's RX buffer still handles the TLP before: this TLP is lost");
+
 endmodule: ep_sva
 
 bind pcie_core ep_sva sva (
@@ -86,5 +95,9 @@ bind pcie_core ep_sva sva (
     .buf_empty(u_dll.g_vc[0].u_vc.retry_buffer_empty),
     .replay   (u_dll.g_vc[0].u_vc.tlp_retransmit_flag),
     .fc_init  ({u_tl.u_fc_credit.tx_fc[2].init, u_tl.u_fc_credit.tx_fc[1].init,
-                u_tl.u_fc_credit.tx_fc[0].init})
+                u_tl.u_fc_credit.tx_fc[0].init}),
+    // tlp_rx_buffer's state: IDLE 0 and STORE_TLP 1 look for STP, no other
+    .rx_stp_busy(u_dll.g_vc[0].u_vc.u_vc_rx.u_tlp_rx_buffer.stp_detected &&
+                 u_dll.g_vc[0].u_vc.u_vc_rx.u_tlp_rx_buffer.link_active &&
+                 u_dll.g_vc[0].u_vc.u_vc_rx.u_tlp_rx_buffer.state > 3'd1)
 );

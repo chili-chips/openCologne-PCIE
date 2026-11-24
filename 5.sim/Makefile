@@ -28,9 +28,10 @@
 # ---- simulator ------------------------------------------------------------------
 #   verilator  (default) compiled to a native executable; the models talk DPI-C
 #   icarus     Icarus Verilog; the same C/C++ models talk VPI
-#   janushdl   JanusHDL (jhdl, 0.22 or later); it loads the Icarus build of the
-#              VPI models, so it needs Icarus too (vpi_user.h). EP=rtl stops on a
-#              JanusHDL issue (openCologne-PCIE#24)
+#   janushdl   JanusHDL (jhdl, 0.22 or later); the models talk DPI-C, as with
+#              Verilator (openPCIE_BFM_pkg imports VProc by DPI-C on every
+#              simulator but Icarus): VProc.so, loaded with --sv-lib. EP=rtl
+#              stops on a JanusHDL issue (openCologne-PCIE#24)
 SIM           ?= verilator
 
 # ---- EP and IFACE: what the endpoint is, and where the host meets it ---------
@@ -127,6 +128,17 @@ MIX           ?= 64
 export A7RC_MIX = $(MIX)
 BURST         ?= 64
 export A7RC_BURST = $(BURST)
+# BURST_ROUNDS: R rounds of the burst, each read back (default 1). ACK: the
+# host's Ack delay in symbol times (default: the Artix-7 RC's, 92 at x1); a
+# slow host, as the CM5 (1000), past the Ack latency limit: the EP must replay
+BURST_ROUNDS  ?= 1
+export A7RC_BURST_ROUNDS = $(BURST_ROUNDS)
+# START_US: the host idle so many us before it trains (default: by SEED, 0 to
+# 100 us, none for seed 1), so the EP waits in Detect
+ACK           ?=
+START_US      ?=
+export A7RC_START_US = $(START_US)
+export A7RC_ACK_TICKS = $(ACK)
 # SIM_FAULT (EP=model): none (default), or the EP model misbehaves, to drive
 # the RC model's error paths: crs (CRS to the first 3 Configuration
 # Requests), nocpl (no Completion for the request after the BAR0 write), late
@@ -140,6 +152,10 @@ SIM_FAULT     ?= none
 PPM           ?= 0
 RETIME        ?= 1
 CDR           ?= FAST
+# POL (EP=rtl IFACE=serial): 1 swaps P and N on the host -> EP pair, so our
+# MAC must invert its lane (RxPolarity). With SIM_ARGS=+serdes_rx_pol_lat=N
+# the SerDes BFM applies RxPolarity N words late, as a slow PHY
+POL           ?= 0
 SEEDS         ?= 10
 REGRESS_S     ?= 900
 REGRESS_TRIES ?= 3
@@ -160,6 +176,13 @@ endif
 ifeq ($(filter FAST ACCURATE,$(CDR)),)
   $(error CDR must be FAST or ACCURATE (got "$(CDR)"))
 endif
+ifeq ($(filter 0 1,$(POL)),)
+  $(error POL must be 0 or 1 (got "$(POL)"))
+endif
+ifeq ($(POL)$(EP)$(IFACE),1rtlserial)
+else ifeq ($(POL),1)
+  $(error POL=1 needs our MAC on our PHY: EP=rtl IFACE=serial (the EP model behind it does not drive RxPolarity))
+endif
 ifneq ($(PPM),0)
   ifeq ($(if $(filter phy,$(IFACE)),1,$(if $(filter rtlserial,$(EP)$(IFACE)),1)),)
     $(error PPM needs our PHY on the line: IFACE=phy, or EP=rtl IFACE=serial)
@@ -175,6 +198,28 @@ ifneq ($(SIM_FAULT)$(EP),none$(EP))
 endif
 ifeq ($(filter 0 1,$(DMA)),)
   $(error DMA must be 0 or 1 (got "$(DMA)"))
+endif
+# TL=1: a shadow of our Transaction Layer beside the EP model
+# (models/tl_shadow.sv, bound into tb; tl.f). It gets the RC -> EP TLPs and
+# DLLPs the EP model's TL gets (the host's dll_rx_* taps); each of its
+# Configuration and I/O completions must match the EP model's, header for
+# header. The run ends with "TL SHADOW: PASS" or "TL SHADOW: FAIL"
+TL            ?= 0
+ifeq ($(TL),1)
+  ifneq ($(EP)$(IFACE),modelpipe)
+    $(error TL=1 needs EP=model IFACE=pipe: it reads the host's PIPE wrapper's taps)
+  endif
+  ifneq ($(SIM),verilator)
+    $(error TL=1 needs SIM=verilator: tried on it alone)
+  endif
+  ifneq ($(SIM_FAULT),none)
+    $(error TL=1 needs SIM_FAULT=none: the misbehaving EP model's completions differ from our TL's by design)
+  endif
+  EP_FILES    += tl.f
+  EP_VLT      += -F tl.f
+  EP_OBJ      := $(EP_OBJ)_tl
+else ifneq ($(TL),0)
+  $(error TL must be 0 or 1 (got "$(TL)"))
 endif
 HOST_DEFS      = -DRC_GEN=2 -DA7RC_LITERAL=$(A7RC) $(A7RC_EXPECT) $(if $(filter serial phy,$(IFACE)),-DSIM_SERIAL) \
                  $(if $(filter 0,$(DMA)),-DA7RC_NO_DMA) $(IFACE_DEFS) \
@@ -238,7 +283,7 @@ JHDL          ?= jhdl
 
 CPPSTD         = -std=c++20
 INCLPATHS      = -I$(USRCODEDIR) -I$(A7RC_DIR) -I$(VIP_DIR)/include
-OBJDIR         = $(CURDIR)/obj/$(SIM)$(EP_OBJ)$(if $(filter 1,$(A7RC)),_a7rc)$(if $(filter 1,$(DMA)),_dma)$(if $(filter 1,$(DUMP)),_dump)$(if $(filter-out none,$(SIM_FAULT)),_fault-$(SIM_FAULT))$(if $(filter-out 0,$(PPM)),_ppm$(PPM))$(if $(filter-out 1,$(RETIME)),_rt$(RETIME))$(if $(filter-out FAST,$(CDR)),_$(CDR))
+OBJDIR         = $(CURDIR)/obj/$(SIM)$(EP_OBJ)$(if $(filter 1,$(A7RC)),_a7rc)$(if $(filter 1,$(DMA)),_dma)$(if $(filter 1,$(DUMP)),_dump)$(if $(filter-out none,$(SIM_FAULT)),_fault-$(SIM_FAULT))$(if $(filter-out 0,$(PPM)),_ppm$(PPM))$(if $(filter-out 1,$(RETIME)),_rt$(RETIME))$(if $(filter-out FAST,$(CDR)),_$(CDR))$(if $(filter 1,$(POL)),_pol)
 USERLIB        = $(OBJDIR)/libuser.a
 
 USER_ALL       = $(USER_C) VUserMain2.cpp a7rc_check.cpp ltssm.c
@@ -246,16 +291,16 @@ USER_ALL       = $(USER_C) VUserMain2.cpp a7rc_check.cpp ltssm.c
 ifeq ($(SIM),verilator)
   DEFS         = -DVPROC_SV -DVPROC -DEXCLUDE_LTSSM
   SIMEXE       = $(OBJDIR)/Vtb
-else ifneq ($(filter icarus janushdl,$(SIM)),)
+else ifeq ($(SIM),janushdl)
+  DEFS         = -DVPROC_SV -DVPROC -DEXCLUDE_LTSSM   # DPI-C, as Verilator
+  VPROC_SO     = $(OBJDIR)/VProc.so
+  SIMEXE       = $(VPROC_SO) $(ICA_FILES)   # JanusHDL compiles the sources at each run
+else ifeq ($(SIM),icarus)
   ICA_INC      = $(dir $(shell command -v $(IVERILOG)))../include/iverilog
   ICA_LIB      = $(dir $(shell command -v $(IVERILOG)))../lib
   DEFS         = -DICARUS -DVPROC -DEXCLUDE_LTSSM -I$(ICA_INC)
   VPROC_SO     = $(OBJDIR)/VProc.vpi
-  ifeq ($(SIM),icarus)
-    SIMEXE     = $(OBJDIR)/sim
-  else
-    SIMEXE     = $(VPROC_SO) $(ICA_FILES)   # JanusHDL compiles the sources at each run
-  endif
+  SIMEXE       = $(OBJDIR)/sim
 else
   $(error SIM must be verilator, icarus or janushdl (got "$(SIM)"))
 endif
@@ -301,7 +346,7 @@ endif
 VLTFLAGS       = --binary -sv --timing --timescale 1ns/10ps --top-module tb -Mdir $(OBJDIR) $(VLTDUMP) \
                  -Wno-fatal -Wno-WIDTH -Wno-lint -Wno-style                     \
                  +define+VPROC_SV +define+VPROC_BYTE_ENABLE                      \
-                 +define+SIM_PPM=$(PPM) +define+SIM_RX_RETIME=$(RETIME)         \
+                 -GPPM=$(PPM) -GRX_RETIME=$(RETIME) -GPOL_DN=$(POL)             \
                  $(EP_VLT) $(VLTVIEWS) -F tb.f $(USRSIMFLAGS)                  \
                  -MAKEFLAGS "--quiet CFG_LDFLAGS_VERILATED="                    \
                  -CFLAGS "$(CPPSTD) -Wno-attributes"                            \
@@ -312,7 +357,7 @@ VLTFLAGS       = --binary -sv --timing --timescale 1ns/10ps --top-module tb -Mdi
 # this test bench does not instantiate it. Its first line is the default
 # timescale, for files without one (no `timescale in RTL)
 ICA_FILES      = $(OBJDIR)/tb.icarus.f
-ICAFLAGS       = -g2012 -DVPROC_BYTE_ENABLE -DSIM_PPM=$(PPM) -DSIM_RX_RETIME=$(RETIME) $(ICA_IFACE) $(ICADUMP) -s tb -c $(ICA_FILES) $(USRSIMFLAGS)
+ICAFLAGS       = -g2012 -DVPROC_BYTE_ENABLE -Ptb.PPM=$(PPM) -Ptb.RX_RETIME=$(RETIME) -Ptb.POL_DN=$(POL) $(ICA_IFACE) $(ICADUMP) -s tb -c $(ICA_FILES) $(USRSIMFLAGS)
 
 # =============================================================================
 # TARGETS
@@ -384,10 +429,16 @@ $(SIMEXE): $(USERLIB) $(RV32LIB) FORCE
 	@for l in $(USERLIB) $(RV32LIB); do [ $$l -nt $@ ] && rm -f $@; done; true   # Verilator's make does not track them
 	@$(VERILATOR) $(VLTFLAGS)
 else
+ifeq ($(SIM),janushdl)
+# DPI-C: the Linux build of the models, as for Verilator (LDLIBS)
+$(VPROC_SO): $(USERLIB) $(RV32LIB)
+	@$(HOST_CXX) -shared -fPIC -pthread -o $@ $(LDLIBS)
+else
 $(VPROC_SO): $(USERLIB) $(RV32LIB)
 	@$(HOST_CXX) -shared -fPIC -pthread -rdynamic -o $@ \
 	    -Wl,-whole-archive $(USERLIB) -Wl,-no-whole-archive $(RV32LIB) -Wl,-whole-archive -L$(VIP_DIR)/lib -lpcieica -lcosimica -Wl,-no-whole-archive \
 	    -L$(ICA_LIB) -lvpi -lrt -ldl
+endif
 
 # JanusHDL reads the list at each run, also from obj/regress/<seed>/: full paths
 $(ICA_FILES): tb.f $(EP_FILES) FORCE | $(OBJDIR)
@@ -409,8 +460,8 @@ else ifeq ($(SIM),icarus)
 SIM_CMD        = $(VVP) -n -M $(OBJDIR) -m VProc $(SIMEXE) $(VVPDUMP)
 else
 # DUMP=1: JanusHDL's own --fst, every signal
-SIM_CMD        = $(JHDL) --top tb $(patsubst -D%,+define+%,-DVPROC_BYTE_ENABLE -DSIM_PPM=$(PPM) -DSIM_RX_RETIME=$(RETIME) $(ICA_IFACE) $(EP_JHDL)) -f $(ICA_FILES) \
-                 --vpi $(VPROC_SO) $(if $(filter 1,$(DUMP)),--fst $(WCX_FST)) $(USRSIMFLAGS)
+SIM_CMD        = $(JHDL) --top tb $(patsubst -D%,+define+%,-DVPROC_BYTE_ENABLE $(ICA_IFACE) $(EP_JHDL)) -gPPM=$(PPM) -gRX_RETIME=$(RETIME) -gPOL_DN=$(POL) -f $(ICA_FILES) \
+                 --sv-lib $(VPROC_SO) $(if $(filter 1,$(DUMP)),--fst $(WCX_FST)) $(USRSIMFLAGS)
 endif
 
 run: all

@@ -47,21 +47,18 @@
 // delay carries its unit. The periods below are in ps: a delay is
 // #(x * 1ns / 1000.0), as 1ps rounds to 0 at 10 ps precision.
 
-// On the serial line with our PHY (IFACE=phy, EP=rtl IFACE=serial): the EP's
-// REFCLK SIM_PPM off the host's clocks (make PPM; + faster), as boards with
-// their own reference clocks (SRNS); the host's receiver for a partner on its
-// own clock, SIM_RX_RETIME (make RETIME, default 1; openPCIE_BFM tb_serial)
-`ifndef SIM_PPM
-`define SIM_PPM 0
-`endif
-`ifndef SIM_RX_RETIME
-`define SIM_RX_RETIME 1
-`endif
-
+// PPM: on the serial line with our PHY (IFACE=phy, EP=rtl IFACE=serial), the
+// EP's REFCLK so many ppm off the host's clocks (make PPM; + faster), as
+// boards with their own reference clocks (SRNS). RX_RETIME: the host's
+// receiver for a partner on its own clock (make RETIME, default 1). POL_DN:
+// the host -> EP pair with P and N swapped (make POL=1), so the EP's MAC
+// must invert its lane in Polling (4.2.4.4); with our PHY on the line
 module tb #(
-   parameter RUN_SIM_US     = 10000,
-             PIPE_DATAWIDTH = 64   
-   
+   parameter      RUN_SIM_US     = 10000,
+                  PIPE_DATAWIDTH = 64,
+   parameter real PPM            = 0.0,
+   parameter int  RX_RETIME      = 1,
+   parameter bit  POL_DN         = 1'b0
 )();
 
 //--------------------------------------------------------------
@@ -201,7 +198,7 @@ module tb #(
   initial begin : _refclk
     longint k;
     real    half_ns;
-    half_ns = (HALF_REF_PERIOD_PS / 1000.0) / (1.0 + real'(`SIM_PPM) * 1.0e-6);
+    half_ns = (HALF_REF_PERIOD_PS / 1000.0) / (1.0 + PPM * 1.0e-6);
     refclk  = 1'b0;
     for (k = 1; ; k++) begin
       /* verilator lint_off ZERODLY */  // never 0: k grows each edge
@@ -232,6 +229,11 @@ module tb #(
   end
 
   assign ser_dn_idle = (ser_dn_same == 12) && (ser_dn == ser_dn_q);
+
+  // the pair at the EP's pins, P and N swapped with POL_DN (idle: P = N either way)
+  logic       ser_dn_p, ser_dn_n;
+  assign ser_dn_p = POL_DN ? (ser_dn_idle ? ser_dn : ~ser_dn) : ser_dn;
+  assign ser_dn_n = POL_DN ? ser_dn : (ser_dn_idle ? ser_dn : ~ser_dn);
 `endif
 
 `ifdef EP_RTL
@@ -240,6 +242,7 @@ module tb #(
   (
     .clk_brd                           (clk_brd),
     .perst_n                           (rst_n),
+    .clkreq_n                          (),
     .link_up                           (link_up),
     .fw_pass                           (fw_pass)
   );
@@ -247,8 +250,8 @@ module tb #(
   // the SerDes pins are not ports of top (no GateMate netlist reaches them):
   // its nets, by hierarchy
   assign dut.refclk  = refclk;
-  assign dut.ser_rxp = ser_dn;
-  assign dut.ser_rxn = ser_dn_idle ? ser_dn : ~ser_dn;
+  assign dut.ser_rxp = ser_dn_p;
+  assign dut.ser_rxn = ser_dn_n;
   assign ser_up      = dut.ser_txp;
   assign ser_up_n    = dut.ser_txn;
 `else
@@ -291,8 +294,8 @@ module tb #(
   (
     .rst_n                             (rst_n),
     .refclk                            (refclk),
-    .ser_rxp                           (ser_dn),
-    .ser_rxn                           (ser_dn_idle ? ser_dn : ~ser_dn),
+    .ser_rxp                           (ser_dn_p),
+    .ser_rxn                           (ser_dn_n),
     .ser_txp                           (ser_up),
     .ser_txn                           (ser_up_n)
   );
@@ -366,12 +369,19 @@ module tb #(
 // (tb.dut.bfm_pcie)
 //--------------------------------------------------------------
 
-  // Data Link: RC -> EP TLPs as a DLL hands them to its TL, on pclk; for a
-  // TL under test without the MAC and DLL below it (nothing reads them yet)
+  // Data Link: RC -> EP TLPs as sent, on pclk (the EP model's taps,
+  // tb.dut.bfm_pcie, have them as its DLL hands them to its TL). And
+  // Transaction: the EP's TLPs the RC takes, on rx_clk; make TL=1 checks
+  // its shadow TL's completions against them (models/tl_shadow.sv)
   logic [PIPE_DATAWIDTH-1:0]           dll_rx_data;
   logic                                dll_rx_tlp_valid;
   logic                                dll_rx_tlp_first;
   logic                                dll_rx_tlp_last;
+  logic                                rx_clk;
+  logic [              31:0]           rx_tlp_data;
+  logic                                rx_tlp_sop;
+  logic                                rx_tlp_eop;
+  logic                                rx_tlp_valid;
 
 `ifdef IFACE_SERIAL
   PcieVhostSerial #(
@@ -379,7 +389,7 @@ module tb #(
     .NodeNum                           (HOST_NODE),
     .EndPoint                          (0),
     .Gen2Clk                           (1),
-    .RX_RETIME                         (`SIM_RX_RETIME)
+    .RX_RETIME                         (RX_RETIME)
   ) u_rc
   (
     .Clk                               (pcieclk2),
@@ -459,7 +469,8 @@ module tb #(
     .dllp_up_data                      (),
     .dllp_up_valid                     (),
 
-    // Transaction: for waveform decoders, read from the dump
+    // Transaction: for waveform decoders, read from the dump; rx_* also for
+    // make TL=1
     .tx_clk                            (),
     .tx_tlp_data                       (),
     .tx_tlp_sop                        (),
@@ -469,11 +480,11 @@ module tb #(
     .tx_peer_sop                       (),
     .tx_peer_eop                       (),
     .tx_peer_valid                     (),
-    .rx_clk                            (),
-    .rx_tlp_data                       (),
-    .rx_tlp_sop                        (),
-    .rx_tlp_eop                        (),
-    .rx_tlp_valid                      (),
+    .rx_clk                            (rx_clk),
+    .rx_tlp_data                       (rx_tlp_data),
+    .rx_tlp_sop                        (rx_tlp_sop),
+    .rx_tlp_eop                        (rx_tlp_eop),
+    .rx_tlp_valid                      (rx_tlp_valid),
     .rx_peer_data                      (),
     .rx_peer_sop                       (),
     .rx_peer_eop                       (),

@@ -53,12 +53,17 @@
 //==========================================================================
 
 module top (
-    input  logic clk_brd,  // board oscillator
-    input  logic perst_n,  // PERST# from the connector, active low
+    input  logic clk_brd,   // board oscillator
+    input  logic perst_n,   // PERST# from the connector, active low
 
-    output logic link_up,  // for an LED: the data link is up
-    output logic fw_pass   // for an LED: the firmware has reported PASS
+    output logic clkreq_n,  // CLKREQ# to the connector: low, the REFCLK requested
+    output logic link_up,   // for an LED: the data link is up
+    output logic fw_pass    // for an LED: the firmware has reported PASS
 );
+
+  // An M.2 card asserts CLKREQ# to have the host drive REFCLK; no power
+  // states that release it (L1 PM substates), so always low
+  assign clkreq_n = 1'b0;
 
   logic phy_rdy;
   logic rst_pipe_n;

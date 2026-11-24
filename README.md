@@ -13,7 +13,7 @@
 [![DLL+PHY-Sim:Pass](https://badgen.net/badge/DLL%2BPHY%20Sim/Pass/green)](2.rtl/4.dll/sim)
 [![TopSim:WIP](https://badgen.net/badge/TopSim/WIP/orange)](5.sim)
 [![PCIE:TODO](https://badgen.net/badge/PCIE/TODO/red)](#project-status)
-[![LiteX:TODO](https://badgen.net/badge/LiteX/TODO/red)](6.litex/README.md)
+[![LiteX:TODO](https://badgen.net/badge/LiteX/TODO/red)](7.litex/README.md)
 
 **openCologne-PCIE** is a **soft PCIE EndPoint core** for the Cologne Chip GateMate FPGA, built with the fully opensource [nextPNR-himbaechel](https://github.com/YosysHQ/prjpeppercorn) _"PrjPeppercorn"_ tools. It continues [openCologne](https://github.com/chili-chips/openCologne) and complements the [openPCIE](https://github.com/chili-chips/openpcie) RootComplex.
 
@@ -53,7 +53,8 @@
 | [3.sw](3.sw/README.md) | EP firmware |
 | [4.build](4.build/README.md) | Build flow |
 | [5.sim](5.sim/README.md) | Test bench and VIP |
-| [6.litex](6.litex/README.md) | LiteX integration |
+| [6.test](6.test/README.md) | Lab test from the host |
+| [7.litex](7.litex/README.md) | LiteX integration |
 
 <div align="center">
   <img alt="PCIe EndPoint top-level stack" width="35%" src="0.doc/2.rtl/pcie-ep-top-stack.png">
@@ -214,6 +215,8 @@ See [4.build/README.md](4.build/README.md)
 2) **PC:** enumeration and PIO from a Linux PC as the host
 3) **Raspberry Pi:** the same with a Raspberry Pi as the host
 
+The lab test from the host, with what it measures and how: [6.test](6.test/README.md).
+
 #### References:
 - [PCIE Utils](https://mj.ucw.cz/sw/pciutils)
 - [Debug PCIE issues using 'lspci' and 'setpci'](https://adaptivesupport.amd.com/s/article/1148199?language=en_US)
@@ -240,7 +243,7 @@ See [4.build/README.md](4.build/README.md)
   <a href="https://github.com/enjoy-digital/litex"><img width="25%" alt="LiteX logo" src="0.doc/artwork/LiteX.logo.png"></a>
 </div>
 
-See [6.litex/README.md](6.litex/README.md)
+See [7.litex/README.md](7.litex/README.md)
 
 --------------------
 

@@ -104,7 +104,6 @@ Data (D) symbols are scrambled with the standard PCIe LFSR, **G(x) = x¹⁶ + x�
 | Framing (STP, SDP, END, EDB) is done in the DLL, not the Physical Layer | 4.2.2 | |
 | RX descrambles a TS1/TS2 received in L0 | 4.2.3 | [#9](https://github.com/chili-chips/openCologne-PCIE/issues/9) |
 | Disable Scrambling taken from the last PCLK of Configuration.Complete | 4.2.6.3.5 | [#10](https://github.com/chili-chips/openCologne-PCIE/issues/10) |
-| SKP ordered sets every 2360-2384 symbol times, not 1180-1538 | 4.2.7.1 | [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6) |
 | A TS1 is cut short at every SKP in Polling.Active, a TS2 on the step to Configuration | 4.2.7.1 | [#7](https://github.com/chili-chips/openCologne-PCIE/issues/7) |
 | COM and SKP of a received SKP ordered set reach the DLL as data | 4.2.7.2 | [#8](https://github.com/chili-chips/openCologne-PCIE/issues/8) |
 | No clock tolerance compensation: SerDes clock correction off; common REFCLK only | 4.2.7 | |

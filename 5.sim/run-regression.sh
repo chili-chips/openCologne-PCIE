@@ -24,8 +24,7 @@ fails=0
 
 # the runs that fail today, and why
 declare -A KNOWN=(
-    [rtl-tester]="#3 #4 #6 #13"
-    [rtl-serial]="#6"
+    [rtl-tester]="#3 #4 #13"
     [dll-stp]="#3"
     [dll-end]="#3"
     [fault-nocpl]="by design"                  # SIM_FAULT=nocpl: the request is never completed
@@ -33,7 +32,6 @@ declare -A KNOWN=(
 # ... and what the log of each must show: another failure is not the known one
 declare -A KNOWN_SIG=(
     [rtl-tester]="no Completion for a read whose Completion is lost once"   # #3: the host's lost TLP never replayed; the 10 ms limit comes before Recovery (#9)
-    [rtl-serial]="SVA #6"
     [dll-stp]="stp corrupted: EP did not replay"
     [dll-end]="end corrupted: EP did not replay"
     [fault-nocpl]="never completed"
@@ -100,6 +98,14 @@ run rtl-tester     EP=rtl SIM_ARGS=+verilator+error+limit+100 "$@"
 run rtl-serial     EP=rtl IFACE=serial A7RC=1 "$@"
 # Sustained load, as the hardware BAR0 test: 1000 mix requests to the EP model
 run load           MIX=1000 "$@"
+# Our TL beside the EP model, fed what the EP model's DLL hands its TL: its
+# completions against the EP model's
+run tl-shadow      TL=1 "$@"
+if grep -a -q 'TL SHADOW: PASS' $LOG/tl-shadow.log; then
+    report tl-check 0 1 "TL=1" "$(grep -a 'completions compared' $LOG/tl-shadow.log)"
+else
+    report tl-check 0 0 "TL=1" "$(grep -a -m1 'TL SHADOW\|TL shadow: .*differ\|%Error' $LOG/tl-shadow.log)"
+fi
 # The EP model misbehaves (SIM_FAULT): the host's error paths
 run fault-crs      SIM_FAULT=crs "$@"
 run fault-late     SIM_FAULT=late "$@"

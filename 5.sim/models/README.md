@@ -5,6 +5,7 @@ This directory contains the following models
 * `soc_cpu.VPROC.sv` : _VProc_ based `soc_cpu` compatible virtual processor.
 * `phy_vproc_rc.sv` : the `phy_top` socket with `IFACE=pipe`, the host at the PIPE: a wrapper of openPCIE_BFM's `pipe_phy_core.sv`.
 * `ep_model_phy.sv` : `IFACE=phy`, the EP model behind our PHY: `phy_top` with the EP model on its PIPE through openPCIE_BFM's `pipe_mac_adapter.sv`.
+* `tl_shadow.sv` : `TL=1`, our Transaction Layer beside the EP model, bound into `tb`: `dll_if` driven from the EP model's Data Link taps, its completions checked against the EP model's.
 * `ep_wavecrux_view.sv` : our EP's layer boundaries, for the WaveCrux decoders (`EP=rtl DUMP=1`).
 * `tlp_dw_if.sv`, `tlp_dw_monitor.sv`, `tlp_wavecrux_view.sv` : the SOC's AXI-Stream TLPs, one DW per clock, for the TLP decoder.
 * `gatemate_cells_sim.sv` : simulation models of the GateMate primitives `clk_rst_gen` uses: `CC_USR_RSTN`, `CC_BUFG`.

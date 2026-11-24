@@ -142,7 +142,7 @@ It replaced our own host: upstream's pcieVHost 1.9.3 in RC mode, unmodified, wit
 
 **Tester and literal.** The default tester runs the lab RC's sequence, then what the spec allows but its firmware never sends; `A7RC=1` is literal, only what the lab RC sends. Its stages and its spec checker: [openPCIE_BFM, drive and check](https://github.com/chili-chips/openPCIE_BFM/blob/main/3.sw/a7rc/README.md#drive-and-check). EP DMA under credit starvation runs only with `DMA=1`: our EP has no DMA yet ([#14](https://github.com/chili-chips/openCologne-PCIE/issues/14)).
 
-- **Against our EP** (2026-11-02) the tester run fails. The checker flags Naks for back-to-back TLPs ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4); on an error-free line any Nak is a violation, `DL.NAK`), no replay after held Acks or across a Recovery (`DL.REPLAY`, `TL.CPL-ALL`, [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3)) and the SKP interval (`PL.SKP`, [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6)). The InitFC after every Recovery (`FC.INIT-ORDER`), Unsupported Request for reads longer than 1 DW (`TL.UR`) and reads that return data older than an earlier write (`TL.ORDER`) are fixed.
+- **Against our EP** (2026-11-02) the tester run fails. The checker flags Naks for back-to-back TLPs ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4); on an error-free line any Nak is a violation, `DL.NAK`), no replay after held Acks or across a Recovery (`DL.REPLAY`, `TL.CPL-ALL`, [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3)) (the SKP interval, `PL.SKP`, [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6), is fixed). The InitFC after every Recovery (`FC.INIT-ORDER`), Unsupported Request for reads longer than 1 DW (`TL.UR`) and reads that return data older than an earlier write (`TL.ORDER`) are fixed.
 - **The newer host faults** (openPCIE_BFM `Faults()`, 2026-11-23: a lost TLP, a nullified one, a skipped sequence number, a bad ECRC, an Ack for a TLP never sent). Against our EP the lost Completion is never replayed: the host waits its 2.18 ms Completion timeout, [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3) at system level; the run then reaches the 10 ms limit. The EP model passes all of them.
 
 **Spec checker.** Every TLP and DLLP is checked against 59 PCIe Base 2.1 rules; any violation fails the run. The tester's random mix is seeded (`make SEED=N`, `make regress`). The EP model passes all 59, at the PIPE and on the serial line, over 100 seeds; our EP passes with `A7RC=1` and fails the tester, above.
@@ -157,7 +157,7 @@ The model also found that our DLL's InitFC advertised P 32/1008 and NP 32/1, whi
 
 | Switch | Values | Selects | Today |
 |---|---|---|---|
-| `SIM` | `verilator` (default), `icarus`, `janushdl` | the simulator; the C/C++ models talk DPI-C to Verilator, VPI to Icarus and JanusHDL (the Icarus build of the models, so JanusHDL needs Icarus installed) | all three, with `EP=model`; `EP=rtl` on Verilator (JanusHDL: [#24](https://github.com/chili-chips/openCologne-PCIE/issues/24)) |
+| `SIM` | `verilator` (default), `icarus`, `janushdl` | the simulator; the C/C++ models talk DPI-C to Verilator and JanusHDL (`VProc.so`, `--sv-lib`), VPI to Icarus (no DPI-C) | all three, with `EP=model`; `EP=rtl` on Verilator (JanusHDL: [#24](https://github.com/chili-chips/openCologne-PCIE/issues/24)) |
 | `EP` | `model` (default), `rtl` | the EP: a second pcieVHost in EP mode (`EPPIPEx1__pcieVHost_DUT`, node 1), or our MAC + DLL + TL RTL with firmware | `model` passes; `rtl` passes with `A7RC=1`, fails the default tester mode, [above](#the-host-openpcies-artix-7-rc-model); `rtl` on Verilator (JanusHDL: [#24](https://github.com/chili-chips/openCologne-PCIE/issues/24)); Icarus does not parse the generated `csr_pkg.sv` (unpacked structs) |
 | `IFACE` | `pipe` (default), `serial`, `phy` | where the host meets the EP: the PIPE (`RCPIPEx1__pcieVHost`, node 2; with `EP=rtl` in the `phy_top` socket), or the serial line (`PcieVhostSerial`), which adds the PHY: the real one with `EP=rtl`, the EP model's own with `EP=model`; `phy`: the serial line, the EP model behind the real PHY (`EP=model`, Verilator only) | all four `EP` x `IFACE` work; `EP=rtl` gives the same results on both, [above](#running-the-co-simulation); `phy` passes, tester and `A7RC=1`, 20 seeds |
 | `CPU` | `rtl`, `vproc`, `iss` | the SOC CPU, with `EP=rtl`: eduBOS5 RTL, a native C/C++ program at node 0, or the rv32 ISS ([below](#the-cpu-node-three-ways-to-run-the-socs-software)) | all three, with `EP=rtl` |
@@ -165,6 +165,15 @@ The model also found that our DLL's InitFC advertised P 32/1008 and NP 32/1, whi
 | `DMA` | `0` (default), `1` | the tester's EP DMA stage: off, or on | off until our EP has DMA ([#14](https://github.com/chili-chips/openCologne-PCIE/issues/14)); the EP model passes it |
 | `SEED` | `1` (default), any | the seed of the tester's random stimulus, read at run time (no rebuild) | |
 | `SIM_FAULT` | `none` (default), `crs`, `nocpl`, `late` | with `EP=model`, the EP model misbehaves, to drive the host's error paths (as openPCIE's `SIM_FAULT` for its RC firmware): CRS to the first 3 Configuration Requests; no Completion for the request after the BAR0 write; electrically idle for 200 µs after reset ([`usercode/VUserMain1.cpp`](usercode/VUserMain1.cpp)) | `crs`, `late`: PASS; `nocpl`: FAIL on that request alone (`TL.CPL-ALL`), as designed (2026-11-23) |
+| `TL` | `0` (default), `1` | with `EP=model IFACE=pipe`, Verilator: our TL (`tl_top`) beside the EP model, without MAC or DLL, fed the EP model's Data Link taps, what its DLL hands its TL ([`models/tl_shadow.sv`](models/tl_shadow.sv), [`tl.f`](tl.f)). Each Configuration and I/O completion must match the EP model's, header for header (not the data: the config spaces differ), and carry the captured Completer ID. Ends with `TL SHADOW: PASS` or `FAIL`; `SIM_ARGS=+tl_shadow_debug` traces each TLP | PASS (2026-11-24): 156 completions compared, 0 differ |
+| `PPM` | `0` (default), any | with our PHY on the line (`IFACE=phy`, `EP=rtl IFACE=serial`): the EP's REFCLK so many ppm off the host's clocks (+ faster), as with separate reference clocks (SRNS); a `tb` parameter. Use it with `CDR=ACCURATE` | out of scope: this core runs from the host's REFCLK. As expected, +300 and +1000 FAIL: the RX buffer underflows and the link goes deaf both ways; -90 and -300 pass a run only because the overflow comes later ([#26](https://github.com/chili-chips/openCologne-PCIE/issues/26); 2026-11-23) |
+| `POL` | `0` (default), `1` | `EP=rtl IFACE=serial`: P and N swapped on the host -> EP pair, so our MAC must invert its lane in Polling (`RxPolarity`); a `tb` parameter. With `SIM_ARGS=+serdes_rx_pol_lat=N` the SerDes BFM applies `RxPolarity` `N` words late, as a slow PHY | PASS with the inversion at 0, 16, 64 and 256 words late; never applied: no link, as it must (2026-11-24) |
+| `RETIME` | `1` (default), `0` | the host's serial receiver: for a partner on its own clock (openPCIE_BFM `RX_RETIME`), or `0`, sampling on its own clock (slips at any offset) | |
+| `CDR` | `FAST` (default), `ACCURATE` | the SerDes BFM's receiver on our PHY's paths; `ACCURATE` tracks a frequency offset | both pass at 0 ppm |
+| `BURST_ROUNDS` | `1` (default), any | R rounds of the burst, each but the last read back | |
+| `ACK` | profile (default), any | the host's Ack delay in symbol times (92 at x1); a slow host past the Ack latency limit, as the CM5 (1000): the EP must replay | |
+| `START_US` | by seed (default), any | the host idle so many µs after reset before it trains, so the EP waits in Detect; by seed 0 to 100 µs, none for seed 1 | |
+| `BURST` | `64` (default), any | the tester's posted burst: N 1-DW writes back to back, then read back; `0` skips it; read at run time. Its throughput is a `===> Probe:` line | |
 | `MIX` | `64` (default), any | the tester's random mix: N writes and reads, read at run time (no rebuild); sustained load, as the hardware BAR0 test | `MIX=1000` passes with the EP model |
 | `SEEDS` | `10` (default) | `make regress`: seeds 1 to `SEEDS` | 100 seeds pass with `EP=model`; at about 1 s a seed, 1000 seeds per regression are practical (about 3 minutes with `REGRESS_JOBS=8`) |
 | `REGRESS_JOBS` | `1` (default), any | seeds run side by side, each in `obj/regress/<seed>/` (openPCIE_BFM's `4.build/regress.sh`) | a seed takes about 1 s with the EP model (coroutine VProc, below) |
@@ -182,7 +191,7 @@ The model also found that our DLL's InitFC advertised P 32/1008 and NP 32/1, whi
 
 Two lists, each a script in `5.sim`: [`run-sanity.sh`](run-sanity.sh) and [`run-regression.sh`](run-regression.sh). They print one line per run, keep the logs in `obj/sanity/` and `obj/regression/`, and exit non-zero on a failure. Make variables pass through (`bash run-sanity.sh SIM=icarus`). The EP DMA stage runs only in the regression's seeds (`DMA=1`, on the EP model): our EP has no DMA yet ([#14](https://github.com/chili-chips/openCologne-PCIE/issues/14)).
 
-**Sanity**, after every change: `bash run-sanity.sh`, seven runs, about 3 minutes. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines. Our EP drops an SKP ([#6](https://github.com/chili-chips/openCologne-PCIE/issues/6)), so its three runs go on past the SVA and pass as "known #6" if PL.SKP holds every checker violation and the firmware still ends `0x0000face`.
+**Sanity**, after every change: `bash run-sanity.sh`, seven runs, about 3 minutes. Each must end `RC MODEL RESULT: PASS`, and Verilator and Icarus must print the same `===>` lines. Our EP's three runs stop at any SVA; the dropped SKP ([#6](https://github.com/chili-chips/openCologne-PCIE/issues/6)) is fixed.
 
 ```sh
 make run                          # EP model at the PIPE, Verilator
@@ -204,6 +213,7 @@ diff <(grep -a '===>' v.log) <(grep -a '===>' i.log)  #   the same lines, PIPE a
 make EP=rtl run                                       # our EP against the tester
 make EP=rtl IFACE=serial A7RC=1 run                   # our EP with the real PHY
 make MIX=1000 run                                     # sustained load, EP model
+make TL=1 run                                         # our TL beside the EP model
 make mutants                                          # the checker against broken EP models
 make SIM_FAULT=crs run; make SIM_FAULT=late run; make SIM_FAULT=nocpl run  # the EP model misbehaves
 (cd ../2.rtl/1.phy/3.sim && bash run-phy.sh pipe64 && bash run-phy.sh equiv)
@@ -216,13 +226,14 @@ make SIM_FAULT=crs run; make SIM_FAULT=late run; make SIM_FAULT=nocpl run  # the
 | `make regress SEEDS=100 REGRESS_JOBS=8 DMA=1` | 20 s | 0 of 100 failed; every rule checked in some seed (the EP model answers CRS in one seed in four), but `PL.SPEED` and `PL.EIOS`: not applicable, our EP and the EP model are Gen1 |
 | `make regress SEEDS=20 REGRESS_JOBS=8 IFACE=phy` | 76 s | 0 of 20 failed (2026-11-14): Cologne Chip's PIPE logic and the SerDes BFM pass the checker's 59 rules against a known-good EP; a tester run takes 14 s (826 µs simulated), `A7RC=1` 7 s |
 | Verilator against Icarus | 3 min (Icarus serial) | the same `===>` lines, PIPE and serial |
-| `make EP=rtl run` | 70 s | FAIL: [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3), [#4](https://github.com/chili-chips/openCologne-PCIE/issues/4), [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6), [#9](https://github.com/chili-chips/openCologne-PCIE/issues/9), [#13](https://github.com/chili-chips/openCologne-PCIE/issues/13). Stops on `SVA #6` at 139 µs (a dropped SKP). Let on with `SIM_ARGS=+verilator+error+limit+100`: `SVA #3` at 6.03 ms; with openPCIE_BFM 2cb0257 the host's faults come first: the lost Completion is never replayed (#3, 2.18 ms timeout), and the 10 ms limit comes before Recovery (2026-11-23) |
-| `make EP=rtl IFACE=serial A7RC=1 run` | 35 s | FAIL: [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6), stops at 216.0 µs on `SVA #6`: the MAC drops an SKP Ordered Set |
+| `make EP=rtl run` | 70 s | FAIL: [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3), [#4](https://github.com/chili-chips/openCologne-PCIE/issues/4), [#9](https://github.com/chili-chips/openCologne-PCIE/issues/9), [#13](https://github.com/chili-chips/openCologne-PCIE/issues/13). Stops on `SVA #6` at 139 µs (a dropped SKP). Let on with `SIM_ARGS=+verilator+error+limit+100`: `SVA #3` at 6.03 ms; with openPCIE_BFM 2cb0257 the host's faults come first: the lost Completion is never replayed (#3, 2.18 ms timeout), and the 10 ms limit comes before Recovery (2026-11-23) |
+| `make EP=rtl IFACE=serial A7RC=1 run` | 76 s | PASS (2026-11-24): 59 rules, 0 violations; SKP Ordered Sets 1168-1216 symbol times apart ([#6](https://github.com/chili-chips/openCologne-PCIE/issues/6) fixed) |
 | `run-phy.sh pipe64`, `equiv` | 5 s | PASS |
 | `run-dll-phy.sh` | 6 s | PASS: a corrupted sequence number, TLP byte or LCRC is Naked and replayed, a DLLP with a bad CRC dropped |
 | `run-dll-phy.sh --inject=stp`, `--inject=end` | 10 s each | FAIL: [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3), a TLP with its STP or END hit is never replayed |
 | `run-tl.sh` | 20 s | PASS |
 | `make MIX=1000 run` | 2 s | PASS (2026-11-23): 1000 mix requests, 59 rules, 0 violations; needs the openPCIE_BFM bump |
+| `make TL=1 run` | 45 s | PASS (2026-11-24): our TL's 156 Configuration completions match the EP model's; 115 UR for memory reads outside its 4 KB BAR0. Needs the openPCIE_BFM bump (receive taps after the DLL's checks) |
 | `make SIM_FAULT=crs`, `late`, `nocpl` run | 5 s each | `crs`, `late` PASS; `nocpl` FAIL on its request alone (`TL.CPL-ALL`), as designed (2026-11-23) |
 | `make mutants` | 63 s | 0 of 8 missed (2026-11-23); the 4 `PL.EIOS` mutants n/a (Gen1); needs the openPCIE_BFM bump |
 
@@ -232,10 +243,11 @@ make SIM_FAULT=crs run; make SIM_FAULT=late run; make SIM_FAULT=nocpl run  # the
 
 | Assertion | Fails when | Issue |
 |---|---|---|
-| `a_skp` | in L0, no SKP Ordered Set on the PIPE for 1538 + 128 + 28 Symbol Times (4.2.7.1) | [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6) |
-| `a_skp_mux` | the MAC's SKP generator sends its SKP word in a cycle its output mux gives to data, an OS or IDLE: the SKP is lost | [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6) |
+| `a_skp` | in L0, no SKP Ordered Set on the PIPE for 1538 + 128 + 28 Symbol Times (4.2.7.1) | [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6), fixed: a guard now |
+| `a_skp_mux` | the MAC's SKP generator sends its SKP word in a cycle its output mux gives to data, an OS or IDLE: the SKP is lost | [#6](https://github.com/chili-chips/openCologne-PCIE/issues/6), fixed: a guard now |
 | `a_replay` | a TLP in the retry buffer is neither Acked nor replayed within the REPLAY_TIMER limit, 2 × 711 Symbol Times (3.5.2.1), in L0 | [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3) |
 | `a_fc_init` | the DLL enters DL_Active, but the TL does not hold the InitFC credit limits of P, NP and Cpl (3.2.1) | none: fixed, the TL runs on `mac_rst_n` |
+| `a_rx_stp_busy` | an STP arrives while the DLL's RX buffer (`tlp_rx_buffer`) still checks, writes or forwards the TLP before: it looks for STP only in IDLE and STORE_TLP, so that TLP is lost and the next one Naked | [#4](https://github.com/chili-chips/openCologne-PCIE/issues/4) |
 
 ### WaveCrux decoders
 
