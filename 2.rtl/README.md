@@ -68,6 +68,7 @@ Only the C firmware changes role. Everything is open source: no split between ve
 - [Inside GateMate: Analysis and Benchmarking of a New FPGA Architecture](https://ieeexplore.ieee.org/document/11322434) by Tarik Ibrahimović and Nedim Osmić, ICM 2025
 - [7 Series FPGAs Integrated Block for PCI Express, UG477](../0.doc/2.rtl/ug477_7Series_IntBlock_PCIe.pdf) by AMD/Xilinx: the user interface (TRN / AXI-Stream, configuration space) our EP reproduces; the reference whenever in doubt
 - [USB 3 implementation on GateMate](https://videos.cern.ch/record/3025766), CERN FPGA Developers' Forum 2026: best-talk award, funded by NLnet
+- [pci_eerie, GateMate port](https://github.com/goran-mahovlic/pci_eerie/tree/gatemate-w16/gatemate) by Goran Mahovlić: the other open-source PCIE EP on GateMate, a port of [regymm pci_eerie](https://github.com/regymm/pci_eerie). Gen1 x1 on a 64-bit PIPE at 31.25 MHz (`EERIE_W8`), timing closed on the CCGM1A1 and enumerated on the ULX5M-M2; Gen2 on a 128-bit PIPE, also at 31.25 MHz (`EERIE_W16`). Its README lists each timing fix with its measured effect, and verifies against our [openPCIE_BFM](https://github.com/chili-chips/openPCIE_BFM) and [openSERDES_BFM](https://github.com/chili-chips/openSERDES_BFM)
 
   
 #### Examples:
@@ -86,7 +87,7 @@ Proprietary PCIE Core for Xilinx 7Series FPGA devices
 > - [Alex's wrappers for Xilinx and Altera PCIE HMs, with DMA](https://github.com/alexforencich/verilog-pcie)
 > - [LitePCIE wrappers for vendor (Xilinx, Gowin, Lattice, ...) PCIE HMs](https://github.com/enjoy-digital/litepcie)
 >
-> A common misconception: these are not open-source PCIE cores, but examples of how to use proprietary ones. Ours is the first open-source PCIE EP core for GateMate, and the only one built from scratch. It has also set off parallel work on the same theme, such as the recent [regymm pci_eerie](https://github.com/regymm/pci_eerie): plug-and-play compatible with the Xilinx `PCIE_2_1` HM, and its [GateMate port](https://github.com/goran-mahovlic/pci_eerie/tree/gatemate-w8/gatemate).
+> A common misconception: these are not open-source PCIE cores, but examples of how to use proprietary ones. Ours is the first open-source PCIE EP core for GateMate, and the only one built from scratch. It has also set off parallel work on the same theme, such as the recent [regymm pci_eerie](https://github.com/regymm/pci_eerie): plug-and-play compatible with the Xilinx `PCIE_2_1` HM, and its [GateMate port](https://github.com/goran-mahovlic/pci_eerie/tree/gatemate-w16/gatemate).
 
 ---
 # PIO MemWr/Rd signalling flow: a walkthrough

@@ -69,6 +69,7 @@ module packet_handler
   // 7 = 2 byte sequence number + 4 byte LCRC + 1 byte END
   localparam int WIN_BYTES = WIN_WORDS * DATA_BYTES;
   localparam int POS_WIDTH = $clog2(WIN_BYTES) + 1;
+  localparam int OFF_W = $clog2(DATA_BYTES);  // a byte in the oldest word
   localparam int MAX_TLP_WORDS = (4096 + 16 + 4 + DATA_BYTES - 1) / DATA_BYTES + 1;
   localparam logic HALF_WORDS = (DATA_BYTES == 8);  //  only possible for 64-bit data width
 
@@ -106,56 +107,91 @@ module packet_handler
     end
   endgenerate
 
-  logic                        in_tlp;  // TLP detected, wait for END
-  logic        [POS_WIDTH-1:0] q;  // window position
+  // The window, 8 zero bytes longer, so that pick never reads past it
+  logic [(WIN_BYTES+8)*8-1:0] win_pad;
+  logic [ WIN_BYTES+8-1:0]    win_k_pad;
+  assign                      win_pad   = {64'b0, win};
+  assign                      win_k_pad = {8'b0, win_k};
+
+  // The 8 bytes from byte b + o of the window on, and the K flag of byte b + o.
+  // b is a constant, o a byte in the oldest word (#15): a DATA_BYTES-way mux,
+  // not a shifter over the whole window
+  // The window is an argument: an assign is sensitive to its arguments only
+  function automatic logic [63:0] pick(
+      input logic [(WIN_BYTES+8)*8-1:0] v,
+      input logic [OFF_W-1:0]           o,
+      input int                         b
+  );
+    return v[8*b+8*int'(o)+:64];
+  endfunction
+
+  function automatic pipe_data_t pick_word(
+      input logic [(WIN_BYTES+8)*8-1:0] v,
+      input logic [OFF_W-1:0]           o,
+      input int                         b
+  );
+    return v[8*b+8*int'(o)+:DATA_WIDTH];
+  endfunction
+
+  function automatic logic pick_k(
+      input logic [WIN_BYTES+8-1:0] v,
+      input logic [OFF_W-1:0]       o,
+      input int                     b
+  );
+    return v[b+int'(o)];
+  endfunction
+
+  logic                   in_tlp;  // TLP detected, wait for END
+  // the TLP's STP in the oldest word: its data starts TLP_PREFIX_BYTES later
+  logic   [    OFF_W-1:0] stp_pos;
   // the first byte the last packet detection did not consume: where the search starts
-  logic        [POS_WIDTH-1:0] ptr;
-  logic        [         12:0] word_cnt;  // words of the current TLP
+  logic   [POS_WIDTH-1:0] ptr;
+  logic   [         12:0] word_cnt;  // words of the current TLP
 
   // Lowest SDP/STP at or after ptr in the oldest word
-  logic                        start_found;
-  logic                        start_is_stp;
-  logic        [POS_WIDTH-1:0] start_pos;
-  integer                      p;
-  tlp_prefix_t                 prefix;  // STP and the sequence number, when a TLP starts
-  assign prefix = win[8*start_pos+:$bits(tlp_prefix_t)];
+  logic                   start_found;
+  logic                   start_is_stp;
+  logic   [    OFF_W-1:0] start_pos;
+  integer                 p;
 
   always_comb begin
     start_found  = 1'b0;
     start_is_stp = 1'b0;
-    start_pos    = {POS_WIDTH{1'b0}};
+    start_pos    = '0;
     for (p = DATA_BYTES - 1; p >= 0; p = p - 1) begin
       // the lowest SDP/STP at or after ptr in the oldest word
       if (p >= ptr && win_k[p] && (win[8*p+:8] == K_SDP || win[8*p+:8] == K_STP)) begin
         start_found  = 1'b1;
         start_is_stp = (win[8*p+:8] == K_STP);
-        start_pos    = POS_WIDTH'(p);
+        start_pos    = OFF_W'(p);
       end
     end
   end
 
-  logic [7:0] end_full;
-  // if the last word is full, END should be here
-  assign end_full = win[8*(int'(q)+DATA_BYTES+4)+:8];
-  logic end_full_k;
-  assign end_full_k = win_k[int'(q)+DATA_BYTES+4];  // if the last word is full, END should be here
-  logic [7:0] end_half;
-  // if the last word is half, END should be here
-  assign end_half = HALF_WORDS ? win[8*(q+8)+:8] : 8'h00;
-  logic end_half_k;
-  assign end_half_k = HALF_WORDS ? win_k[q+8] : 1'b0;
+  // The 8 bytes from the SDP/STP on, and from the TLP's first data byte on
+  logic        [63:0] start_bytes;
+  pipe_data_t         start_tlp;
+  tlp_prefix_t        prefix;  // STP and the sequence number, when a TLP starts
+  assign start_bytes = pick(win_pad, start_pos, 0);
+  assign start_tlp   = pick_word(win_pad, start_pos, TLP_PREFIX_BYTES);
+  assign prefix      = start_bytes[$bits(tlp_prefix_t)-1:0];
 
-  logic [31:0] lcrc_full;
-  assign lcrc_full = {
-    win[8*(int'(q)+DATA_BYTES)+:8],
-    win[8*(int'(q)+DATA_BYTES+1)+:8],
-    win[8*(int'(q)+DATA_BYTES+2)+:8],
-    win[8*(int'(q)+DATA_BYTES+3)+:8]
-  };  // if the last word is full, LCRC should be here
-  logic [31:0] lcrc_half;
-  assign lcrc_half = {
-    win[8*(q+4)+:8], win[8*(q+5)+:8], win[8*(q+6)+:8], win[8*(q+7)+:8]
-  };  // if the last word is half, LCRC should be here
+  // In a TLP, its data word starts at stp_pos + TLP_PREFIX_BYTES (Q0)
+  localparam int Q0 = TLP_PREFIX_BYTES;
+  pipe_data_t        tlp_data;  // the data word
+  logic [ 7:0] end_full;  // if the last word is full, END should be here
+  logic        end_full_k;
+  logic [ 7:0] end_half;  // if the last word is half, END should be here
+  logic        end_half_k;
+  logic [31:0] lcrc_full;  // if the last word is full, LCRC should be here; byte 0 in [31:24]
+  logic [31:0] lcrc_half;  // if the last word is half, LCRC should be here
+  assign       tlp_data   = pick_word(win_pad, stp_pos, Q0);
+  assign       end_full   = 8'(pick(win_pad, stp_pos, Q0 + DATA_BYTES + 4));
+  assign       end_full_k = pick_k(win_k_pad, stp_pos, Q0 + DATA_BYTES + 4);
+  assign       end_half   = HALF_WORDS ? 8'(pick(win_pad, stp_pos, Q0 + 8)) : 8'h00;
+  assign       end_half_k = HALF_WORDS ? pick_k(win_k_pad, stp_pos, Q0 + 8) : 1'b0;
+  assign       lcrc_full  = lcrc_wire(32'(pick(win_pad, stp_pos, Q0 + DATA_BYTES)));
+  assign       lcrc_half  = lcrc_wire(32'(pick(win_pad, stp_pos, Q0 + 4)));
 
   always_ff @(posedge clk or posedge reset) begin
     if (reset) begin
@@ -169,7 +205,7 @@ module packet_handler
       sequence_number <= '0;
       lcrc            <= 32'b0;
       in_tlp          <= 1'b0;
-      q               <= {POS_WIDTH{1'b0}};
+      stp_pos         <= '0;
       ptr             <= {POS_WIDTH{1'b0}};
       word_cnt        <= 13'd0;
     end
@@ -188,21 +224,22 @@ module packet_handler
         word_cnt <= word_cnt + 1'b1;
         if (HALF_WORDS && end_half == K_END && end_half_k) begin  // Half word TLP
           end_detected <= 1'b1;
-          data_tl      <= {{(DATA_WIDTH / 2) {1'b0}}, win[8*q+:DATA_WIDTH/2]};
+          data_tl      <= {{(DATA_WIDTH / 2) {1'b0}}, tlp_data[DATA_WIDTH/2-1:0]};
           tlp_valid    <= 1'b1;
           tlp_half     <= 1'b1;
           lcrc         <= lcrc_half;
           in_tlp       <= 1'b0;
           // = 4 byte LCRC + 1 byte END + 4 bytes of the last half word - DATA_BYTES
-          ptr          <= q + POS_WIDTH'(9 - DATA_BYTES);
+          ptr          <= POS_WIDTH'(stp_pos) + POS_WIDTH'(Q0 + 9 - DATA_BYTES);
         end
         else if (end_full == K_END && end_full_k) begin  // Full word TLP
           end_detected <= 1'b1;
-          data_tl      <= win[8*q+:DATA_WIDTH];
+          data_tl      <= tlp_data;
           tlp_valid    <= 1'b1;
           lcrc         <= lcrc_full;
           in_tlp       <= 1'b0;
-          ptr          <= q + 5;  // = 4 byte LCRC + 1 byte END + last word - DATA_BYTES
+          // = 4 byte LCRC + 1 byte END + last word - DATA_BYTES
+          ptr          <= POS_WIDTH'(stp_pos) + POS_WIDTH'(Q0 + 5);
         end
         else if (end_lost || word_cnt == 13'(MAX_TLP_WORDS)) begin
           // TLP is too long or END is lost
@@ -210,23 +247,23 @@ module packet_handler
           ptr    <= {POS_WIDTH{1'b0}};
         end
         else begin  // Extract normal payload
-          data_tl   <= win[8*q+:DATA_WIDTH];
+          data_tl   <= tlp_data;
           tlp_valid <= 1'b1;
         end
       end
       else if (start_found && start_is_stp) begin  // TLP
         stp_detected    <= 1'b1;
         sequence_number <= {prefix.rsvd, prefix.seq_hi, prefix.seq_lo};
-        data_tl         <= win[8*(int'(start_pos)+TLP_PREFIX_BYTES)+:DATA_WIDTH];
+        data_tl         <= start_tlp;
         tlp_valid       <= 1'b1;
         in_tlp          <= 1'b1;
-        q               <= start_pos + POS_WIDTH'(TLP_PREFIX_BYTES);
+        stp_pos         <= start_pos;
         word_cnt        <= 13'd1;
       end
       else if (start_found) begin  // DLLP
         sdp_detected <= 1'b1;
-        data_dllp    <= win[8*start_pos+:PATTERN_WIDTH];
-        ptr          <= start_pos + POS_WIDTH'(8 - DATA_BYTES);  // DLLP is always 8 bytes
+        data_dllp <= start_bytes[PATTERN_WIDTH-1:0];
+        ptr <= POS_WIDTH'(start_pos) + POS_WIDTH'(8 - DATA_BYTES);  // DLLP is always 8 bytes
       end
       else begin
         // nothing
