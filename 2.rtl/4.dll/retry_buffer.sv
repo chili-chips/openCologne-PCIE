@@ -139,13 +139,15 @@ module retry_buffer
   end
 
   assign tlp_out.data = ((state == WRITE_START) | (state == SEND_TLP))
-                          ? mem_rdata : {DATA_WIDTH{1'b0}};
+                      ? mem_rdata
+                      : {DATA_WIDTH{1'b0}};
 
   // K flags: STP in byte 0 of the first word, END in the last byte of the last
   // word, or in the middle of it when its upper half is empty
   pipe_flags_t end_k;
-  assign end_k = stored_last_half ? {{(DATA_BYTES/2){1'b0}}, 1'b1, {(DATA_BYTES/2-1){1'b0}}}
-                               : {1'b1, {(DATA_BYTES-1){1'b0}}};
+  assign end_k = stored_last_half
+               ? {{(DATA_BYTES/2){1'b0}}, 1'b1, {(DATA_BYTES/2-1){1'b0}}}
+               : {1'b1, {(DATA_BYTES-1){1'b0}}};
   assign tlp_out.kcode = (state == WRITE_START) ? {{(DATA_BYTES-1){1'b0}}, 1'b1}
                         : ((state == SEND_TLP) & (read_cnt == word_cnt - 1)) ? end_k
                         : {DATA_BYTES{1'b0}};
@@ -162,94 +164,71 @@ module retry_buffer
 
   // CRC also takes sequence number into account
   // Feed sequence number first
-  logic [LFSR_WIDTH-1:0] crc_seq_0;
-  logic [LFSR_WIDTH-1:0] crc_seq_1;
-  logic                  crc_en;
+  logic  crc_en;
   // enabled when sequence number and TLP available
-  assign                 crc_en = tlp_valid & ((state == IDLE & tlp_first) | state == STORE_TLP);
+  assign crc_en = tlp_valid & ((state == IDLE & tlp_first) | state == STORE_TLP);
 
-  logic [LFSR_WIDTH-1:0] crc_state;  // store current CRC state
+  logic [LFSR_WIDTH-1:0] crc_state;  // the words through the clock before (lcrc_pipe)
 
   logic  seq_crc_en;  // the sequence number enters the LCRC with the first TLP word
   assign seq_crc_en = (state == IDLE & tlp_first) & tlp_valid;
 
-  lcrc_byte u_seq_crc_0 (
-      .data_in ({stp_prefix.rsvd, stp_prefix.seq_hi}),
-      .crc_en  (seq_crc_en),
-      .crc_in  (crc_state),
-      .crc_out (crc_seq_0)
+  // the sequence number's two bytes, byte 0 in [7:0]
+  logic [15:0] seq_bytes;
+  assign       seq_bytes = {stp_prefix.seq_lo, stp_prefix.rsvd, stp_prefix.seq_hi};
+
+  // two stages; the half-word end of a TLP: the upper DW is no part of the
+  // CRC. The last TLP word is in crc_state one clock after it
+  lcrc_pipe u_lcrc (
+      .clk       (clk),
+      .reset     (reset),
+      .en        (crc_en),
+      .seq       (seq_crc_en),
+      .half      (last_half),
+      .data      (tlp_in_data),
+      .seq_bytes (seq_bytes),
+      .crc       (crc_state)
   );
 
-  lcrc_byte u_seq_crc_1 (
-      .data_in (stp_prefix.seq_lo),
-      .crc_en  (seq_crc_en),
-      .crc_in  (crc_seq_0),
-      .crc_out (crc_seq_1)
-  );
-
-  logic [LFSR_WIDTH-1:0] crc_tlp_in;
-  // crc after sequence number as crc_in for first tlp word
-  assign crc_tlp_in = (state == IDLE & tlp_first) ? crc_seq_1 : crc_state;
-  logic [DATA_BYTES*LFSR_WIDTH-1:0] lfsr_in;
-  logic [DATA_BYTES*LFSR_WIDTH-1:0] lfsr_out;
-
-  assign lfsr_in = {lfsr_out[(DATA_BYTES-1)*LFSR_WIDTH-1:0], crc_tlp_in};
-
-  logic [LFSR_WIDTH-1:0] crc_next;
-  assign                 crc_next = lfsr_out[DATA_BYTES*LFSR_WIDTH-1-:LFSR_WIDTH];
-
-  genvar i;
-  generate
-    for (i = 0; i < DATA_BYTES; i = i + 1) begin : g_crc_bytes
-      // the half-word end of a TLP: the upper DW is no part of the CRC
-      logic  byte_en;
-      assign byte_en = crc_en & (i < DATA_BYTES / 2 | ~last_half);
-
-      lcrc_byte u_crc_byte (
-          .data_in (tlp_in_data[i*8+:8]),
-          .crc_en  (byte_en),
-          .crc_in  (lfsr_in[i*LFSR_WIDTH+:LFSR_WIDTH]),
-          .crc_out (lfsr_out[i*LFSR_WIDTH+:LFSR_WIDTH])
-      );
-    end
-  endgenerate
-
-  // Needed in case the first payload is also the last payload
-  // We need crc output in the same cycle as the first payload
-  logic [LFSR_WIDTH-1:0] crc_computed_next;
+  logic [LFSR_WIDTH-1:0] crc_computed;
   genvar m;
   generate
-    for (m = 0; m < 8; m = m + 1) begin : g_compute_lcrc_next
-      assign crc_computed_next[m]    = ~crc_next[7-m];
-      assign crc_computed_next[m+8]  = ~crc_next[15-m];
-      assign crc_computed_next[m+16] = ~crc_next[23-m];
-      assign crc_computed_next[m+24] = ~crc_next[31-m];
+    for (m = 0; m < 8; m = m + 1) begin : g_compute_lcrc
+      assign crc_computed[m]    = ~crc_state[7-m];
+      assign crc_computed[m+8]  = ~crc_state[15-m];
+      assign crc_computed[m+16] = ~crc_state[23-m];
+      assign crc_computed[m+24] = ~crc_state[31-m];
     end
   endgenerate
 
   // Write port: one whole word a clock. A TLP word straddles two buffer
   // words (STP and the sequence number come first), so the part that starts
   // the next word waits in carry until the next TLP word completes it. The
-  // last words (the rest of the TLP, the LCRC, END) go in after the last TLP
-  // word: tail_word0 in PRE_WRITE at write_ptr - 1, tail_word1 (32-bit only)
-  // one clock later at write_ptr. Nothing reads them before.
+  // words with the LCRC go in once crc_state has the last TLP word, its TLP
+  // bytes waiting in tail_bytes: one clock after it at write_ptr - 1
+  // (write_ptr - 2 for a half-word end), then (a half-word end, or 32-bit)
+  // one clock later at write_ptr - 1 (write_ptr, 32-bit). Nothing reads them
+  // before.
   logic        tlp_beat;
   assign       tlp_beat = tlp_valid & ((state == IDLE & tlp_first) | state == STORE_TLP);
   logic [23:0] carry;
-  pipe_data_t        tail_word0;
-  logic              tail_we0;
+  logic [55:0] tail_bytes;  // the TLP bytes of tail word 0
+  logic        tail_we0;
+  logic        tail_we1;
 
   always_ff @(posedge clk or posedge reset) begin
     if (reset) begin
       tail_we0 <= 1'b0;
+      tail_we1 <= 1'b0;
     end
     else begin
       tail_we0 <= tlp_beat & tlp_last;
+      tail_we1 <= tail_we0 & ((DATA_WIDTH == 32) | stored_last_half);
     end
   end
 
   logic [31:0] lcrc_on_wire;  // byte 0 in [7:0]
-  assign       lcrc_on_wire = lcrc_wire(crc_computed_next);
+  assign       lcrc_on_wire = lcrc_wire(crc_computed);
 
   generate
     if (DATA_WIDTH == 64) begin : g_64
@@ -257,10 +236,10 @@ module retry_buffer
         if (tlp_beat) begin
           carry <= tlp_in_data[63:40];
           if (state == STORE_TLP && last_half) begin
-            tail_word0 <= {32'b0, K_END, lcrc_on_wire[31:8]};
+            tail_bytes <= {tlp_in_data[31:0], carry};
           end
           else begin
-            tail_word0 <= {K_END, lcrc_on_wire, tlp_in_data[63:40]};
+            tail_bytes <= {32'b0, tlp_in_data[63:40]};
           end
         end
       end
@@ -275,35 +254,28 @@ module retry_buffer
           mem_wdata = {tlp_in_data[39:0], stp_prefix};
         end
         else if (state == STORE_TLP && tlp_valid) begin
-          mem_we = 1'b1;
-          if (last_half) begin
-            mem_wdata = {lcrc_on_wire[7:0], tlp_in_data[31:0], carry};
-          end
+          mem_we = ~last_half;  // a half word waits in tail_bytes for the LCRC
+        end
+        else if (tail_we0 && stored_last_half) begin
+          mem_we    = 1'b1;
+          mem_waddr = write_ptr - bram_addr_t'(2);
+          mem_wdata = {lcrc_on_wire[7:0], tail_bytes};
         end
         else if (tail_we0) begin
           mem_we    = 1'b1;
-          mem_wdata = tail_word0;
+          mem_wdata = {K_END, lcrc_on_wire, tail_bytes[23:0]};
+        end
+        else if (tail_we1) begin
+          mem_we    = 1'b1;
+          mem_wdata = {32'b0, K_END, lcrc_on_wire[31:8]};
         end
       end
     end
     else if (DATA_WIDTH == 32) begin : g_32
-      pipe_data_t tail_word1;
-      logic       tail_we1;
-
-      always_ff @(posedge clk or posedge reset) begin
-        if (reset) begin
-          tail_we1 <= 1'b0;
-        end
-        else begin
-          tail_we1 <= tail_we0;
-        end
-      end
-
       always_ff @(posedge clk) begin
         if (tlp_beat) begin
           carry      <= tlp_in_data[31:8];
-          tail_word0 <= {lcrc_on_wire[7:0], tlp_in_data[31:8]};
-          tail_word1 <= {K_END, lcrc_on_wire[31:8]};
+          tail_bytes <= {32'b0, tlp_in_data[31:8]};
         end
       end
 
@@ -321,12 +293,12 @@ module retry_buffer
         end
         else if (tail_we0) begin
           mem_we    = 1'b1;
-          mem_wdata = tail_word0;
+          mem_wdata = {lcrc_on_wire[7:0], tail_bytes[23:0]};
         end
         else if (tail_we1) begin
           mem_we    = 1'b1;
           mem_waddr = write_ptr;
-          mem_wdata = tail_word1;
+          mem_wdata = {K_END, lcrc_on_wire[31:8]};
         end
       end
     end
@@ -341,7 +313,6 @@ module retry_buffer
       read_cnt         <= 0;
       word_cnt         <= 0;
       tlp_scheduled    <= 1'b0;
-      crc_state        <= {LFSR_WIDTH{1'b1}};
       stored_last_half <= 1'b0;
     end
     else begin
@@ -350,7 +321,6 @@ module retry_buffer
         IDLE: begin
           if (tlp_valid && tlp_first) begin
             write_ptr        <= 2;
-            crc_state        <= crc_next;
             stored_last_half <= 1'b0;
             if (tlp_last) begin  // First is last
               read_ptr <= 0;
@@ -379,7 +349,6 @@ module retry_buffer
 
               stored_last_half <= last_half;
             end
-            crc_state <= crc_next;
           end
         end
 
@@ -395,7 +364,6 @@ module retry_buffer
             tlp_scheduled <= 1'b0;
             write_ptr     <= 0;
             word_cnt      <= 0;
-            crc_state     <= {LFSR_WIDTH{1'b1}};
             state         <= IDLE;
             // We want to wait for the TLP to be allowed to be sent before moving to next state
           end
@@ -432,7 +400,6 @@ module retry_buffer
           if (release_flag) begin
             write_ptr <= 0;
             word_cnt  <= 0;
-            crc_state <= {LFSR_WIDTH{1'b1}};
             state     <= IDLE;
             // Retransmit the packet
             // TODO: Add a counter for the retransmission

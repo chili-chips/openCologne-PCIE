@@ -5,7 +5,7 @@
     {
       "kind": "signal",
       "id": "ocpcie-0",
-      "ref": "10",
+      "ref": "23",
       "path": "tb.pclk",
       "name": "pclk",
       "color": 4283417591,
@@ -15,7 +15,7 @@
     {
       "kind": "signal",
       "id": "ocpcie-1",
-      "ref": "11",
+      "ref": "24",
       "path": "tb.downdata",
       "name": "downdata",
       "color": 4283417591,
@@ -25,7 +25,7 @@
     {
       "kind": "signal",
       "id": "ocpcie-2",
-      "ref": "12",
+      "ref": "25",
       "path": "tb.downdatak",
       "name": "downdatak",
       "color": 4283417591,
@@ -35,7 +35,7 @@
     {
       "kind": "signal",
       "id": "ocpcie-4",
-      "ref": "13",
+      "ref": "26",
       "path": "tb.updata",
       "name": "updata",
       "color": 4294948685,
@@ -45,7 +45,7 @@
     {
       "kind": "signal",
       "id": "ocpcie-5",
-      "ref": "14",
+      "ref": "27",
       "path": "tb.updatak",
       "name": "updatak",
       "color": 4294948685,
@@ -92,9 +92,9 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "pclk": "10",
-          "data": "11",
-          "datak": "12"
+          "pclk": "53",
+          "data": "128",
+          "datak": "129"
         },
         "parameters": {
           "scrambling": "auto",
@@ -107,9 +107,9 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "pclk": "10",
-          "data": "11",
-          "datak": "12"
+          "pclk": "53",
+          "data": "128",
+          "datak": "129"
         },
         "parameters": {
           "scrambling": "auto",
@@ -124,9 +124,9 @@
       "instanceNumber": 2,
       "config": {
         "bindings": {
-          "pclk": "10",
-          "data": "13",
-          "datak": "14"
+          "pclk": "53",
+          "data": "26",
+          "datak": "27"
         },
         "parameters": {
           "scrambling": "auto",
@@ -139,9 +139,9 @@
       "instanceNumber": 2,
       "config": {
         "bindings": {
-          "pclk": "10",
-          "data": "13",
-          "datak": "14"
+          "pclk": "53",
+          "data": "26",
+          "datak": "27"
         },
         "parameters": {
           "scrambling": "auto",

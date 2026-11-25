@@ -103,6 +103,120 @@ package dll_pkg;
     return {lcrc[7:0], lcrc[15:8], lcrc[23:16], lcrc[31:24]};
   endfunction
 
+  // LCRC: polynomial 04C11DB7, seed all ones (PCIe 2.1 3.5.2.1)
+  localparam logic [31:0] LCRC_POLY  = 32'h04C1_1DB7;
+
+  // The LCRC of a PCLK word in one flat step (#15). Chained byte-serial stages
+  // with an enable each synthesize as a deep chain; but the LFSR is linear:
+  // next bit j is the XOR of some state bits and some data bits. The masks
+  // that pick them are constants, computed at elaboration from the serial
+  // LFSR, so each next bit is one balanced XOR tree.
+  // Data: up to the sequence number (2 bytes) and a word; byte 0 goes first
+  localparam int          LCRC_BYTES = DATA_BYTES + 2;
+  typedef logic [LCRC_W-1:0] lcrc_t;
+  typedef logic [LCRC_BYTES*8-1:0] lcrc_data_t;
+  typedef logic [LCRC_W-1:0][LCRC_W-1:0] lcrc_crows_t;  // row j: state bits in next bit j
+  typedef logic [LCRC_W-1:0][LCRC_BYTES*8-1:0] lcrc_drows_t;  // row j: data bits in it
+
+  // The serial LFSR over n bytes, bit 0 of byte 0 first
+  function automatic lcrc_t lcrc_serial(input lcrc_t crc, input lcrc_data_t data, input int n);
+    for (int i = 0; i < n * 8; i++) begin
+      crc = {crc[LCRC_W-2:0], 1'b0} ^ ((crc[LCRC_W-1] ^ data[i]) ? LCRC_POLY : '0);
+    end
+    return crc;
+  endfunction
+
+  // The masks for n bytes: the serial LFSR on each state bit and each data bit alone
+  function automatic lcrc_crows_t lcrc_crows(input int n);
+    lcrc_crows_t rows;
+    lcrc_t       cols [LCRC_W];
+    lcrc_t       row;
+    for (int i = 0; i < LCRC_W; i++) begin
+      cols[i] = lcrc_serial(lcrc_t'(1) << i, '0, n);
+    end
+    for (int j = 0; j < LCRC_W; j++) begin
+      for (int i = 0; i < LCRC_W; i++) begin
+        row[i] = cols[i][j];
+      end
+      rows[j] = row;
+    end
+    return rows;
+  endfunction
+
+  function automatic lcrc_drows_t lcrc_drows(input int n);
+    lcrc_drows_t rows;
+    lcrc_t       cols [LCRC_BYTES*8];
+    lcrc_data_t  row;
+    for (int i = 0; i < LCRC_BYTES * 8; i++) begin
+      cols[i] = (i < n * 8) ? lcrc_serial('0, lcrc_data_t'(1) << i, n) : '0;
+    end
+    for (int j = 0; j < LCRC_W; j++) begin
+      for (int i = 0; i < LCRC_BYTES * 8; i++) begin
+        row[i] = cols[i][j];
+      end
+      rows[j] = row;
+    end
+    return rows;
+  endfunction
+
+  // A word, half a word (the last DW of a TLP), and both after the sequence number
+  localparam lcrc_crows_t LCRC_C_W  = lcrc_crows(DATA_BYTES);
+  localparam lcrc_crows_t LCRC_C_H  = lcrc_crows(DATA_BYTES / 2);
+  localparam lcrc_crows_t LCRC_C_SW = lcrc_crows(DATA_BYTES + 2);
+  localparam lcrc_crows_t LCRC_C_SH = lcrc_crows(DATA_BYTES / 2 + 2);
+  localparam lcrc_drows_t LCRC_D_W  = lcrc_drows(DATA_BYTES);
+  localparam lcrc_drows_t LCRC_D_H  = lcrc_drows(DATA_BYTES / 2);
+  localparam lcrc_drows_t LCRC_D_SW = lcrc_drows(DATA_BYTES + 2);
+  localparam lcrc_drows_t LCRC_D_SH = lcrc_drows(DATA_BYTES / 2 + 2);
+
+  function automatic lcrc_t lcrc_flat(
+      input lcrc_t       crc,
+      input lcrc_data_t  data,
+      input lcrc_crows_t crows,
+      input lcrc_drows_t drows
+  );
+    lcrc_t next;
+    for (int j = 0; j < LCRC_W; j++) begin
+      next[j] = ^(crc & crows[j]) ^ ^(data & drows[j]);
+    end
+    return next;
+  endfunction
+
+  // One word's LCRC step in two parts, for lcrc_pipe (#15): next =
+  // lcrc_state(crc, half) ^ lcrc_part(...), since the step is linear.
+  // lcrc_part is the data's part: seq_bytes first when seq (byte 0 in [7:0]),
+  // only the lower half of data when half. A word with seq starts a TLP: its
+  // state is the seed (all ones), whose part is a constant, taken in here
+  function automatic lcrc_t lcrc_part(
+      input pipe_data_t        data,
+      input logic       [15:0] seq_bytes,
+      input logic              seq,
+      input logic              half
+  );
+    lcrc_data_t d_w, d_h, d_sw, d_sh;
+    d_w  = lcrc_data_t'(data);
+    d_h  = lcrc_data_t'(data[DATA_WIDTH/2-1:0]);
+    d_sw = lcrc_data_t'({data, seq_bytes});
+    d_sh = lcrc_data_t'({data[DATA_WIDTH/2-1:0], seq_bytes});
+    if (seq && half) begin
+      return lcrc_flat('1, d_sh, LCRC_C_SH, LCRC_D_SH);
+    end
+    else if (seq) begin
+      return lcrc_flat('1, d_sw, LCRC_C_SW, LCRC_D_SW);
+    end
+    else if (half) begin
+      return lcrc_flat('0, d_h, LCRC_C_H, LCRC_D_H);
+    end
+    else begin
+      return lcrc_flat('0, d_w, LCRC_C_W, LCRC_D_W);
+    end
+  endfunction
+
+  // The state's part of a step without seq: a word, or half a word
+  function automatic lcrc_t lcrc_state(input lcrc_t crc, input logic half);
+    return half ? lcrc_flat(crc, '0, LCRC_C_H, LCRC_D_H) : lcrc_flat(crc, '0, LCRC_C_W, LCRC_D_W);
+  endfunction
+
   // The sequence number field of a TLP, as received: 4 reserved bits, then
   // the number. The LCRC covers the reserved bits too (PCIe 2.1 3.5.2.1)
   typedef struct packed {

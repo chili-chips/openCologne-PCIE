@@ -106,7 +106,7 @@ equiv_status
 EOF
 rc=0
 "$YOSYS" $YOSYS_ARGS -q -l eq.log eq.ys >/dev/null || rc=$?
-grep -E "Found [0-9]+ .equiv|Of those cells|^ERROR" eq.log | tail -3
+grep -E "Found [0-9]+ .equiv|Of those cells|successfully proven|^ERROR" eq.log | tail -3
 grep "Unproven" eq.log | sed -E 's/.*: .([^ ]*)_gold.*/\1/; s/\[[0-9]+\]//g' | sort | uniq -c
 echo "log: $W/eq.log"
 

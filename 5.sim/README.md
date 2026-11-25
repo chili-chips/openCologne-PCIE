@@ -102,7 +102,7 @@ make EP=rtl DUMP=1 run       # also write tb_rtl.fst: every layer of the EP, for
 
 `DUMP=1` writes the FST natively (Verilator `--trace-fst`, Icarus `vvp -fst`, JanusHDL `--fst`: every signal):
 
-- **`EP=model`: `tb.fst`.** The PIPE link both ways, its clock and reset, and one decoder page per pcieVHost (`tb.u_rc`, `tb.dut.bfm_pcie`): every decoder input (PIPE, DLL, TLPs), under the names WaveCrux auto-binds. `IFACE=serial`: `tb_serial.fst`, the serial line (`tb.ser_dn_line`, `tb.ser_up_line`); on Icarus also the ports of both models (Verilator: `tb.vlt` keeps the upstream models out). `IFACE=phy`: `tb_phy.fst`, the line, the PIPE of our PHY (`tb.dut.pipe_mac`), the PHY inside, and the EP model's page (`tb.dut.bfm_pcie`), about 43 MB.
+- **`EP=model`: `tb.fst`.** The PIPE link both ways, its clock and reset, and one decoder page per pcieVHost (`tb.g_rc.u_rc`, `tb.g_ep_model.dut.bfm_pcie`): every decoder input (PIPE, DLL, TLPs), under the names WaveCrux auto-binds. `IFACE=serial`: `tb_serial.fst`, the serial line (`tb.ser_dn_line`, `tb.ser_up_line`); on Icarus also the ports of both models (Verilator: `tb.vlt` keeps the upstream models out). `IFACE=phy`: `tb_phy.fst`, the line, the PIPE of our PHY (`tb.g_ep_phy.dut.pipe_mac`), the PHY inside, and the EP model's page (`tb.g_ep_phy.dut.bfm_pcie`), about 43 MB.
 - **`EP=rtl`: `tb_rtl.fst`** (`IFACE=serial`: `tb_rtl_serial.fst`). A decoder page at every layer boundary of our EP ([below](#viewing-the-ep-in-wavecrux)).
 - **Session.** [`tb.DLL-PIPE.wavecrux`](tb.DLL-PIPE.wavecrux) opens the tracked [`tb.fst`](tb.fst) (Verilator run) with Ferrite's PIPE and DLL decoders on both directions. It binds signals by number: after a change to the dumped signals, run [`tools/wavecrux-rebind.py`](tools/wavecrux-rebind.py) on it.
 - **lz4.** Verilator 5.055 has its own FST writer, which needs the lz4 headers (`liblz4-dev`).
@@ -260,18 +260,18 @@ Three complementary sets, one per layer:
 | WaveCrux Pro PCIe TLP analysis | latency, timeouts, Base Spec rule checks, bus statistics | [WaveCrux docs](https://github.com/Ferrite-Engineering/wavecrux/blob/main/docs-site/docs/protocol-decoders.md#pcie-tlp-analysis) |
 
 - Ferrite's DLL decoder names each TLP from the PIPE bits (`TLP seq=5 MWr32 len=1`).
-- Our TLP decoder reads the host's TLP stream from `tb.u_rc` (`tx_` RC -> EP, `rx_` EP -> RC), from transaction taps we added to pcieVHost ([below](#transaction-taps-a-test-platform-at-every-layer)).
+- Our TLP decoder reads the host's TLP stream from `tb.g_rc.u_rc` (`tx_` RC -> EP, `rx_` EP -> RC), from transaction taps we added to pcieVHost ([below](#transaction-taps-a-test-platform-at-every-layer)).
 - With `EP=rtl`, all three sets decode our EP's own layers, from the PIPE to the firmware ([Viewing the EP in WaveCrux](#viewing-the-ep-in-wavecrux)).
 
 ### Transaction taps: a test platform at every layer
 
-Each pcieVHost reports every TLP and DLLP it sends and receives on ports of its own, offered at the PIPE, Data Link and Transaction layers ([how it works](https://github.com/chili-chips/openPCIE_BFM/blob/main/2.rtl/README.md#transaction-taps)). Both sides use it: the host `RCPIPEx1__pcieVHost` and the EP model `EPPIPEx1__pcieVHost_DUT`, each with its decoder page, `tb.u_rc` and `tb.dut.bfm_pcie`, with the same names by link direction (dn = RC -> EP, up = EP -> RC). With `EP=rtl`, the host's `dll_rx_*` can drive a TL under test, and its taps are the reference for the DUT's own TL and DLL.
+Each pcieVHost reports every TLP and DLLP it sends and receives on ports of its own, offered at the PIPE, Data Link and Transaction layers ([how it works](https://github.com/chili-chips/openPCIE_BFM/blob/main/2.rtl/README.md#transaction-taps)). Both sides use it: the host `RCPIPEx1__pcieVHost` and the EP model `EPPIPEx1__pcieVHost_DUT`, each with its decoder page, `tb.g_rc.u_rc` and `tb.g_ep_model.dut.bfm_pcie`, with the same names by link direction (dn = RC -> EP, up = EP -> RC). With `EP=rtl`, the host's `dll_rx_*` can drive a TL under test, and its taps are the reference for the DUT's own TL and DLL.
 
 ### Viewing the EP in WaveCrux
 
 With `EP=rtl`, `DUMP=1` gives our EP a decoder page at every layer boundary:
 
-- [`models/ep_wavecrux_view.sv`](models/ep_wavecrux_view.sv), bound into `pcie_core` as `wavecrux` (`tb.dut.u_core.wavecrux`; with `IFACE=serial` `tb.dut.u_pcie_top.u_core.wavecrux`);
+- [`models/ep_wavecrux_view.sv`](models/ep_wavecrux_view.sv), bound into `pcie_core` as `wavecrux` (`tb.g_ep_rtl.dut.u_core.wavecrux`; with `IFACE=serial` `tb.g_ep_rtl_serial.dut.u_pcie_top.u_core.wavecrux`);
 - the CPU's retired instructions, `soc_top.cpu_view` (`DUMP=1` builds eduBOS5 with `RISCV_FORMAL`).
 
 [`wavecrux.f`](wavecrux.f) lists the view files. Verilator does not limit the trace to the `$dumpvars` scopes, so the FST also holds all of `pcie_top`, six levels deep: the RTL behind every decoded packet is in the same file.
@@ -284,9 +284,9 @@ With `EP=rtl`, `DUMP=1` gives our EP a decoder page at every layer boundary:
 | TL ↔ `trn_bridge`, `trn_rx_if`, `trn_tx_if` | `trn_*` | the same | layers, serial |
 | `trn_bridge` ↔ SOC, AXI-Stream | `m_axis_rx_*`, `s_axis_tx_*` | WaveCrux Pro: PCIe TLP, Xilinx 7 Series AXIS preset | layers, serial |
 | | `tlp_view.tx_*`, `tlp_view.rx_*` | our [TLP decoder](https://github.com/Ferrite-Engineering/wavecrux-decoders/tree/main/decoders/pcie-tlp) (free), one DW per clock | free |
-| SOC CPU | `tb.dut.u_soc.cpu_view.rvfi_*` | WaveCrux: RISC-V instruction trace | all |
+| SOC CPU | `tb.g_ep_rtl.dut.u_soc.cpu_view.rvfi_*` | WaveCrux: RISC-V instruction trace | all |
 | serial line, `IFACE=serial` | `tb.ser_dn_line`, `tb.ser_up_line` | wcx-pcie: PCIe serial line, symbols and Data Link Layer | serial |
-| host taps, `IFACE=pipe` | `tb.u_rc` `tx_*`, `rx_*` | our TLP decoder | layers, free |
+| host taps, `IFACE=pipe` | `tb.g_rc.u_rc` `tx_*`, `rx_*` | our TLP decoder | layers, free |
 
 As on the host's page, dn is RC -> EP and up is EP -> RC. The Pro TLP decoder takes both directions in one instance, `tlp_*` RC -> EP and `peer_*` EP -> RC, and pairs every completion with its request. Its Data Width has to be 64: at its default, 32, it reads only the lower DW of each beat, and the completions come out wrong.
 
@@ -457,13 +457,22 @@ Four fixes got there, all in openPCIE's `pcievhost-speed.patch`:
 | `SIM_SERIAL` | `Makefile` (`IFACE=serial`, `phy`) | the host does 8b/10b and scrambling itself, on the serial line | openPCIE |
 | `A7RC_LITERAL` | `Makefile` (`A7RC`) | `1`: the host sends only what the lab RC sends; `0`: the tester | openPCIE |
 | `VPROC` | `Makefile` | the HAL's VProc back end (`csr_regs.h`, `pcie.c`), compiled with `CPU=vproc` | ours |
-| `EP_RTL` | `Makefile` (`EP=rtl`) | `tb.sv` instantiates the EP RTL instead of the EP model | ours |
-| `IFACE_SERIAL` | `Makefile` (`IFACE=serial`, `phy`) | `tb.sv` connects the host on the serial line | ours |
-| `IFACE_PHY` | `Makefile` (`IFACE=phy`) | `tb.sv` puts `ep_model_phy` under the host; `VUserMain1.cpp` scrambles at the PIPE, without 8b/10b | ours |
+| `IFACE_PHY` | `Makefile` (`IFACE=phy`) | `VUserMain1.cpp` scrambles at the PIPE, without 8b/10b | ours |
 | `CDR_MODEL=FAST` | `Makefile` (`EP=rtl IFACE=serial`, `IFACE=phy`) | the SerDes BFM's CDR model | ours |
 | `SOC_CPU_VPROC` | `Makefile` (`CPU=vproc`, `iss`) | `soc_top.sv` puts `soc_cpu.VPROC.sv` in the CPU socket | ours |
 | `RISCV_FORMAL` | `Makefile` (`EP=rtl DUMP=1`) | eduBOS5 drives its RVFI outputs, for the CPU's WaveCrux page | ours |
-| `DUMP` | `Makefile` (`DUMP=1`) | `tb.sv` writes `tb.fst`, `tb_serial.fst`, `tb_phy.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst` | ours |
+
+`tb.sv` has no defines: its settings are parameters, which the Makefile passes to each simulator (`TB_PARAMS`: Verilator `-G`, Icarus `-Ptb.`, JanusHDL `-g`):
+
+| Parameter | Set by | Effect |
+|---|---|---|
+| `EP_RTL` | `EP=rtl` | our EP RTL instead of the EP model |
+| `IFACE_SERIAL` | `IFACE=serial`, `phy` | the host on the serial line |
+| `IFACE_PHY` | `IFACE=phy` | the EP model behind our PHY (`ep_model_phy`) |
+| `DUMP` | `DUMP=1` | writes `tb.fst`, `tb_serial.fst`, `tb_phy.fst`, `tb_rtl.fst` or `tb_rtl_serial.fst` (JanusHDL: its own `--fst`) |
+| `PPM`, `RX_RETIME`, `POL_DN` | `PPM`, `RETIME`, `POL` | see the make variables above |
+
+The DUT and the host sit in generate blocks, one per setting (`tb.g_ep_model.dut`, `tb.g_ep_rtl.dut`, `tb.g_ep_rtl_serial.dut`, `tb.g_ep_phy.dut`, `tb.g_ep_serial.dut`; the host `tb.g_rc.u_rc` or `tb.g_rc_serial.u_rc`). A mode compiles only its own blocks' modules. Verilator resolves a dotted reference even in a block not taken, so the references into `top`, `pcie_top` and `ep_model_phy` (the SerDes pins of `top`, three dumps) are in [`models/tb_glue_*.sv`](models), bound into `tb` by the mode that compiles them (`TB_GLUE`).
 
 The model's own defines (`EXCLUDE_LTSSM`, `VPROC_SV`, `ICARUS`, `VPROC_BYTE_ENABLE`, ...): [openPCIE_BFM, build defines](https://github.com/chili-chips/openPCIE_BFM/blob/main/2.rtl/README.md#build-defines).
 

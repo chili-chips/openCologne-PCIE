@@ -78,9 +78,9 @@ module soc_top
   // The CPU -- two interchangeable implementations
   //
   //   default             : the eduBOS5 RTL core (CPU.eduBOS5, a copy from
-  //                         openPCIE), 2-stage pipeline,
-  //                         executing firmware.hex out of the RAM below;
-  //                         `define SOC_EDUBOS5_3STG for 3-stage.
+  //                         openPCIE), 3-stage pipeline, register file in
+  //                         block RAM, executing firmware.hex out of the RAM
+  //                         below; `define SOC_EDUBOS5_2STG for 2-stage.
   //   `define SOC_CPU_VPROC : the VProc virtual processor, so that a native
   //                         C/C++ program or the rv32 ISS drives the very
   //                         same bus. Co-simulation only -- see 5.sim.
@@ -177,14 +177,20 @@ module soc_top
     end
   endgenerate
 
-`ifdef SOC_EDUBOS5_3STG
-  localparam int EDUBOS5_WAIT4REGS = 1;  // 3-stage pipeline
+  // GateMate has no LUT RAM: the 3-stage core, whose register file reads on a
+  // clock and so maps to block RAM. SOC_EDUBOS5_2STG: the 2-stage core, its
+  // register file in flip-flops (the build before 2026-11-24)
+`ifdef SOC_EDUBOS5_2STG
+  localparam int EDUBOS5_WAIT4REGS = 0;     // 2-stage pipeline
+  localparam bit EDUBOS5_RF_SYNC   = 1'b0;  // register file read asynchronously
 `else
-  localparam int EDUBOS5_WAIT4REGS = 0;  // 2-stage pipeline
+  localparam int EDUBOS5_WAIT4REGS = 1;     // 3-stage pipeline
+  localparam bit EDUBOS5_RF_SYNC   = 1'b1;  // register file in block RAM
 `endif
 
   edubos5 #(
-      .EN_WAIT4REGS (EDUBOS5_WAIT4REGS)
+      .EN_WAIT4REGS (EDUBOS5_WAIT4REGS),
+      .RF_SYNC_READ (EDUBOS5_RF_SYNC)
   ) cpu (
       .clk           (clk),
       .arst_n        (resetn),

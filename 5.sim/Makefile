@@ -66,8 +66,8 @@ else ifeq ($(EP),rtl)
   endif
   A7RC_EXPECT  = -DA7RC_EP_EXPECT='"a7rc_ep.h"' -DA7RC_PIPE_SCRAMBLE  # our EP scrambles at the PIPE too
   EP_FILES     = rtl.f
-  EP_VLT       = +define+EP_RTL -F rtl.f --assert models/ep_sva.sv
-  EP_JHDL      = -DEP_RTL                # JanusHDL: the same define, and ep_sva.sv in the list
+  EP_VLT       = -F rtl.f --assert models/ep_sva.sv
+  # JanusHDL: ep_sva.sv in the list
   EP_JHDL_SV   = models/ep_sva.sv
   EP_OBJ       = _rtl
   FW_IN        = cp $(CURDIR)/../4.build/sw_build/firmware.hex firmware.hex &&
@@ -80,8 +80,6 @@ ifeq ($(IFACE),serial)
     EP_FILES  += phy.f
     EP_VLT    += +define+CDR_MODEL=$(CDR) ../2.rtl/top.sv -F phy.f
   endif
-  EP_VLT      += +define+IFACE_SERIAL
-  ICA_IFACE    = -DIFACE_SERIAL
   EP_OBJ      := $(EP_OBJ)_serial
 else ifeq ($(IFACE),phy)
   ifneq ($(EP),model)
@@ -92,7 +90,7 @@ else ifeq ($(IFACE),phy)
   endif
   # the host scrambles on the line; the EP model scrambles at the PIPE, our
   # PHY does 8b/10b (usercode/VUserMain1.cpp)
-  EP_VLT      += +define+IFACE_SERIAL +define+IFACE_PHY +define+CDR_MODEL=$(CDR) \
+  EP_VLT      += +define+CDR_MODEL=$(CDR) \
                  --assert -F ep_phy.f
   EP_FILES     = ep_phy.f phy.f
   IFACE_DEFS   = -DIFACE_PHY
@@ -169,7 +167,7 @@ REGRESS_DUMP  ?= none
 WCX_OPEN      ?= 1
 WCX_FST        = $(if $(filter rtl,$(EP)),tb_rtl,tb)$(if $(filter pipe,$(IFACE)),,_$(IFACE)).fst
 WCX_SIGNALS    = $(if $(filter serial phy,$(IFACE)),tb.ser_dn_line tb.ser_up_line,tb.downdata tb.updata \
-                 tb.u_rc.tx_tlp_valid tb.u_rc.tx_tlp_data tb.u_rc.rx_tlp_valid tb.u_rc.rx_tlp_data)
+                 tb.g_rc.u_rc.tx_tlp_valid tb.g_rc.u_rc.tx_tlp_data tb.g_rc.u_rc.rx_tlp_valid tb.g_rc.u_rc.rx_tlp_data)
 ifeq ($(filter 0 1,$(A7RC)),)
   $(error A7RC must be 0 or 1 (got "$(A7RC)"))
 endif
@@ -322,7 +320,7 @@ LDLIBS         = -Wl,-whole-archive $(USERLIB) -Wl,-no-whole-archive \
                  -lpthread -lrt -ldl -rdynamic
 
 # DUMP=1: tb.fst, written natively (Verilator --trace-fst, vvp -fst); depth 3
-# reaches the decoder pages, tb.u_rc (RC) and tb.dut.bfm_pcie (EP); tb.vlt keeps the
+# reaches the decoder pages, tb.g_rc.u_rc (RC) and tb.g_ep_model.dut.bfm_pcie (EP); tb.vlt keeps the
 # upstream models out of it (IFACE=serial: tb_serial.fst, the line; the serial
 # host is upstream's, so its ports are not in it; IFACE=phy: tb_phy.fst, the
 # line, the PIPE of our PHY and the EP model's page). With EP=rtl: tb_rtl.fst (IFACE=serial: tb_rtl_serial.fst),
@@ -330,14 +328,29 @@ LDLIBS         = -Wl,-whole-archive $(USERLIB) -Wl,-no-whole-archive \
 # drives its RVFI outputs (RISCV_FORMAL) for the CPU's page
 DUMP          ?= 0
 ifeq ($(DUMP),1)
-  VLTDUMP      = --trace-fst --trace-depth 3 +define+DUMP tb.vlt
-  ICADUMP      = -DDUMP
+  VLTDUMP      = --trace-fst --trace-depth 4 -GDUMP=1 tb.vlt   # depth: + the generate block
+  ICADUMP      = -Ptb.DUMP=1
   VVPDUMP      = -fst
   ifeq ($(EP),rtl)
-    VLTDUMP    = --trace-fst --trace-depth 6 +define+DUMP +define+RISCV_FORMAL tb.vlt
+    VLTDUMP    = --trace-fst --trace-depth 7 -GDUMP=1 +define+RISCV_FORMAL tb.vlt
     VLTVIEWS   = -F wavecrux.f   # after rtl.f: the views import its packages (Verilator 5.055: USEBEFOREDECL)
   endif
 endif
+
+# tb.sv's glue for the modes whose DUT block other modes cannot compile
+# (models/tb_glue_*.sv, bound into tb)
+TB_GLUE        = $(if $(filter rtl,$(EP)),models/tb_glue_ep_rtl$(if $(filter serial,$(IFACE)),_serial).sv, \
+                 $(if $(filter phy,$(IFACE)),models/tb_glue_ep_phy.sv))
+EP_VLT        += $(TB_GLUE)
+EP_JHDL_SV    += $(TB_GLUE)
+
+# tb.sv's parameters (no macros), name=value; each simulator's way: Verilator
+# -G, Icarus -Ptb., JanusHDL -g. DUMP is VLTDUMP's and ICADUMP's (JanusHDL
+# dumps with its own --fst)
+TB_PARAMS      = PPM=$(PPM) RX_RETIME=$(RETIME) POL_DN=$(POL) \
+                 EP_RTL=$(if $(filter rtl,$(EP)),1,0) \
+                 IFACE_SERIAL=$(if $(filter serial phy,$(IFACE)),1,0) \
+                 IFACE_PHY=$(if $(filter phy,$(IFACE)),1,0)
 
 # --timing: the test bench and the models use delays and event controls
 # CFG_LDFLAGS_VERILATED cleared: a Verilator built with mold links through it
@@ -346,7 +359,7 @@ endif
 VLTFLAGS       = --binary -sv --timing --timescale 1ns/10ps --top-module tb -Mdir $(OBJDIR) $(VLTDUMP) \
                  -Wno-fatal -Wno-WIDTH -Wno-lint -Wno-style                     \
                  +define+VPROC_SV +define+VPROC_BYTE_ENABLE                      \
-                 -GPPM=$(PPM) -GRX_RETIME=$(RETIME) -GPOL_DN=$(POL)             \
+                 $(addprefix -G,$(TB_PARAMS))                                    \
                  $(EP_VLT) $(VLTVIEWS) -F tb.f $(USRSIMFLAGS)                  \
                  -MAKEFLAGS "--quiet CFG_LDFLAGS_VERILATED="                    \
                  -CFLAGS "$(CPPSTD) -Wno-attributes"                            \
@@ -357,7 +370,7 @@ VLTFLAGS       = --binary -sv --timing --timescale 1ns/10ps --top-module tb -Mdi
 # this test bench does not instantiate it. Its first line is the default
 # timescale, for files without one (no `timescale in RTL)
 ICA_FILES      = $(OBJDIR)/tb.icarus.f
-ICAFLAGS       = -g2012 -DVPROC_BYTE_ENABLE -Ptb.PPM=$(PPM) -Ptb.RX_RETIME=$(RETIME) -Ptb.POL_DN=$(POL) $(ICA_IFACE) $(ICADUMP) -s tb -c $(ICA_FILES) $(USRSIMFLAGS)
+ICAFLAGS       = -g2012 -DVPROC_BYTE_ENABLE $(addprefix -Ptb.,$(TB_PARAMS)) $(ICADUMP) -s tb -c $(ICA_FILES) $(USRSIMFLAGS)
 
 # =============================================================================
 # TARGETS
@@ -444,7 +457,7 @@ endif
 $(ICA_FILES): tb.f $(EP_FILES) FORCE | $(OBJDIR)
 	@{ echo '+timescale+1ns/10ps'; sed -e 's#$$VIP_DIR#$(VIP_DIR)#g' -e '/mem_model\.sv/d' \
 	    $(if $(filter janushdl,$(SIM)),-e 's#^[A-Za-z0-9_.]#$(CURDIR)/&#') $(EP_FILES) tb.f; \
-	  $(if $(filter janushdl,$(SIM)),$(foreach f,$(EP_JHDL_SV),echo $(CURDIR)/$(f);)) } > $@
+	  $(if $(filter janushdl,$(SIM)),$(foreach f,$(EP_JHDL_SV),echo $(CURDIR)/$(f);)) } | awk '!seen[$$0]++' > $@   # each file once: rtl.f and tb.f share the BFM package
 
 ifeq ($(SIM),icarus)
 $(SIMEXE): $(VPROC_SO) $(ICA_FILES) FORCE
@@ -460,7 +473,7 @@ else ifeq ($(SIM),icarus)
 SIM_CMD        = $(VVP) -n -M $(OBJDIR) -m VProc $(SIMEXE) $(VVPDUMP)
 else
 # DUMP=1: JanusHDL's own --fst, every signal
-SIM_CMD        = $(JHDL) --top tb $(patsubst -D%,+define+%,-DVPROC_BYTE_ENABLE $(ICA_IFACE) $(EP_JHDL)) -gPPM=$(PPM) -gRX_RETIME=$(RETIME) -gPOL_DN=$(POL) -f $(ICA_FILES) \
+SIM_CMD        = $(JHDL) --top tb +define+VPROC_BYTE_ENABLE $(addprefix -g,$(TB_PARAMS)) -f $(ICA_FILES) \
                  --sv-lib $(VPROC_SO) $(if $(filter 1,$(DUMP)),--fst $(WCX_FST)) $(USRSIMFLAGS)
 endif
 

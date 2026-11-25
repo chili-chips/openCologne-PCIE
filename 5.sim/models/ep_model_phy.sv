@@ -171,7 +171,7 @@ module ep_model_phy
 
   //------------------------------------------------------------------
   // The EP model: a pcieVHost in EP mode at VProc node 1, as in
-  // EPPIPEx1__pcieVHost_DUT; tb.dut.bfm_pcie is its decoder page
+  // EPPIPEx1__pcieVHost_DUT; tb.g_ep_phy.dut.bfm_pcie is its decoder page
   //------------------------------------------------------------------
   PIPEx1__pcieVHost #(
       .NodeNum            (1),

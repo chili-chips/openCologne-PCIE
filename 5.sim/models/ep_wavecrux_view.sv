@@ -13,7 +13,7 @@
 //
 //   Each boundary is offered under the names the decoders auto-bind (a
 //   decoder signal matches the suffix of a signal name under a shared
-//   prefix), by link direction as on the host's page, tb.u_rc
+//   prefix), by link direction as on the host's page, tb.g_rc.u_rc
 //   (dn = RC -> EP, up = EP -> RC):
 //
 //     PIPE         pipe_dn_*, pipe_up_* (pclk, data, datak; rxvalid and

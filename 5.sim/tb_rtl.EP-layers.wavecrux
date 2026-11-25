@@ -5,8 +5,8 @@
     {
       "kind": "signal",
       "id": "ocpcie-0",
-      "ref": "1152",
-      "path": "tb.dut.u_core.wavecrux.ltssm_name",
+      "ref": "1034",
+      "path": "tb.g_ep_rtl.dut.u_core.wavecrux.ltssm_name",
       "name": "ltssm_name",
       "color": 4288585374,
       "format": "ascii",
@@ -15,8 +15,8 @@
     {
       "kind": "signal",
       "id": "ocpcie-1",
-      "ref": "1153",
-      "path": "tb.dut.u_core.wavecrux.dl_name",
+      "ref": "1035",
+      "path": "tb.g_ep_rtl.dut.u_core.wavecrux.dl_name",
       "name": "dl_name",
       "color": 4288585374,
       "format": "ascii",
@@ -25,8 +25,8 @@
     {
       "kind": "signal",
       "id": "ocpcie-2",
-      "ref": "38",
-      "path": "tb.dut.u_core.wavecrux.link_up",
+      "ref": "68",
+      "path": "tb.g_ep_rtl.dut.u_core.wavecrux.link_up",
       "name": "link_up",
       "color": 4288585374,
       "format": "hexadecimal",
@@ -35,7 +35,7 @@
     {
       "kind": "signal",
       "id": "ocpcie-3",
-      "ref": "39",
+      "ref": "69",
       "path": "tb.fw_pass",
       "name": "fw_pass",
       "color": 4288585374,
@@ -84,15 +84,15 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "clk": "28",
-          "tlp_data": "1404",
-          "tlp_sop": "1405",
-          "tlp_eop": "1406",
-          "tlp_valid": "1407",
-          "peer_data": "1408",
-          "peer_sop": "1409",
-          "peer_eop": "1410",
-          "peer_valid": "1411"
+          "clk": "36",
+          "tlp_data": "1429",
+          "tlp_sop": "1430",
+          "tlp_eop": "1431",
+          "tlp_valid": "1432",
+          "peer_data": "1433",
+          "peer_sop": "1434",
+          "peer_eop": "1435",
+          "peer_valid": "1436"
         },
         "parameters": {}
       }
@@ -102,11 +102,11 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "pclk": "29",
-          "data": "30",
-          "datak": "31",
-          "rxvalid": "66",
-          "rxstatus": "68"
+          "pclk": "37",
+          "data": "38",
+          "datak": "39",
+          "rxvalid": "93",
+          "rxstatus": "95"
         },
         "parameters": {
           "scrambling": "auto",
@@ -121,10 +121,10 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "pclk": "29",
-          "data": "30",
-          "datak": "31",
-          "rxvalid": "66"
+          "pclk": "37",
+          "data": "38",
+          "datak": "39",
+          "rxvalid": "93"
         },
         "parameters": {
           "scrambling": "auto",
@@ -137,9 +137,9 @@
       "instanceNumber": 2,
       "config": {
         "bindings": {
-          "pclk": "29",
-          "data": "92",
-          "datak": "93"
+          "pclk": "37",
+          "data": "119",
+          "datak": "120"
         },
         "parameters": {
           "scrambling": "off",
@@ -152,17 +152,17 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "clk": "29",
-          "rst_n": "49",
-          "tlp_data": "1154",
-          "tlp_sop": "109",
-          "tlp_eop": "110",
-          "tlp_valid": "108",
-          "peer_data": "1155",
-          "peer_sop": "98",
-          "peer_eop": "99",
-          "peer_valid": "97",
-          "peer_keep": "1156"
+          "clk": "37",
+          "rst_n": "59",
+          "tlp_data": "1180",
+          "tlp_sop": "136",
+          "tlp_eop": "137",
+          "tlp_valid": "135",
+          "peer_data": "1181",
+          "peer_sop": "125",
+          "peer_eop": "126",
+          "peer_valid": "124",
+          "peer_keep": "1182"
         },
         "parameters": {
           "data_width": "64"
@@ -174,20 +174,20 @@
       "instanceNumber": 2,
       "config": {
         "bindings": {
-          "clk": "29",
-          "rst_n": "49",
-          "tlp_data": "985",
-          "tlp_sop": "129",
-          "tlp_eop": "130",
-          "tlp_valid": "131",
-          "peer_data": "1105",
-          "peer_sop": "119",
-          "peer_eop": "120",
-          "peer_valid": "121",
-          "tlp_ready": "135",
-          "tlp_keep": "1075",
-          "peer_ready": "126",
-          "peer_keep": "1157"
+          "clk": "37",
+          "rst_n": "59",
+          "tlp_data": "1012",
+          "tlp_sop": "157",
+          "tlp_eop": "158",
+          "tlp_valid": "159",
+          "peer_data": "1131",
+          "peer_sop": "147",
+          "peer_eop": "148",
+          "peer_valid": "149",
+          "tlp_ready": "163",
+          "tlp_keep": "1101",
+          "peer_ready": "154",
+          "peer_keep": "1183"
         },
         "parameters": {
           "data_width": "64"
@@ -199,20 +199,20 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "user_clk_out": "29",
-          "user_reset_out": "1158",
-          "m_axis_rx_tdata": "56",
-          "m_axis_rx_tkeep": "57",
-          "m_axis_rx_tlast": "59",
-          "m_axis_rx_tvalid": "60",
-          "m_axis_rx_tready": "61",
-          "m_axis_rx_tuser": "1159",
-          "s_axis_tx_tdata": "70",
-          "s_axis_tx_tkeep": "71",
-          "s_axis_tx_tlast": "73",
-          "s_axis_tx_tvalid": "74",
-          "s_axis_tx_tready": "75",
-          "s_axis_tx_tuser": "72"
+          "user_clk_out": "37",
+          "user_reset_out": "1184",
+          "m_axis_rx_tdata": "77",
+          "m_axis_rx_tkeep": "78",
+          "m_axis_rx_tlast": "80",
+          "m_axis_rx_tvalid": "87",
+          "m_axis_rx_tready": "88",
+          "m_axis_rx_tuser": "1185",
+          "s_axis_tx_tdata": "97",
+          "s_axis_tx_tkeep": "98",
+          "s_axis_tx_tlast": "100",
+          "s_axis_tx_tvalid": "101",
+          "s_axis_tx_tready": "102",
+          "s_axis_tx_tuser": "99"
         },
         "parameters": {}
       }
@@ -222,10 +222,10 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "clk": "29",
-          "instruction": "1184",
-          "valid": "1217",
-          "pc": "1227"
+          "clk": "37",
+          "instruction": "1210",
+          "valid": "1243",
+          "pc": "1253"
         },
         "parameters": {
           "xlen": "32",
@@ -242,9 +242,9 @@
       "instanceNumber": 3,
       "config": {
         "bindings": {
-          "pclk": "29",
-          "data": "94",
-          "datak": "95"
+          "pclk": "37",
+          "data": "121",
+          "datak": "122"
         },
         "parameters": {
           "scrambling": "off",
@@ -257,10 +257,10 @@
       "instanceNumber": 4,
       "config": {
         "bindings": {
-          "pclk": "29",
-          "data": "32",
-          "datak": "33",
-          "txelecidle": "35"
+          "pclk": "37",
+          "data": "40",
+          "datak": "41",
+          "txelecidle": "43"
         },
         "parameters": {
           "scrambling": "auto",
@@ -273,10 +273,10 @@
       "instanceNumber": 2,
       "config": {
         "bindings": {
-          "pclk": "29",
-          "data": "32",
-          "datak": "33",
-          "txelecidle": "35"
+          "pclk": "37",
+          "data": "40",
+          "datak": "41",
+          "txelecidle": "43"
         },
         "parameters": {
           "scrambling": "auto",
@@ -291,15 +291,15 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "clk": "28",
-          "tlp_data": "1408",
-          "tlp_sop": "1409",
-          "tlp_eop": "1410",
-          "tlp_valid": "1411",
-          "peer_data": "1404",
-          "peer_sop": "1405",
-          "peer_eop": "1406",
-          "peer_valid": "1407"
+          "clk": "36",
+          "tlp_data": "1433",
+          "tlp_sop": "1434",
+          "tlp_eop": "1435",
+          "tlp_valid": "1436",
+          "peer_data": "1429",
+          "peer_sop": "1430",
+          "peer_eop": "1431",
+          "peer_valid": "1432"
         },
         "parameters": {}
       }

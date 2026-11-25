@@ -37,34 +37,68 @@
 //              https://opensource.org/license/bsd-3-clause
 //==========================================================================
 
-// LFSR with polynomial x^32 + x^26 + x^23 + x^22 + x^16 + x^12 + x^11 + x^10
-//                    + x^8 + x^7 + x^5 + x^4 + x^2 + x + 1
-// Initial value is 0xFFFFFFFF
+// The LCRC of the words of a TLP in two stages (#15). Stage 1 registers each
+// word's data part (lcrc_part, the wide XOR over the data); stage 2 adds the
+// state's part (lcrc_state, 32 inputs). Only stage 2 is in the loop.
+// crc covers the words up to the clock before: a word in at clock t is in crc
+// at t+1, from the stage 1 registers, as a register of the one-stage LCRC had it.
+module lcrc_pipe
+  import pipe_pkg::*;
+  import dll_pkg::*;
+(
+    input  logic              clk,
+    input  logic              reset,
 
-module lcrc_byte (
-    input  logic [ 7:0] data_in,
-    input  logic        crc_en,
-    input  logic [31:0] crc_in,
-    output logic [31:0] crc_out
+    input  logic              en,         // a word of the TLP
+    input  logic              seq,        // its first: the sequence number goes ahead
+    input  logic              half,       // only its lower half (the last DW)
+    input  pipe_data_t        data,
+    input  logic       [15:0] seq_bytes,  // byte 0 in [7:0]
+
+    output lcrc_t             crc
 );
 
-  localparam logic [31:0] POLY = 32'h04C1_1DB7;  // the PCIe LCRC polynomial above
+  logic  part_en;
+  logic  part_seq;
+  logic  part_half;
+  lcrc_t part;
+  lcrc_t crc_q;
 
-  // One LFSR step per data bit, bit 0 first
-  always_comb begin
-    crc_out = crc_in;
-    if (crc_en) begin
-      for (int i = 0; i < 8; i++) begin
-        crc_out = {crc_out[30:0], 1'b0} ^ (crc_out[31] ^ data_in[i] ? POLY : '0);
+  // part feeds the FSMs' LCRC check through crc: a control flop, reset
+  always_ff @(posedge clk or posedge reset) begin
+    if (reset) begin
+      part_en   <= 1'b0;
+      part_seq  <= 1'b0;
+      part_half <= 1'b0;
+      part      <= '0;
+      crc_q     <= '1;
+    end
+    else begin
+      part_en <= en;
+      if (en) begin
+        part_seq  <= seq;
+        part_half <= half;
+        part      <= lcrc_part(data, seq_bytes, seq, half);
       end
+      crc_q <= crc;
+    end
+  end
+
+  // a first word's state is the seed, already in its part
+  always_comb begin
+    crc = crc_q;
+    if (part_en && part_seq) begin
+      crc = part;
+    end
+    else if (part_en) begin
+      crc = lcrc_state(crc_q, part_half) ^ part;
     end
   end
 
 endmodule
-
 // -----------------------------------------------------------------------------
 // Project:     openCologne-PCIE
 // Description: NLnet-sponsored open-source implementation
 // Version:     1.0
-// Date:        Jul 11, 2026
+// Date:        Nov 24, 2026
 // -----------------------------------------------------------------------------

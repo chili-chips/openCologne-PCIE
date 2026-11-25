@@ -14,7 +14,8 @@
 #   yosys      Yosys check on the read_slang netlist: combinational loops,
 #              conflicting drivers, used-but-undriven wires, latches
 #   reset      Yosys netlist and run-lint-reset.py: a control flop or flag with
-#              no reset (data and address flops need none: waived by name)
+#              no reset (data and address flops need none: waived by name);
+#              top, then eduBOS5 alone with RV32M and the counters
 #   slang      read_slang -Wextra: strict IEEE parse, second opinion
 #   verible    Verible style rules (run-lint.verible) on all RTL (not the BFM, csr.sv, eduBOS5): our case
 #              rule -- signals and ports lower case, constants UPPER case --
@@ -85,6 +86,7 @@ W=${LINT_WORK:-$(mktemp -d)}
 mkdir -p "$W"
 
 # ---- work copy ----------------------------------------------------------------
+rm -rf "$W/2.rtl" "$W/csr" "$W/bb.v"   # a reused LINT_WORK keeps no stale sources or stubs
 (cd "$REPO" && cp -r --parents 2.rtl/*.sv 2.rtl/1.phy/phy_top.sv 2.rtl/1.phy/2.openSERDES_BFM/1.gatemate/1.model \
    2.rtl/2.pipe/*.sv 2.rtl/3.mac/*.sv 2.rtl/4.dll/*.sv 2.rtl/5.tlp 2.rtl/6.trn_bridge 2.rtl/7.soc \
    "$W/")
@@ -94,13 +96,18 @@ cp "$REPO/4.build/sw_build/firmware.hex" "$W/"
 cd "$W"
 SV=$(design_rtl 2.rtl csr $SIM | tr '\n' ' ')
 OWN="$(own_rtl 2.rtl) $(ls 2.rtl/2.pipe/*.sv 2.rtl/3.mac/*.sv 2.rtl/4.dll/*.sv | grep -v -E '_(if|pkg)\.sv')"
+EDUBOS5_SV=$(for f in pkg rf alu; do echo 2.rtl/7.soc/CPU.eduBOS5/edubos5_$f.sv; done
+             echo 2.rtl/7.soc/CPU.eduBOS5/edubos5.sv)
 
 have() { command -v "$1" >/dev/null 2>&1; }
 declare -A RESULT
 skip() { RESULT[$1]="skipped ($2)"; echo "-- $1: skipped, $2"; }
 
-# waiver regexes of one phase: the lines "<phase> <regex>" of the waivers file
+# waiver regexes of one phase: the lines "<phase> <regex>" of the waivers file;
+# a regex that never matches keeps grep -v -f from dropping every line when
+# the phase has no waiver
 waivers() {
+  echo '^$'
   [ -f "$WAIVERS" ] || return 0
   awk -v ph="$1" '{ sub(/\r$/, "") } $1 == ph { sub(/^[ \t]*[^ \t]+[ \t]+/, ""); print }' "$WAIVERS"
 }
@@ -113,7 +120,7 @@ waivers() {
 } > lint_ok.txt
 
 found() {  # $1 phase; one finding per line on stdin (not a pipe: RESULT must stay in this shell)
-  cat > $1.all
+  awk '!seen[$0]++' > $1.all  # a finding that several tops or runs share, once
   # drop findings about a pin waived inline: file:line plus the 'PIN' the tools
   # quote (Windows tools print \ in paths)
   awk 'NR == FNR { ok[$0] = 1; next }
@@ -274,12 +281,23 @@ run_reset() {
   [ -z "$SIM" ] || { skip reset "sim view: the SerDes BFM is behavioural, not for synthesis tools"; return; }
   have "$YOSYS" || { skip reset "$YOSYS not found"; return; }
   bb || { skip reset "no GateMate stubs"; return; }
-  "$YOSYS" $YOSYS_ARGS -q -l reset.log -p "read_slang $SL_DEFS --top $TOP bb.v $SV;       hierarchy -check -top $TOP; proc; flatten; opt_expr; opt_clean; opt_dff; opt_clean;       write_json reset.json" >/dev/null 2>&1
+  "$YOSYS" $YOSYS_ARGS -q -l reset.log -p "read_slang $SL_DEFS --top $TOP bb.v $SV; \
+      hierarchy -check -top $TOP; proc; flatten; opt_expr; opt_clean; opt_dff; opt_clean; \
+      write_json reset.json" >/dev/null 2>&1
   local rc=$?
   [ $rc -eq 0 ] && [ -s reset.json ] || { failed reset "exit $rc, no netlist"; return; }
   "$PYTHON" "$HERE/run-lint-reset.py" reset.json > reset.out 2>> reset.log ||
     { failed reset "netlist check failed"; return; }
-  found reset < reset.out
+  # eduBOS5 alone with the options no SoC build sets: RV32M (in RTL) and the
+  # counters
+  "$YOSYS" $YOSYS_ARGS -q -l reset.cpu.log -p "read_slang --top edubos5 -G USE_HW_MUL=1 -G EN_COUNTERS=1 \
+      $(echo $EDUBOS5_SV); hierarchy -check -top edubos5; proc; flatten; opt_expr; opt_clean; opt_dff; opt_clean; \
+      write_json reset.cpu.json" >/dev/null 2>&1
+  rc=$?
+  [ $rc -eq 0 ] && [ -s reset.cpu.json ] || { failed reset "eduBOS5 RV32M: exit $rc, no netlist"; return; }
+  "$PYTHON" "$HERE/run-lint-reset.py" reset.cpu.json >> reset.out 2>> reset.log ||
+    { failed reset "eduBOS5 RV32M: netlist check failed"; return; }
+  found reset < <(sort -u reset.out)
 }
 
 run_slang() {

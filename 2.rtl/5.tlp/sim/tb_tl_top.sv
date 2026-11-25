@@ -708,6 +708,20 @@ module tb_tl_top
         end
     end
 
+    // tl_top's tx_buf_avail is trn_tlps_fit(free_words) three clocks late
+    trn_words_t free_d1, free_d2, free_d3;
+    integer     up_clks;
+    always @(posedge clk) begin
+        free_d1 <= trn_tx.free_words;
+        free_d2 <= free_d1;
+        free_d3 <= free_d2;
+        up_clks <= (reset || !dut.dl_up) ? 0 : up_clks + 1;
+        if (!reset && dut.dl_up && up_clks >= 3 && cfg.tx_buf_avail !== trn_tlps_fit(free_d3)) begin
+            errors = errors + 1;
+            $display("[%0t] ERROR: tx_buf_avail %0d, free_words %0d three clocks before", $time, cfg.tx_buf_avail, free_d3);
+        end
+    end
+
     always @(posedge clk) begin
         if (!reset && bridge_rst_n && trn_tx.vld && !trn_tx.rdy) begin
             errors = errors + 1;

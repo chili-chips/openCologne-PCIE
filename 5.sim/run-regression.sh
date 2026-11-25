@@ -40,7 +40,7 @@ declare -A KNOWN_SIG=(
 other_assert() {  # name: the first design assertion that is not an SVA of its
     local re      # known issues (the bench's own ends are KNOWN_SIG's business)
     re=$(echo "${KNOWN[$1]}" | sed 's/#\([0-9]*\)/SVA #\1:/g; s/ /|/g')
-    grep -a 'Assertion failed in tb\.dut' $LOG/$1.log | grep -a -v -E "\*\*\*\* ($re)" | head -1 | sed -E 's/^\[[0-9]+\] //' | cut -c1-100
+    grep -a 'Assertion failed in tb\.g_ep' $LOG/$1.log | grep -a -v -E "\*\*\*\* ($re)" | head -1 | sed -E 's/^\[[0-9]+\] //' | cut -c1-100
 }
 
 report() {  # name, seconds, pass (0/1), what, result

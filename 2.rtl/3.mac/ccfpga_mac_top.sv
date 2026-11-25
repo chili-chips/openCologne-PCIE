@@ -398,9 +398,9 @@ module ccfpga_mac_top
   assign descrambler_en = ~ts_ctrl.disable_scrambling;
   // Training sequence indication for scrambler/descrambler
   assign tx_sym_is_ts = sending_os ? {DATA_BYTES{1'b1}} : {DATA_BYTES{1'b0}};
-  assign rx_sym_is_ts =
-      (s_fsm_state == L0 | s_fsm_state == CONFIG_IDLE | s_fsm_state == PRE_L0) ?
-      {DATA_BYTES{1'b0}} : {DATA_BYTES{1'b1}};
+  assign rx_sym_is_ts = (s_fsm_state == L0 | s_fsm_state == CONFIG_IDLE | s_fsm_state == PRE_L0)
+                      ? {DATA_BYTES{1'b0}}
+                      : {DATA_BYTES{1'b1}};
   // -----------------------------------------------------------------------------------------------
 endmodule
 

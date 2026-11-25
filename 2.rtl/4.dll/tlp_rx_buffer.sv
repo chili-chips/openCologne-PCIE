@@ -96,71 +96,39 @@ module tlp_rx_buffer
     WRITE_START = 3'd5,
     SEND_TLP    = 3'd6
   } state_e;
-  state_e                  state;
+  state_e state;
 
 
   // CRC also takes sequence number into account
   // Feed sequence number first
-  logic [LFSR_WIDTH-1:0] crc_seq_0;
-  logic [LFSR_WIDTH-1:0] crc_seq_1;
-  logic                  crc_en;
+  logic  crc_en;
   // enabled when sequence number and TLP available
-  assign                 crc_en = tlp_valid & (stp_detected | state == STORE_TLP);
+  assign crc_en = tlp_valid & (stp_detected | state == STORE_TLP);
 
-  logic     [LFSR_WIDTH-1:0] crc_state;  // store current CRC state;
+  logic     [LFSR_WIDTH-1:0] crc_state;  // the words through the clock before (lcrc_pipe)
   logic     [LFSR_WIDTH-1:0] rx_lcrc;  // store received LCRC for comparison
   seq_num_t                  rx_seq_num;  // store sequence number for comparison
 
   logic  seq_crc_en;  // the sequence number enters the LCRC at STP
   assign seq_crc_en = stp_detected & tlp_valid;
 
-  lcrc_byte u_seq_crc_0 (
-      .data_in ({sequence_number.rsvd, sequence_number.num[11:8]}),
-      .crc_en  (seq_crc_en),
-      .crc_in  (crc_state),
-      .crc_out (crc_seq_0)
+  // the sequence number's two bytes, byte 0 in [7:0]
+  logic [15:0] seq_bytes;
+  assign seq_bytes = {sequence_number.num[7:0], sequence_number.rsvd, sequence_number.num[11:8]};
+
+  // two stages; the half-word end of a TLP: the upper DW is no part of the
+  // CRC. An STP restarts it, so a dropped TLP leaves nothing behind. The
+  // last word, with END, is in crc_state in CHECK_CRC
+  lcrc_pipe u_lcrc (
+      .clk       (clk),
+      .reset     (reset),
+      .en        (crc_en),
+      .seq       (seq_crc_en),
+      .half      (tlp_half),
+      .data      (data_tl_in),
+      .seq_bytes (seq_bytes),
+      .crc       (crc_state)
   );
-
-  lcrc_byte u_seq_crc_1 (
-      .data_in (sequence_number.num[7:0]),
-      .crc_en  (seq_crc_en),
-      .crc_in  (crc_seq_0),
-      .crc_out (crc_seq_1)
-  );
-
-  logic [LFSR_WIDTH-1:0]            crc_tlp_in;
-  // crc after sequence number as crc_in for first tlp word
-  assign                            crc_tlp_in = stp_detected ? crc_seq_1 : crc_state;
-  logic [DATA_BYTES*LFSR_WIDTH-1:0] lfsr_in;
-  logic [DATA_BYTES*LFSR_WIDTH-1:0] lfsr_out;
-
-  generate
-    if (DATA_BYTES == 1) begin : g_lfsr_chain_1
-      assign lfsr_in = crc_tlp_in;
-    end
-    else begin : g_lfsr_chain
-      assign lfsr_in = {lfsr_out[(DATA_BYTES-1)*LFSR_WIDTH-1:0], crc_tlp_in};
-    end
-  endgenerate
-
-  logic [LFSR_WIDTH-1:0] crc_next;
-  assign                 crc_next = lfsr_out[DATA_BYTES*LFSR_WIDTH-1-:LFSR_WIDTH];
-
-  genvar i;
-  generate
-    for (i = 0; i < DATA_BYTES; i = i + 1) begin : g_crc_bytes
-      // the half-word end of a TLP: the upper DW is no part of the CRC
-      logic  byte_en;
-      assign byte_en = crc_en & (i < DATA_BYTES / 2 | ~tlp_half);
-
-      lcrc_byte u_crc_byte (
-          .data_in (data_tl_in[i*8+:8]),
-          .crc_en  (byte_en),
-          .crc_in  (lfsr_in[i*LFSR_WIDTH+:LFSR_WIDTH]),
-          .crc_out (lfsr_out[i*LFSR_WIDTH+:LFSR_WIDTH])
-      );
-    end
-  endgenerate
 
   // bit complemented and bit-reversed for each byte
   logic [LFSR_WIDTH-1:0] crc_computed;
@@ -218,7 +186,6 @@ module tlp_rx_buffer
       read_ptr         <= 0;
       read_cnt         <= 0;
       word_cnt         <= 0;
-      crc_state        <= {LFSR_WIDTH{1'b1}};
       rx_lcrc          <= {LFSR_WIDTH{1'b0}};
       rx_seq_num       <= 12'b0;
       nak_scheduled    <= 1'b0;
@@ -241,7 +208,6 @@ module tlp_rx_buffer
               write_ptr  <= 1;  // first word has already been written in this cycle
               word_cnt   <= 1;
               rx_seq_num <= sequence_number.num;
-              crc_state  <= crc_next;
               state      <= STORE_TLP;
             end
             else if ((next_rcv_seq - sequence_number.num) <= SEQ_HALF) begin
@@ -265,14 +231,12 @@ module tlp_rx_buffer
             nak_seq_num   <= next_rcv_seq - 1'b1;
             write_ptr     <= 0;
             word_cnt      <= 0;
-            crc_state     <= {LFSR_WIDTH{1'b1}};
             state         <= IDLE;
           end
           else begin
             if (tlp_valid) begin
               write_ptr <= write_ptr + 1;
               word_cnt  <= word_cnt + 1;
-              crc_state <= crc_next;
             end
             if (end_detected) begin
               rx_lcrc <= lcrc;
@@ -301,7 +265,6 @@ module tlp_rx_buffer
             nak_seq_num   <= next_rcv_seq - 1'b1;
             write_ptr     <= 0;
             word_cnt      <= 0;
-            crc_state     <= {LFSR_WIDTH{1'b1}};
             state         <= IDLE;
           end
         end
@@ -321,7 +284,6 @@ module tlp_rx_buffer
           if (read_cnt == word_cnt) begin
             write_ptr <= 0;
             word_cnt  <= 0;
-            crc_state <= {LFSR_WIDTH{1'b1}};
             state     <= IDLE;
           end
           else begin

@@ -236,8 +236,12 @@ module send_dllp
   endfunction
 
   // An InitFC DLLP (VC0) of type t and class c with credits h/d
-  function automatic logic [63:0] initfc(input dllp_type_e t, input fc_class_e c, input fc_hdr_t h,
-                                         input fc_data_t d);
+  function automatic logic [63:0] initfc(
+      input dllp_type_e t,
+      input fc_class_e  c,
+      input fc_hdr_t    h,
+      input fc_data_t   d
+  );
     dllp_type_byte_t ty;
     dllp_fc_body_t   b;
     ty                = '0;

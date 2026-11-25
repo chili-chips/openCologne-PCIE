@@ -273,7 +273,7 @@ The top-level run, `make EP=rtl DUMP=1 run` in [5.sim](../../5.sim/README.md#vie
 
 | Where | Signals | Decoder |
 |---|---|---|
-| `dll_if` | `tb.dut.u_core.wavecrux.dll_*`, each DW in the byte order the TL reads | PCIe TLP |
+| `dll_if` | `tb.g_ep_rtl.dut.u_core.wavecrux.dll_*`, each DW in the byte order the TL reads | PCIe TLP |
 | `trn_rx_if`, `trn_tx_if` | `trn_*` | PCIe TLP |
 | AXI-Stream of `trn_bridge` | `m_axis_rx_*`, `s_axis_tx_*`: the interface of AMD's 7 Series PCIe core (PG054), which `trn_bridge` builds on the TRN ports of `PCIE_2_1` | Xilinx 7 Series preset |
 

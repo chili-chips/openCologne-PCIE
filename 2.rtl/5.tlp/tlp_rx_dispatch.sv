@@ -86,8 +86,12 @@ module tlp_rx_dispatch
 
   localparam logic [31:0] BAR0_MASK = ~((32'd1 << BAR0_SIZE_BITS) - 32'd1);
 
-  function automatic logic bar0_hit(input hdr_dw23_t addr_hdr_dw23, input logic four_dw,
-                                    input logic mem_en, input logic [31:0] base);
+  function automatic logic bar0_hit(
+      input hdr_dw23_t        addr_hdr_dw23,
+      input logic             four_dw,
+      input logic             mem_en,
+      input logic      [31:0] base
+  );
     logic [31:0] addr_lo;
     addr_lo = four_dw ? addr_hdr_dw23.dw3.addr_lo : addr_hdr_dw23.dw2.addr_lo;
     return mem_en
@@ -95,8 +99,11 @@ module tlp_rx_dispatch
          & (((addr_lo ^ base) & BAR0_MASK) == 32'h0000_0000);
   endfunction
 
-  function automatic action_e msg_action(input logic [7:0] code, input logic with_data,
-                                         input logic poisoned);
+  function automatic action_e msg_action(
+      input logic [7:0] code,
+      input logic       with_data,
+      input logic       poisoned
+  );
     action_e act;
     if (!with_data && code == MSG_PME_TURN_OFF) begin
       act = A_PME;
@@ -114,9 +121,13 @@ module tlp_rx_dispatch
     return act;
   endfunction
 
-  function automatic action_e tlp_action(input tlp_kind_e kind, input logic poisoned,
-                                         input logic bar_hit, input logic func0,
-                                         input logic [7:0] code);
+  function automatic action_e tlp_action(
+      input tlp_kind_e       kind,
+      input logic            poisoned,
+      input logic            bar_hit,
+      input logic            func0,
+      input logic      [7:0] code
+  );
     action_e act;
     act = A_UR_CPL;
     unique0 case (kind)
@@ -136,8 +147,11 @@ module tlp_rx_dispatch
     return (act == A_CFG_RD) | (act == A_CFG_WR) | (act == A_UR_CPL) | (act == A_PME);
   endfunction
 
-  function automatic logic action_ready(input action_e act, input logic app_ready,
-                                        input logic gen_ready);
+  function automatic logic action_ready(
+      input action_e act,
+      input logic    app_ready,
+      input logic    gen_ready
+  );
     logic ready;
     ready = 1'b1;
     if (act == A_APP) begin
@@ -286,8 +300,9 @@ module tlp_rx_dispatch
 
 
   assign h_length_dw = tlp_length_dw(cur_hdr_dw01.dw0);
-  assign h_addr_6_2 = hdr_4dw_r ? cur_hdr_dw23.dw3.addr_lo.addr[4:0] :
-                                cur_hdr_dw23.dw2.addr_lo.addr[4:0];
+  assign h_addr_6_2 = hdr_4dw_r
+                    ? cur_hdr_dw23.dw3.addr_lo.addr[4:0]
+                    : cur_hdr_dw23.dw2.addr_lo.addr[4:0];
 
   assign cpl.is_msg = cpl_is_msg;
   assign cpl.with_data = cpl_with_data;
@@ -320,8 +335,9 @@ module tlp_rx_dispatch
       12'({h_length_dw, 2'b00} - 13'(fbe_lo) - 13'(lbe_hi));
   assign mrd_lower = {h_addr_6_2, (cur_hdr_dw01.dw1.req.first_be == 4'b0000) ? 2'd0 : fbe_lo};
 
-  assign atomic_bytes = (cur_hdr_dw01.dw0.tlp_type == TLP_TYPE_CAS) ? {h_length_dw, 1'b0} :
-      12'({h_length_dw, 2'b00});
+  assign atomic_bytes = (cur_hdr_dw01.dw0.tlp_type == TLP_TYPE_CAS)
+                      ? {h_length_dw, 1'b0}
+                      : 12'({h_length_dw, 2'b00});
 
   assign cur_data_dw23 = cur_data;
   assign sspl_dw4 = dw_byte_swap(hdr_4dw_r ? cur_data_dw23.dw2 : cur_hdr_dw23.dw3);

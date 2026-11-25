@@ -77,7 +77,7 @@ vip/openPCIE_BFM/2.rtl/openPCIE_BFM_pkg.sv
 ../2.rtl/4.dll/dll_clk_counter.sv
 ../2.rtl/4.dll/dll_fsm.sv
 ../2.rtl/4.dll/dll_top.sv
-../2.rtl/4.dll/lcrc_byte.sv
+../2.rtl/4.dll/lcrc_pipe.sv
 ../2.rtl/4.dll/packet_handler.sv
 ../2.rtl/4.dll/retry_buffer.sv
 ../2.rtl/4.dll/send_dllp.sv

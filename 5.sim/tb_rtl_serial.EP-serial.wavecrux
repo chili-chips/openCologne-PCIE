@@ -5,8 +5,8 @@
     {
       "kind": "signal",
       "id": "ocpcie-0",
-      "ref": "1169",
-      "path": "tb.dut.u_pcie_top.u_core.wavecrux.ltssm_name",
+      "ref": "1040",
+      "path": "tb.g_ep_rtl_serial.dut.u_pcie_top.u_core.wavecrux.ltssm_name",
       "name": "ltssm_name",
       "color": 4288585374,
       "format": "ascii",
@@ -15,8 +15,8 @@
     {
       "kind": "signal",
       "id": "ocpcie-1",
-      "ref": "1170",
-      "path": "tb.dut.u_pcie_top.u_core.wavecrux.dl_name",
+      "ref": "1041",
+      "path": "tb.g_ep_rtl_serial.dut.u_pcie_top.u_core.wavecrux.dl_name",
       "name": "dl_name",
       "color": 4288585374,
       "format": "ascii",
@@ -25,8 +25,8 @@
     {
       "kind": "signal",
       "id": "ocpcie-2",
-      "ref": "38",
-      "path": "tb.dut.u_pcie_top.u_core.wavecrux.link_up",
+      "ref": "74",
+      "path": "tb.g_ep_rtl_serial.dut.u_pcie_top.u_core.wavecrux.link_up",
       "name": "link_up",
       "color": 4288585374,
       "format": "hexadecimal",
@@ -35,7 +35,7 @@
     {
       "kind": "signal",
       "id": "ocpcie-3",
-      "ref": "39",
+      "ref": "75",
       "path": "tb.fw_pass",
       "name": "fw_pass",
       "color": 4288585374,
@@ -84,7 +84,7 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "line": "48"
+          "line": "53"
         },
         "parameters": {
           "rate": "gen1",
@@ -100,7 +100,7 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "line": "48"
+          "line": "53"
         },
         "parameters": {
           "rate": "gen1",
@@ -114,10 +114,10 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "pclk": "67",
-          "data": "72",
-          "datak": "73",
-          "rxvalid": "68"
+          "pclk": "72",
+          "data": "77",
+          "datak": "78",
+          "rxvalid": "73"
         },
         "parameters": {
           "scrambling": "auto",
@@ -130,17 +130,17 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "clk": "67",
-          "rst_n": "75",
-          "tlp_data": "1171",
-          "tlp_sop": "128",
-          "tlp_eop": "129",
-          "tlp_valid": "127",
-          "peer_data": "1172",
-          "peer_sop": "117",
-          "peer_eop": "118",
-          "peer_valid": "116",
-          "peer_keep": "1173"
+          "clk": "72",
+          "rst_n": "80",
+          "tlp_data": "1182",
+          "tlp_sop": "139",
+          "tlp_eop": "140",
+          "tlp_valid": "138",
+          "peer_data": "1183",
+          "peer_sop": "128",
+          "peer_eop": "129",
+          "peer_valid": "127",
+          "peer_keep": "1184"
         },
         "parameters": {
           "data_width": "64"
@@ -152,20 +152,20 @@
       "instanceNumber": 2,
       "config": {
         "bindings": {
-          "clk": "67",
-          "rst_n": "75",
-          "tlp_data": "1003",
-          "tlp_sop": "148",
-          "tlp_eop": "149",
-          "tlp_valid": "150",
-          "peer_data": "1123",
-          "peer_sop": "138",
-          "peer_eop": "139",
-          "peer_valid": "140",
-          "tlp_ready": "154",
-          "tlp_keep": "1093",
-          "peer_ready": "145",
-          "peer_keep": "1174"
+          "clk": "72",
+          "rst_n": "80",
+          "tlp_data": "1014",
+          "tlp_sop": "160",
+          "tlp_eop": "161",
+          "tlp_valid": "162",
+          "peer_data": "1134",
+          "peer_sop": "150",
+          "peer_eop": "151",
+          "peer_valid": "152",
+          "tlp_ready": "166",
+          "tlp_keep": "1104",
+          "peer_ready": "157",
+          "peer_keep": "1185"
         },
         "parameters": {
           "data_width": "64"
@@ -177,20 +177,20 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "user_clk_out": "67",
-          "user_reset_out": "1175",
-          "m_axis_rx_tdata": "82",
-          "m_axis_rx_tkeep": "83",
-          "m_axis_rx_tlast": "85",
-          "m_axis_rx_tvalid": "86",
-          "m_axis_rx_tready": "87",
-          "m_axis_rx_tuser": "1176",
-          "s_axis_tx_tdata": "89",
-          "s_axis_tx_tkeep": "90",
-          "s_axis_tx_tlast": "92",
-          "s_axis_tx_tvalid": "93",
-          "s_axis_tx_tready": "94",
-          "s_axis_tx_tuser": "91"
+          "user_clk_out": "72",
+          "user_reset_out": "1186",
+          "m_axis_rx_tdata": "94",
+          "m_axis_rx_tkeep": "82",
+          "m_axis_rx_tlast": "96",
+          "m_axis_rx_tvalid": "97",
+          "m_axis_rx_tready": "98",
+          "m_axis_rx_tuser": "1187",
+          "s_axis_tx_tdata": "100",
+          "s_axis_tx_tkeep": "101",
+          "s_axis_tx_tlast": "103",
+          "s_axis_tx_tvalid": "104",
+          "s_axis_tx_tready": "105",
+          "s_axis_tx_tuser": "102"
         },
         "parameters": {}
       }
@@ -200,10 +200,10 @@
       "instanceNumber": 1,
       "config": {
         "bindings": {
-          "clk": "67",
-          "instruction": "1201",
-          "valid": "1234",
-          "pc": "1244"
+          "clk": "72",
+          "instruction": "1212",
+          "valid": "1245",
+          "pc": "1255"
         },
         "parameters": {
           "xlen": "32",
@@ -220,10 +220,10 @@
       "instanceNumber": 2,
       "config": {
         "bindings": {
-          "pclk": "67",
-          "data": "65",
-          "datak": "66",
-          "txelecidle": "62"
+          "pclk": "72",
+          "data": "70",
+          "datak": "71",
+          "txelecidle": "67"
         },
         "parameters": {
           "scrambling": "auto",
@@ -236,7 +236,7 @@
       "instanceNumber": 2,
       "config": {
         "bindings": {
-          "line": "49"
+          "line": "54"
         },
         "parameters": {
           "rate": "gen1",
@@ -250,7 +250,7 @@
       "instanceNumber": 2,
       "config": {
         "bindings": {
-          "line": "49"
+          "line": "54"
         },
         "parameters": {
           "rate": "gen1",

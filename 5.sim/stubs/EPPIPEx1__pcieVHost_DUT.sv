@@ -61,7 +61,7 @@ module EPPIPEx1__pcieVHost_DUT
 //--------------------------------------------------------------
 // The EP model: a pcieVHost in EP mode at VProc node 1. Its other ports,
 // left open here, are the link at the PIPE, Data Link and Transaction
-// layers as the EP sees it: tb.dut.bfm_pcie is the EP's decoder page of a
+// layers as the EP sees it: tb.g_ep_model.dut.bfm_pcie is the EP's decoder page of a
 // dump (see vip/openPCIE_BFM/2.rtl/PIPEx1__pcieVHost.sv)
 //--------------------------------------------------------------
 

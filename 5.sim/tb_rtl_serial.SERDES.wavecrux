@@ -1,177 +1,177 @@
 {
- "version": 4,
- "sourceFilePath": "tb_rtl_serial.fst",
- "signals": [
-  {
-   "kind": "signal",
-   "id": "ser-0",
-   "ref": "1029",
-   "path": "tb.dut.u_pcie_top.u_core.wavecrux.ltssm_name",
-   "name": "ltssm_name",
-   "color": 4288585374,
-   "format": "ascii",
-   "height": 30.0
-  },
-  {
-   "kind": "signal",
-   "id": "ser-1",
-   "ref": "1030",
-   "path": "tb.dut.u_pcie_top.u_core.wavecrux.dl_name",
-   "name": "dl_name",
-   "color": 4288585374,
-   "format": "ascii",
-   "height": 30.0
-  },
-  {
-   "kind": "signal",
-   "id": "ser-2",
-   "ref": "90",
-   "path": "tb.dut.u_phy_top.u_serdes.clk_core_tx_i",
-   "name": "clk_core_tx_i",
-   "color": 4294922834,
-   "format": "binary",
-   "height": 30.0
-  },
-  {
-   "kind": "signal",
-   "id": "ser-3",
-   "ref": "130",
-   "path": "tb.dut.u_phy_top.u_serdes.tx_data_i",
-   "name": "tx_data_i",
-   "color": 4294944550,
-   "format": "hex",
-   "height": 30.0
-  },
-  {
-   "kind": "signal",
-   "id": "ser-4",
-   "ref": "131",
-   "path": "tb.dut.u_phy_top.u_serdes.tx_char_is_k_i",
-   "name": "tx_char_is_k_i",
-   "color": 4294944550,
-   "format": "hex",
-   "height": 30.0
-  },
-  {
-   "kind": "signal",
-   "id": "ser-5",
-   "ref": "66",
-   "path": "tb.dut.u_phy_top.u_serdes.TX_SERIO_P_B",
-   "name": "TX_SERIO_P_B",
-   "color": 4294944550,
-   "format": "binary",
-   "height": 30.0
-  },
-  {
-   "kind": "signal",
-   "id": "ser-6",
-   "ref": "1541",
-   "path": "tb.dut.u_phy_top.u_serdes.clk_core_rx_o",
-   "name": "clk_core_rx_o",
-   "color": 4294922834,
-   "format": "binary",
-   "height": 30.0
-  },
-  {
-   "kind": "signal",
-   "id": "ser-7",
-   "ref": "1621",
-   "path": "tb.dut.u_phy_top.u_serdes.rx_data_o",
-   "name": "rx_data_o",
-   "color": 4283417591,
-   "format": "hex",
-   "height": 30.0
-  },
-  {
-   "kind": "signal",
-   "id": "ser-8",
-   "ref": "1032",
-   "path": "tb.dut.u_phy_top.u_serdes.rx_char_is_k_o",
-   "name": "rx_char_is_k_o",
-   "color": 4283417591,
-   "format": "hex",
-   "height": 30.0
-  },
-  {
-   "kind": "signal",
-   "id": "ser-9",
-   "ref": "65",
-   "path": "tb.dut.u_phy_top.u_serdes.RX_SERIO_P_B",
-   "name": "RX_SERIO_P_B",
-   "color": 4283417591,
-   "format": "binary",
-   "height": 30.0
-  }
- ],
- "cursor": {
-  "primary": null,
-  "secondary": null
- },
- "markers": {},
- "view": {
-  "ticksPerPixel": 90909.09090909091,
-  "panOffsetTicks": 720000000.0,
-  "scrollOffset": 0.0
- },
- "panels": {
-  "signalTree": false,
-  "valueColumn": false,
-  "transactionView": false,
-  "bottomDockTab": "transactions",
-  "stageView": false,
-  "statisticsStrip": false,
-  "cocotbLogPanel": false,
-  "rtlSource": false,
-  "sizes": {
-   "left": 300.0,
-   "right": 150.0,
-   "bottom": 260.0
-  }
- },
- "signalTreeState": {
-  "expanded": [],
-  "selected": [],
-  "scroll": 0.0
- },
- "translateFilters": {},
- "stage": {
-  "panels": []
- },
- "activeTheme": "wavecrux-dark",
- "decoders": [
-  {
-   "decoderId": "ferrite.pcie_pipe_w64",
-   "instanceNumber": 1,
-   "config": {
-    "bindings": {
-     "pclk": "90",
-     "data": "130",
-     "datak": "131"
+  "version": 4,
+  "sourceFilePath": "tb_rtl_serial.fst",
+  "signals": [
+    {
+      "kind": "signal",
+      "id": "ser-0",
+      "ref": "1040",
+      "path": "tb.g_ep_rtl_serial.dut.u_pcie_top.u_core.wavecrux.ltssm_name",
+      "name": "ltssm_name",
+      "color": 4288585374,
+      "format": "ascii",
+      "height": 30.0
     },
-    "parameters": {
-     "scrambling": "auto",
-     "sample_point": "before_edge",
-     "coalesce": false,
-     "show_idle": false
-    }
-   }
-  },
-  {
-   "decoderId": "ferrite.pcie_pipe_w64",
-   "instanceNumber": 2,
-   "config": {
-    "bindings": {
-     "pclk": "1541",
-     "data": "1621",
-     "datak": "1032"
+    {
+      "kind": "signal",
+      "id": "ser-1",
+      "ref": "1041",
+      "path": "tb.g_ep_rtl_serial.dut.u_pcie_top.u_core.wavecrux.dl_name",
+      "name": "dl_name",
+      "color": 4288585374,
+      "format": "ascii",
+      "height": 30.0
     },
-    "parameters": {
-     "scrambling": "auto",
-     "sample_point": "before_edge",
-     "coalesce": false,
-     "show_idle": false
+    {
+      "kind": "signal",
+      "id": "ser-2",
+      "ref": "101",
+      "path": "tb.g_ep_rtl_serial.dut.u_phy_top.u_serdes.clk_core_tx_i",
+      "name": "clk_core_tx_i",
+      "color": 4294922834,
+      "format": "binary",
+      "height": 30.0
+    },
+    {
+      "kind": "signal",
+      "id": "ser-3",
+      "ref": "141",
+      "path": "tb.g_ep_rtl_serial.dut.u_phy_top.u_serdes.tx_data_i",
+      "name": "tx_data_i",
+      "color": 4294944550,
+      "format": "hex",
+      "height": 30.0
+    },
+    {
+      "kind": "signal",
+      "id": "ser-4",
+      "ref": "142",
+      "path": "tb.g_ep_rtl_serial.dut.u_phy_top.u_serdes.tx_char_is_k_i",
+      "name": "tx_char_is_k_i",
+      "color": 4294944550,
+      "format": "hex",
+      "height": 30.0
+    },
+    {
+      "kind": "signal",
+      "id": "ser-5",
+      "ref": "71",
+      "path": "tb.g_ep_rtl_serial.dut.u_phy_top.u_serdes.TX_SERIO_P_B",
+      "name": "TX_SERIO_P_B",
+      "color": 4294944550,
+      "format": "binary",
+      "height": 30.0
+    },
+    {
+      "kind": "signal",
+      "id": "ser-6",
+      "ref": "1552",
+      "path": "tb.g_ep_rtl_serial.dut.u_phy_top.u_serdes.clk_core_rx_o",
+      "name": "clk_core_rx_o",
+      "color": 4294922834,
+      "format": "binary",
+      "height": 30.0
+    },
+    {
+      "kind": "signal",
+      "id": "ser-7",
+      "ref": "1633",
+      "path": "tb.g_ep_rtl_serial.dut.u_phy_top.u_serdes.rx_data_o",
+      "name": "rx_data_o",
+      "color": 4283417591,
+      "format": "hex",
+      "height": 30.0
+    },
+    {
+      "kind": "signal",
+      "id": "ser-8",
+      "ref": "1043",
+      "path": "tb.g_ep_rtl_serial.dut.u_phy_top.u_serdes.rx_char_is_k_o",
+      "name": "rx_char_is_k_o",
+      "color": 4283417591,
+      "format": "hex",
+      "height": 30.0
+    },
+    {
+      "kind": "signal",
+      "id": "ser-9",
+      "ref": "70",
+      "path": "tb.g_ep_rtl_serial.dut.u_phy_top.u_serdes.RX_SERIO_P_B",
+      "name": "RX_SERIO_P_B",
+      "color": 4283417591,
+      "format": "binary",
+      "height": 30.0
     }
-   }
-  }
- ]
+  ],
+  "cursor": {
+    "primary": null,
+    "secondary": null
+  },
+  "markers": {},
+  "view": {
+    "ticksPerPixel": 90909.09090909091,
+    "panOffsetTicks": 720000000.0,
+    "scrollOffset": 0.0
+  },
+  "panels": {
+    "signalTree": false,
+    "valueColumn": false,
+    "transactionView": false,
+    "bottomDockTab": "transactions",
+    "stageView": false,
+    "statisticsStrip": false,
+    "cocotbLogPanel": false,
+    "rtlSource": false,
+    "sizes": {
+      "left": 300.0,
+      "right": 150.0,
+      "bottom": 260.0
+    }
+  },
+  "signalTreeState": {
+    "expanded": [],
+    "selected": [],
+    "scroll": 0.0
+  },
+  "translateFilters": {},
+  "stage": {
+    "panels": []
+  },
+  "activeTheme": "wavecrux-dark",
+  "decoders": [
+    {
+      "decoderId": "ferrite.pcie_pipe_w64",
+      "instanceNumber": 1,
+      "config": {
+        "bindings": {
+          "pclk": "101",
+          "data": "141",
+          "datak": "142"
+        },
+        "parameters": {
+          "scrambling": "auto",
+          "sample_point": "before_edge",
+          "coalesce": false,
+          "show_idle": false
+        }
+      }
+    },
+    {
+      "decoderId": "ferrite.pcie_pipe_w64",
+      "instanceNumber": 2,
+      "config": {
+        "bindings": {
+          "pclk": "1552",
+          "data": "1633",
+          "datak": "1043"
+        },
+        "parameters": {
+          "scrambling": "auto",
+          "sample_point": "before_edge",
+          "coalesce": false,
+          "show_idle": false
+        }
+      }
+    }
+  ]
 }

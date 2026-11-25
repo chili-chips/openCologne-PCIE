@@ -13,8 +13,8 @@
 //   duplicate or bad TLP. So the TL sees the run's real traffic:
 //   enumeration, BAR set-up, the tester's requests.
 //
-//        dut.bfm_pcie dll_rx_* --> dll_if (rx_tlp, rx_dllp, dl_state) --> tl_top
-//        u_rc rx_tlp_* (the EP model's TLPs the RC takes) --+                |
+//        g_ep_model.dut.bfm_pcie dll_rx_* --> dll_if (rx_tlp, rx_dllp, dl_state) --> tl_top
+//        g_rc.u_rc rx_tlp_* (the EP model's TLPs the RC takes) --+                |
 //                                                            +-- compare <----+ tx_tlp
 //
 //   - dl_state follows the host's flow-control DLLPs: DL_Init on InitFC1,
@@ -339,15 +339,15 @@ endmodule : tl_shadow
 bind tb tl_shadow u_tl_shadow (
     .clk                (pclk),
     .rst_n              (rst_n),
-    .dll_rx_data        (dut.bfm_pcie.dll_rx_data),
-    .dll_rx_tlp_valid   (dut.bfm_pcie.dll_rx_tlp_valid),
-    .dll_rx_tlp_first   (dut.bfm_pcie.dll_rx_tlp_first),
-    .dll_rx_tlp_last    (dut.bfm_pcie.dll_rx_tlp_last),
-    .dll_rx_hdr_credit  (dut.bfm_pcie.dll_rx_hdr_credit),
-    .dll_rx_data_credit (dut.bfm_pcie.dll_rx_data_credit),
-    .dll_rx_update_type (dut.bfm_pcie.dll_rx_update_type),
-    .dll_rx_packet_type (dut.bfm_pcie.dll_rx_packet_type),
-    .dll_rx_dllp_valid  (dut.bfm_pcie.dll_rx_dllp_valid),
+    .dll_rx_data        (g_ep_model.dut.bfm_pcie.dll_rx_data),
+    .dll_rx_tlp_valid   (g_ep_model.dut.bfm_pcie.dll_rx_tlp_valid),
+    .dll_rx_tlp_first   (g_ep_model.dut.bfm_pcie.dll_rx_tlp_first),
+    .dll_rx_tlp_last    (g_ep_model.dut.bfm_pcie.dll_rx_tlp_last),
+    .dll_rx_hdr_credit  (g_ep_model.dut.bfm_pcie.dll_rx_hdr_credit),
+    .dll_rx_data_credit (g_ep_model.dut.bfm_pcie.dll_rx_data_credit),
+    .dll_rx_update_type (g_ep_model.dut.bfm_pcie.dll_rx_update_type),
+    .dll_rx_packet_type (g_ep_model.dut.bfm_pcie.dll_rx_packet_type),
+    .dll_rx_dllp_valid  (g_ep_model.dut.bfm_pcie.dll_rx_dllp_valid),
     .rx_clk             (rx_clk),
     .rx_tlp_data        (rx_tlp_data),
     .rx_tlp_sop         (rx_tlp_sop),

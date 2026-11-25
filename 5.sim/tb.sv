@@ -41,6 +41,23 @@
 //   running openPCIE's Artix-7 RC model, drives the DUT at its PIPE
 //   interface (IFACE=serial: on the serial line): the EP RTL + firmware, or
 //   the EP model EPPIPEx1__pcieVHost_DUT (node 1).
+//
+//   Every setting is a parameter (the Makefile sets them per simulator); no
+//   macros. The DUT and the host sit in generate blocks, one per setting;
+//   each make mode compiles only the modules of its own blocks:
+//
+//     g_ep_rtl_serial  EP=rtl IFACE=serial  top (our PHY and EP)
+//     g_ep_rtl         EP=rtl               phy_vproc_rc + pcie_top
+//     g_ep_phy         IFACE=phy            ep_model_phy (the EP model behind our PHY)
+//     g_ep_serial      IFACE=serial         PcieVhostSerial (the EP model)
+//     g_ep_model       (default)            EPPIPEx1__pcieVHost_DUT
+//     g_rc_serial      IFACE=serial, phy    the host on the serial line
+//     g_rc             IFACE=pipe           the host at the PIPE
+//
+//   As Verilator resolves a dotted reference even in a block not taken, the
+//   references into modules only some modes compile (top, pcie_top,
+//   ep_model_phy) are in models/tb_glue_<block>.sv, bound into tb by the
+//   mode that compiles them: the SerDes pins of top, and the waveform dumps
 //==========================================================================
 
 // No `timescale: 1ns/10ps from the simulator command line (Makefile); every
@@ -58,8 +75,15 @@ module tb #(
                   PIPE_DATAWIDTH = 64,
    parameter real PPM            = 0.0,
    parameter int  RX_RETIME      = 1,
-   parameter bit  POL_DN         = 1'b0
+   parameter bit  POL_DN         = 1'b0,
+   parameter bit  EP_RTL         = 1'b0,  // make EP=rtl: our EP RTL + firmware
+   parameter bit  IFACE_SERIAL   = 1'b0,  // make IFACE=serial or phy: the host on the serial line
+   parameter bit  IFACE_PHY      = 1'b0,  // make IFACE=phy: the EP model behind our PHY
+   parameter bit  DUMP           = 1'b0   // make DUMP=1: the FST waveform
 )();
+
+  // Our PHY under the host: EP=rtl IFACE=serial (top), IFACE=phy (the EP model)
+  localparam bit GM_PHY = IFACE_PHY || (EP_RTL && IFACE_SERIAL);
 
 //--------------------------------------------------------------
 // Clock and reset generation
@@ -139,7 +163,7 @@ module tb #(
 // with EP=model, the EP model is upstream's PcieVhostSerial), the host too
 //--------------------------------------------------------------
 
-`ifdef IFACE_SERIAL
+  // The serial line (IFACE_SERIAL): its clocks run only then
   localparam  HALF_SER_PERIOD_PS        = 100;    // 5 GHz: the host divides it to 2.5 GHz at Gen1
   localparam  HALF_PCIE2_PERIOD_PS      = 1_000;  // 500 MHz: the host divides it to 250 MHz at Gen1
 
@@ -150,29 +174,23 @@ module tb #(
 
   initial begin
     serclk = 1'b0;
-    forever begin
-      #(HALF_SER_PERIOD_PS * 1ns / 1000.0) serclk = ~serclk;
+    if (IFACE_SERIAL) begin
+      forever begin
+        #(HALF_SER_PERIOD_PS * 1ns / 1000.0) serclk = ~serclk;
+      end
     end
   end
 
   initial begin
     pcieclk2 = 1'b0;
-    forever begin
-      #(HALF_PCIE2_PERIOD_PS * 1ns / 1000.0) pcieclk2 = ~pcieclk2;
+    if (IFACE_SERIAL) begin
+      forever begin
+        #(HALF_PCIE2_PERIOD_PS * 1ns / 1000.0) pcieclk2 = ~pcieclk2;
+      end
     end
   end
-`endif
 
-// Our PHY under the host: EP=rtl IFACE=serial (top), IFACE=phy (the EP model)
-`ifdef IFACE_PHY
-`define GM_PHY
-`elsif EP_RTL
-`ifdef IFACE_SERIAL
-`define GM_PHY
-`endif
-`endif
-
-`ifdef EP_RTL
+  // The EP RTL's board clock and outputs (EP_RTL)
   localparam  HALF_BRD_PERIOD_PS        = 50_000; // 10 MHz board clock
 
   logic       clk_brd;
@@ -181,13 +199,14 @@ module tb #(
 
   initial begin
     clk_brd = 1'b0;
-    forever begin
-      #(HALF_BRD_PERIOD_PS * 1ns / 1000.0) clk_brd = ~clk_brd;
+    if (EP_RTL) begin
+      forever begin
+        #(HALF_BRD_PERIOD_PS * 1ns / 1000.0) clk_brd = ~clk_brd;
+      end
     end
   end
-`endif
 
-`ifdef GM_PHY
+  // Our PHY's REFCLK and its receive pair (GM_PHY)
   localparam  HALF_REF_PERIOD_PS        = 5_000;  // 100 MHz PCIE REFCLK
 
   logic       refclk;
@@ -200,11 +219,13 @@ module tb #(
     real    half_ns;
     half_ns = (HALF_REF_PERIOD_PS / 1000.0) / (1.0 + PPM * 1.0e-6);
     refclk  = 1'b0;
-    for (k = 1; ; k++) begin
-      /* verilator lint_off ZERODLY */  // never 0: k grows each edge
-      #((k * half_ns) * 1ns - $realtime);
-      /* verilator lint_on ZERODLY */
-      refclk = ~refclk;
+    if (GM_PHY) begin
+      for (k = 1; ; k++) begin
+        /* verilator lint_off ZERODLY */  // never 0: k grows each edge
+        #((k * half_ns) * 1ns - $realtime);
+        /* verilator lint_on ZERODLY */
+        refclk = ~refclk;
+      end
     end
   end : _refclk
 
@@ -234,144 +255,175 @@ module tb #(
   logic       ser_dn_p, ser_dn_n;
   assign ser_dn_p = POL_DN ? (ser_dn_idle ? ser_dn : ~ser_dn) : ser_dn;
   assign ser_dn_n = POL_DN ? ser_dn : (ser_dn_idle ? ser_dn : ~ser_dn);
-`endif
 
-`ifdef EP_RTL
-`ifdef IFACE_SERIAL
-  top dut
-  (
-    .clk_brd                           (clk_brd),
-    .perst_n                           (rst_n),
-    .clkreq_n                          (),
-    .link_up                           (link_up),
-    .fw_pass                           (fw_pass)
-  );
+// FST waveform, for WaveCrux and GTKWave (make DUMP=1 run): in each DUT
+// block, g_dump (models/tb_glue_<block>.sv for three of them). The signals of this level, i.e. the PIPE link both ways, its
+// clocks and reset, and the host's ports (u_rc), the decoder page. With
+// EP=rtl, the EP's decoder pages instead of the EP model's: its layer
+// boundaries (pcie_core.wavecrux, models/ep_wavecrux_view.sv) and the SOC
+// CPU's retired instructions (soc_top.cpu_view), in a file of their own
 
-  // the SerDes pins are not ports of top (no GateMate netlist reaches them):
-  // its nets, by hierarchy
-  assign dut.refclk  = refclk;
-  assign dut.ser_rxp = ser_dn_p;
-  assign dut.ser_rxn = ser_dn_n;
-  assign ser_up      = dut.ser_txp;
-  assign ser_up_n    = dut.ser_txn;
-`else
-  logic       phy_rdy;
+  if (EP_RTL && IFACE_SERIAL) begin : g_ep_rtl_serial
+    top dut
+    (
+      .clk_brd                           (clk_brd),
+      .perst_n                           (rst_n),
+      .clkreq_n                          (),
+      .link_up                           (link_up),
+      .fw_pass                           (fw_pass)
+    );
 
-  pipe_if pipe_mac ();
+    // the SerDes pins (not ports of top) and the dump: models/tb_glue_ep_rtl_serial.sv
 
-  phy_vproc_rc #(
-    .DATA_BYTES                        (PIPE_DATAWIDTH/8)
-  ) u_phy
-  (
-    .pclk                              (pclk),
-    .rst_n                             (rst_n),
-    .pipe                              (pipe_mac),
-    .phy_rdy                           (phy_rdy),
-    .host_txdata                       (downdata),
-    .host_txdatak                      (downdatak),
-    .host_rxdata                       (updata),
-    .host_rxdatak                      (updatak)
-  );
+    always @(link_up) $display("%t tb: dll_up = %b", $time, link_up);
+    always @(fw_pass) $display("%t tb: fw_pass = %b", $time, fw_pass);
+  end : g_ep_rtl_serial
 
-  pcie_top dut
-  (
-    .clk_brd                           (clk_brd),
-    .perst_n                           (rst_n),
-    .pipe_mac                          (pipe_mac),
-    .phy_rdy                           (phy_rdy),
-    .rst_pipe_n                        (),
-    .dll_up                            (link_up),
-    .fw_pass                           (fw_pass)
-  );
-`endif
+  else if (EP_RTL) begin : g_ep_rtl
+    logic       phy_rdy;
 
-  always @(link_up) $display("%t tb: dll_up = %b", $time, link_up);
-  always @(fw_pass) $display("%t tb: fw_pass = %b", $time, fw_pass);
-`elsif IFACE_PHY
-  // the EP model behind our PHY: phy_top, Cologne Chip's PIPE logic and the
-  // SerDes BFM, the EP model on its PIPE (models/ep_model_phy.sv)
-  ep_model_phy dut
-  (
-    .rst_n                             (rst_n),
-    .refclk                            (refclk),
-    .ser_rxp                           (ser_dn_p),
-    .ser_rxn                           (ser_dn_n),
-    .ser_txp                           (ser_up),
-    .ser_txn                           (ser_up_n)
-  );
-`elsif IFACE_SERIAL
-  PcieVhostSerial #(
-    .LinkWidth                         (1),
-    .NodeNum                           (1),
-    .EndPoint                          (1),
-    .Gen2Clk                           (1)
-  ) dut
-  (
-    .Clk                               (pcieclk2),
-    .SerClk                            (serclk),
-    .notReset                          (rst_n),
-    .ClkOut                            (),
-    .SerClkOut                         (),
-    .LinkIn0                           (ser_dn),
-    .LinkIn1                           (1'b0),
-    .LinkIn2                           (1'b0),
-    .LinkIn3                           (1'b0),
-    .LinkIn4                           (1'b0),
-    .LinkIn5                           (1'b0),
-    .LinkIn6                           (1'b0),
-    .LinkIn7                           (1'b0),
-    .LinkIn8                           (1'b0),
-    .LinkIn9                           (1'b0),
-    .LinkIn10                          (1'b0),
-    .LinkIn11                          (1'b0),
-    .LinkIn12                          (1'b0),
-    .LinkIn13                          (1'b0),
-    .LinkIn14                          (1'b0),
-    .LinkIn15                          (1'b0),
-    .LinkOut0                          (ser_up),
-    .LinkOut1                          (),
-    .LinkOut2                          (),
-    .LinkOut3                          (),
-    .LinkOut4                          (),
-    .LinkOut5                          (),
-    .LinkOut6                          (),
-    .LinkOut7                          (),
-    .LinkOut8                          (),
-    .LinkOut9                          (),
-    .LinkOut10                         (),
-    .LinkOut11                         (),
-    .LinkOut12                         (),
-    .LinkOut13                         (),
-    .LinkOut14                         (),
-    .LinkOut15                         ()
-  );
-`else
-  EPPIPEx1__pcieVHost_DUT #(
-    .DataWidth                         (PIPE_DATAWIDTH)
-  ) dut
-  (
-    .rst_n                             (rst_n),
-    .pclk                              (pclk),
+    pipe_if pipe_mac ();
 
-    // PCIE PIPE data
-    .txdata                            (updata),
-    .txdatak                           (updatak),
-    .rxdata                            (downdata),
-    .rxdatak                           (downdatak)
-  );
-`endif
+    phy_vproc_rc #(
+      .DATA_BYTES                        (PIPE_DATAWIDTH/8)
+    ) u_phy
+    (
+      .pclk                              (pclk),
+      .rst_n                             (rst_n),
+      .pipe                              (pipe_mac),
+      .phy_rdy                           (phy_rdy),
+      .host_txdata                       (downdata),
+      .host_txdatak                      (downdatak),
+      .host_rxdata                       (updata),
+      .host_rxdatak                      (updatak)
+    );
+
+    pcie_top dut
+    (
+      .clk_brd                           (clk_brd),
+      .perst_n                           (rst_n),
+      .pipe_mac                          (pipe_mac),
+      .phy_rdy                           (phy_rdy),
+      .rst_pipe_n                        (),
+      .dll_up                            (link_up),
+      .fw_pass                           (fw_pass)
+    );
+
+    always @(link_up) $display("%t tb: dll_up = %b", $time, link_up);
+    always @(fw_pass) $display("%t tb: fw_pass = %b", $time, fw_pass);
+
+    // the dump: models/tb_glue_ep_rtl.sv
+  end : g_ep_rtl
+
+  else if (IFACE_PHY) begin : g_ep_phy
+    // the EP model behind our PHY: phy_top, Cologne Chip's PIPE logic and the
+    // SerDes BFM, the EP model on its PIPE (models/ep_model_phy.sv)
+    ep_model_phy dut
+    (
+      .rst_n                             (rst_n),
+      .refclk                            (refclk),
+      .ser_rxp                           (ser_dn_p),
+      .ser_rxn                           (ser_dn_n),
+      .ser_txp                           (ser_up),
+      .ser_txn                           (ser_up_n)
+    );
+
+    // the dump: models/tb_glue_ep_phy.sv
+  end : g_ep_phy
+
+  else if (IFACE_SERIAL) begin : g_ep_serial
+    PcieVhostSerial #(
+      .LinkWidth                         (1),
+      .NodeNum                           (1),
+      .EndPoint                          (1),
+      .Gen2Clk                           (1)
+    ) dut
+    (
+      .Clk                               (pcieclk2),
+      .SerClk                            (serclk),
+      .notReset                          (rst_n),
+      .ClkOut                            (),
+      .SerClkOut                         (),
+      .LinkIn0                           (ser_dn),
+      .LinkIn1                           (1'b0),
+      .LinkIn2                           (1'b0),
+      .LinkIn3                           (1'b0),
+      .LinkIn4                           (1'b0),
+      .LinkIn5                           (1'b0),
+      .LinkIn6                           (1'b0),
+      .LinkIn7                           (1'b0),
+      .LinkIn8                           (1'b0),
+      .LinkIn9                           (1'b0),
+      .LinkIn10                          (1'b0),
+      .LinkIn11                          (1'b0),
+      .LinkIn12                          (1'b0),
+      .LinkIn13                          (1'b0),
+      .LinkIn14                          (1'b0),
+      .LinkIn15                          (1'b0),
+      .LinkOut0                          (ser_up),
+      .LinkOut1                          (),
+      .LinkOut2                          (),
+      .LinkOut3                          (),
+      .LinkOut4                          (),
+      .LinkOut5                          (),
+      .LinkOut6                          (),
+      .LinkOut7                          (),
+      .LinkOut8                          (),
+      .LinkOut9                          (),
+      .LinkOut10                         (),
+      .LinkOut11                         (),
+      .LinkOut12                         (),
+      .LinkOut13                         (),
+      .LinkOut14                         (),
+      .LinkOut15                         ()
+    );
+
+    if (DUMP) begin : g_dump
+      initial begin
+        $dumpfile("tb_serial.fst");
+        $dumpvars(1, tb);
+        $dumpvars(1, tb.g_rc_serial.u_rc);
+        $dumpvars(1, dut);
+      end
+    end : g_dump
+  end : g_ep_serial
+
+  else begin : g_ep_model
+    EPPIPEx1__pcieVHost_DUT #(
+      .DataWidth                         (PIPE_DATAWIDTH)
+    ) dut
+    (
+      .rst_n                             (rst_n),
+      .pclk                              (pclk),
+
+      // PCIE PIPE data
+      .txdata                            (updata),
+      .txdatak                           (updatak),
+      .rxdata                            (downdata),
+      .rxdatak                           (downdatak)
+    );
+
+    if (DUMP) begin : g_dump
+      initial begin
+        $dumpfile("tb.fst");
+        $dumpvars(1, tb);
+        $dumpvars(1, tb.g_rc.u_rc);
+        $dumpvars(1, dut.bfm_pcie);
+      end
+    end : g_dump
+  end : g_ep_model
 
 //--------------------------------------------------------------
 // Host: RCPIPEx1__pcieVHost, a pcieVHost in RC mode at VProc node HOST_NODE. Its
-// ports are the RC's decoder page of the dump (tb.u_rc): the link at the
+// ports are the RC's decoder page of the dump (tb.g_rc.u_rc): the link at the
 // PIPE, Data Link and Transaction layers, under the names WaveCrux
 // auto-binds. The EP model has the same, as it sees the link
-// (tb.dut.bfm_pcie)
+// (tb.g_ep_model.dut.bfm_pcie)
 //--------------------------------------------------------------
 
   // Data Link: RC -> EP TLPs as sent, on pclk (the EP model's taps,
-  // tb.dut.bfm_pcie, have them as its DLL hands them to its TL). And
-  // Transaction: the EP's TLPs the RC takes, on rx_clk; make TL=1 checks
+  // tb.g_ep_model.dut.bfm_pcie, have them as its DLL hands them to its TL).
+  // And Transaction: the EP's TLPs the RC takes, on rx_clk; make TL=1 checks
   // its shadow TL's completions against them (models/tl_shadow.sv)
   logic [PIPE_DATAWIDTH-1:0]           dll_rx_data;
   logic                                dll_rx_tlp_valid;
@@ -383,114 +435,116 @@ module tb #(
   logic                                rx_tlp_eop;
   logic                                rx_tlp_valid;
 
-`ifdef IFACE_SERIAL
-  PcieVhostSerial #(
-    .LinkWidth                         (1),
-    .NodeNum                           (HOST_NODE),
-    .EndPoint                          (0),
-    .Gen2Clk                           (1),
-    .RX_RETIME                         (RX_RETIME)
-  ) u_rc
-  (
-    .Clk                               (pcieclk2),
-    .SerClk                            (serclk),
-    .notReset                          (rst_n),
-    .ClkOut                            (),
-    .SerClkOut                         (),
-    .LinkIn0                           (ser_up),
-    .LinkIn1                           (1'b0),
-    .LinkIn2                           (1'b0),
-    .LinkIn3                           (1'b0),
-    .LinkIn4                           (1'b0),
-    .LinkIn5                           (1'b0),
-    .LinkIn6                           (1'b0),
-    .LinkIn7                           (1'b0),
-    .LinkIn8                           (1'b0),
-    .LinkIn9                           (1'b0),
-    .LinkIn10                          (1'b0),
-    .LinkIn11                          (1'b0),
-    .LinkIn12                          (1'b0),
-    .LinkIn13                          (1'b0),
-    .LinkIn14                          (1'b0),
-    .LinkIn15                          (1'b0),
-    .LinkOut0                          (ser_dn),
-    .LinkOut1                          (),
-    .LinkOut2                          (),
-    .LinkOut3                          (),
-    .LinkOut4                          (),
-    .LinkOut5                          (),
-    .LinkOut6                          (),
-    .LinkOut7                          (),
-    .LinkOut8                          (),
-    .LinkOut9                          (),
-    .LinkOut10                         (),
-    .LinkOut11                         (),
-    .LinkOut12                         (),
-    .LinkOut13                         (),
-    .LinkOut14                         (),
-    .LinkOut15                         ()
-  );
-`else
-  RCPIPEx1__pcieVHost #(
-    .NodeNum                           (HOST_NODE),
-    .DataWidth                         (PIPE_DATAWIDTH),
-    .DllBytes                          (PIPE_DATAWIDTH/8)
-  ) u_rc
-  (
-    .pclk                              (pclk),
-    .nreset                            (rst_n),
+  if (IFACE_SERIAL) begin : g_rc_serial
+    PcieVhostSerial #(
+      .LinkWidth                         (1),
+      .NodeNum                           (HOST_NODE),
+      .EndPoint                          (0),
+      .Gen2Clk                           (1),
+      .RX_RETIME                         (RX_RETIME)
+    ) u_rc
+    (
+      .Clk                               (pcieclk2),
+      .SerClk                            (serclk),
+      .notReset                          (rst_n),
+      .ClkOut                            (),
+      .SerClkOut                         (),
+      .LinkIn0                           (ser_up),
+      .LinkIn1                           (1'b0),
+      .LinkIn2                           (1'b0),
+      .LinkIn3                           (1'b0),
+      .LinkIn4                           (1'b0),
+      .LinkIn5                           (1'b0),
+      .LinkIn6                           (1'b0),
+      .LinkIn7                           (1'b0),
+      .LinkIn8                           (1'b0),
+      .LinkIn9                           (1'b0),
+      .LinkIn10                          (1'b0),
+      .LinkIn11                          (1'b0),
+      .LinkIn12                          (1'b0),
+      .LinkIn13                          (1'b0),
+      .LinkIn14                          (1'b0),
+      .LinkIn15                          (1'b0),
+      .LinkOut0                          (ser_dn),
+      .LinkOut1                          (),
+      .LinkOut2                          (),
+      .LinkOut3                          (),
+      .LinkOut4                          (),
+      .LinkOut5                          (),
+      .LinkOut6                          (),
+      .LinkOut7                          (),
+      .LinkOut8                          (),
+      .LinkOut9                          (),
+      .LinkOut10                         (),
+      .LinkOut11                         (),
+      .LinkOut12                         (),
+      .LinkOut13                         (),
+      .LinkOut14                         (),
+      .LinkOut15                         ()
+    );
+  end : g_rc_serial
 
-    // PIPE: the link, and its copies by direction for the decoders
-    .TxData                            (downdata),
-    .TxDataK                           (downdatak),
-    .RxData                            (updata),
-    .RxDataK                           (updatak),
-    .pipe_dn_pclk                      (),
-    .pipe_dn_data                      (),
-    .pipe_dn_datak                     (),
-    .pipe_up_pclk                      (),
-    .pipe_up_data                      (),
-    .pipe_up_datak                     (),
+  else begin : g_rc
+    RCPIPEx1__pcieVHost #(
+      .NodeNum                           (HOST_NODE),
+      .DataWidth                         (PIPE_DATAWIDTH),
+      .DllBytes                          (PIPE_DATAWIDTH/8)
+    ) u_rc
+    (
+      .pclk                              (pclk),
+      .nreset                            (rst_n),
 
-    // Data Link
-    .dll_clk                           (pclk),
-    .dll_rx_data                       (dll_rx_data),
-    .dll_rx_tlp_valid                  (dll_rx_tlp_valid),
-    .dll_rx_tlp_first                  (dll_rx_tlp_first),
-    .dll_rx_tlp_last                   (dll_rx_tlp_last),
-    .dll_rx_hdr_credit                 (),
-    .dll_rx_data_credit                (),
-    .dll_rx_update_type                (),
-    .dll_rx_packet_type                (),
-    .dll_rx_dllp_valid                 (),
-    .dllp_clk                          (),
-    .dllp_dn_data                      (),
-    .dllp_dn_valid                     (),
-    .dllp_up_data                      (),
-    .dllp_up_valid                     (),
+      // PIPE: the link, and its copies by direction for the decoders
+      .TxData                            (downdata),
+      .TxDataK                           (downdatak),
+      .RxData                            (updata),
+      .RxDataK                           (updatak),
+      .pipe_dn_pclk                      (),
+      .pipe_dn_data                      (),
+      .pipe_dn_datak                     (),
+      .pipe_up_pclk                      (),
+      .pipe_up_data                      (),
+      .pipe_up_datak                     (),
 
-    // Transaction: for waveform decoders, read from the dump; rx_* also for
-    // make TL=1
-    .tx_clk                            (),
-    .tx_tlp_data                       (),
-    .tx_tlp_sop                        (),
-    .tx_tlp_eop                        (),
-    .tx_tlp_valid                      (),
-    .tx_peer_data                      (),
-    .tx_peer_sop                       (),
-    .tx_peer_eop                       (),
-    .tx_peer_valid                     (),
-    .rx_clk                            (rx_clk),
-    .rx_tlp_data                       (rx_tlp_data),
-    .rx_tlp_sop                        (rx_tlp_sop),
-    .rx_tlp_eop                        (rx_tlp_eop),
-    .rx_tlp_valid                      (rx_tlp_valid),
-    .rx_peer_data                      (),
-    .rx_peer_sop                       (),
-    .rx_peer_eop                       (),
-    .rx_peer_valid                     ()
-  );
-`endif
+      // Data Link
+      .dll_clk                           (pclk),
+      .dll_rx_data                       (dll_rx_data),
+      .dll_rx_tlp_valid                  (dll_rx_tlp_valid),
+      .dll_rx_tlp_first                  (dll_rx_tlp_first),
+      .dll_rx_tlp_last                   (dll_rx_tlp_last),
+      .dll_rx_hdr_credit                 (),
+      .dll_rx_data_credit                (),
+      .dll_rx_update_type                (),
+      .dll_rx_packet_type                (),
+      .dll_rx_dllp_valid                 (),
+      .dllp_clk                          (),
+      .dllp_dn_data                      (),
+      .dllp_dn_valid                     (),
+      .dllp_up_data                      (),
+      .dllp_up_valid                     (),
+
+      // Transaction: for waveform decoders, read from the dump; rx_* also for
+      // make TL=1
+      .tx_clk                            (),
+      .tx_tlp_data                       (),
+      .tx_tlp_sop                        (),
+      .tx_tlp_eop                        (),
+      .tx_tlp_valid                      (),
+      .tx_peer_data                      (),
+      .tx_peer_sop                       (),
+      .tx_peer_eop                       (),
+      .tx_peer_valid                     (),
+      .rx_clk                            (rx_clk),
+      .rx_tlp_data                       (rx_tlp_data),
+      .rx_tlp_sop                        (rx_tlp_sop),
+      .rx_tlp_eop                        (rx_tlp_eop),
+      .rx_tlp_valid                      (rx_tlp_valid),
+      .rx_peer_data                      (),
+      .rx_peer_sop                       (),
+      .rx_peer_eop                       (),
+      .rx_peer_valid                     ()
+    );
+  end : g_rc
 
 // Top level fatal task, which can be called from anywhere in verilog code.
 // via the `fatal definition in pciedispheader.svh. Any data logging, error
@@ -501,58 +555,13 @@ begin
 end
 endtask
 
-`ifdef IFACE_SERIAL
   // The serial line by direction, under the name the wcx-pcie serial-line
-  // decoders bind (line): RC -> EP and EP -> RC
+  // decoders bind (line): RC -> EP and EP -> RC (IFACE_SERIAL)
   logic       ser_dn_line;
   logic       ser_up_line;
 
   assign ser_dn_line = ser_dn;
   assign ser_up_line = ser_up;
-`endif
-
-// FST waveform, for WaveCrux and GTKWave (make DUMP=1 run): the signals of
-// this level, i.e. the PIPE link both ways, its clocks and reset, and the
-// host's ports (u_rc), the decoder page. With EP=rtl, the EP's decoder
-// pages instead of the EP model's: its layer boundaries (pcie_core.wavecrux,
-// models/ep_wavecrux_view.sv) and the SOC CPU's retired instructions
-// (soc_top.cpu_view), in a file of their own
-`ifdef DUMP
-initial begin
-`ifdef EP_RTL
-`ifdef IFACE_SERIAL
-    $dumpfile("tb_rtl_serial.fst");
-`else
-    $dumpfile("tb_rtl.fst");
-`endif
-`elsif IFACE_PHY
-    $dumpfile("tb_phy.fst");
-`elsif IFACE_SERIAL
-    $dumpfile("tb_serial.fst");
-`else
-    $dumpfile("tb.fst");
-`endif
-    $dumpvars(1, tb);
-    $dumpvars(1, tb.u_rc);
-`ifdef EP_RTL
-`ifdef IFACE_SERIAL
-    $dumpvars(2, tb.dut.u_pcie_top.u_core.wavecrux);
-    $dumpvars(1, tb.dut.u_pcie_top.u_soc.cpu_view);
-`else
-    $dumpvars(2, tb.dut.u_core.wavecrux);
-    $dumpvars(1, tb.dut.u_soc.cpu_view);
-`endif
-`elsif IFACE_PHY
-    $dumpvars(1, tb.dut);           // the PIPE at the adapter, the resets
-    $dumpvars(1, tb.dut.pipe_mac);  // our PHY's PIPE
-    $dumpvars(1, tb.dut.bfm_pcie);  // the EP model's decoder page
-`elsif IFACE_SERIAL
-    $dumpvars(1, tb.dut);
-`else
-    $dumpvars(1, tb.dut.bfm_pcie);
-`endif
-end
-`endif
 
 endmodule: tb
 
@@ -561,6 +570,7 @@ endmodule: tb
 Version History:
 ------------------------------------------------------------------------------
  2025/08/19 SS: initial creation
+ 2026/11/24    : macros (EP_RTL, IFACE_SERIAL, IFACE_PHY, DUMP) made parameters
 
 */
 

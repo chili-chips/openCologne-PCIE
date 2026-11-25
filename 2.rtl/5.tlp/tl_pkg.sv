@@ -227,7 +227,8 @@ package tl_pkg;
 
   // the DLL <-> TL byte order of a word: byte 0 of each DW in [31:24]
   function automatic logic [TRN_DATA_W-1:0] wire_byte_swap(
-      input dw_bytes_t [TRN_DATA_W/32-1:0] beat);
+      input dw_bytes_t [TRN_DATA_W/32-1:0] beat
+  );
     logic [TRN_DATA_W/32-1:0][31:0] swapped;
     for (int i = 0; i < TRN_DATA_W / 32; i++) begin
       swapped[i] = dw_byte_swap(beat[i]);
@@ -687,8 +688,12 @@ package tl_pkg;
     lnk_ctl2_t   control;  // [15:0]
   } cfg_lnk2_dw_t;
 
-  function automatic logic [31:0] cfg_write_merge(input logic [31:0] old, input logic [31:0] wdata,
-                                                  input logic [3:0] be, input logic [31:0] wmask);
+  function automatic logic [31:0] cfg_write_merge(
+      input logic [31:0] old,
+      input logic [31:0] wdata,
+      input logic [3:0]  be,
+      input logic [31:0] wmask
+  );
     logic [3:0][7:0] be_mask;
     for (int i = 0; i < 4; i++) begin
       be_mask[i] = {8{be[i]}};
@@ -696,8 +701,11 @@ package tl_pkg;
     return (old & ~(wmask & be_mask)) | (wdata & wmask & be_mask);
   endfunction
 
-  function automatic logic [31:0] cfg_w1c(input logic [31:0] wdata, input logic [3:0] be,
-                                          input logic [31:0] w1c_mask);
+  function automatic logic [31:0] cfg_w1c(
+      input logic [31:0] wdata,
+      input logic [3:0]  be,
+      input logic [31:0] w1c_mask
+  );
     logic [3:0][7:0] be_mask;
     for (int i = 0; i < 4; i++) begin
       be_mask[i] = {8{be[i]}};
