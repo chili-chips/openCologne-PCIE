@@ -43,7 +43,7 @@ done
 cd "$W"
 echo "run-pnr: BOARD=$BOARD, $CCF, $SDC"
 "$NEXTPNR" --device CCGM1A1 --json top.json --vopt ccf="$HERE/$CCF" --sdc "$HERE/$SDC" \
-  --vopt out=top.txt --router router2 --seed "$SEED" --report report.json -l nextpnr.log >/dev/null 2>&1
+  --vopt out=top.txt --tmg-ripup --seed "$SEED" --report report.json -l nextpnr.log >/dev/null 2>&1
 rc=$?
 if [ $rc -ne 0 ]; then
   echo "run-pnr: nextpnr failed, see $W/nextpnr.log" >&2
