@@ -122,7 +122,7 @@ module retry_buffer
   // prefetch of word 0 with its last word (a TLP is at least 3 words, so
   // that word is never word 0)
   always @(posedge clk) begin : a_buffer_rw
-    if (!reset && mem_we && (mem_waddr == mem_raddr) &&
+    if (mem_we && (mem_waddr == mem_raddr) &&
         !(((state == IDLE) || (state == STORE_TLP)) && !tlp_last)) begin
       $error("retry_buffer: read and write of word %0d meet in state %0d", mem_waddr, state);
     end

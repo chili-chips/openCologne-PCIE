@@ -304,8 +304,7 @@ module soc_top
 `ifndef SYNTHESIS
 `ifndef SOC_CPU_VPROC
   always @(posedge clk) begin : a_ram_rw
-    if (resetn && mem.valid && !addr.bridge && (mem.wstrb != '0) &&
-        (addr.word == imem_addr[12:2])) begin
+    if (mem.valid && !addr.bridge && (mem.wstrb != '0) && (addr.word == imem_addr[12:2])) begin
       $error("soc_top: a store to word %0d meets its instruction fetch", addr.word);
     end
   end
@@ -482,7 +481,7 @@ module soc_top
   // tx_payload index wraps. A clocked check, not an assert property, which
   // Icarus does not support (iverilog#120)
   always @(posedge clk) begin : a_tx_max_payload
-    if (resetn && (tx_state == PREP) && tlp_has_data(
+    if ((tx_state == PREP) && tlp_has_data(
             tx_pl_even_q
         ) && (tlp_length_dw(
             tx_pl_even_q

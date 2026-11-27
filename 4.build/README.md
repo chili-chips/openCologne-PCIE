@@ -156,7 +156,7 @@ for (int b = 0; b < 4; b++)
   q[8*b+:8] <= (wstrb[b] & (wa == ra)) ? 'x : m[ra][8*b+:8];
 ```
 
-Here: the TL queues, the DLL retry buffer and the SOC RAM read X on a collision, with a check that it never happens where the read is used (`a_mem_rw`, `a_buffer_rw`, `a_ram_rw`; Verilator turns X into a constant, so the checks catch what X would show); the SOC RAM per byte. The DLL RX buffer and the SOC RX window use `else`.
+Here: the TL queues, the DLL RX ring and retry buffer and the SOC RAM read X on a collision, with a check that it never happens where the read is used (`a_mem_rw`, `a_ring_rw`, `a_buffer_rw`, `a_ram_rw`; Verilator turns X into a constant, so the checks catch what X would show); the SOC RAM per byte. The SOC RX window uses `else`.
 
 **`run-lint.sh ram` checks it.** It flags every memory that Yosys maps to block RAM with read-first or transparency logic ([`run-lint-ram.py`](hw_build/run-lint-ram.py)).
 

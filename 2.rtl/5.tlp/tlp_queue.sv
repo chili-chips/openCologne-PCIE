@@ -98,7 +98,7 @@ module tlp_queue
 
 `ifndef SYNTHESIS
   always @(posedge clk) begin : a_mem_rw
-    if (rst_n && write && fetch && (wr_ptr == fetch_ptr)) begin
+    if (write && fetch && (wr_ptr == fetch_ptr)) begin
       $error("tlp_queue: write and fetch of word %0d meet", wr_ptr);
     end
   end

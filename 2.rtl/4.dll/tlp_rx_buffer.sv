@@ -72,38 +72,47 @@ module tlp_rx_buffer
 
   typedef logic [BRAM_ADDR_WIDTH-1:0] bram_addr_t;
 
-  // Buffer to store received TLP
-  pipe_data_t rx_buffer   [DEPTH];
+  // The received TLPs in a ring. The writer stores a TLP while the reader
+  // forwards the ones before it, so an STP right after an END is taken: the
+  // writer checks the LCRC in the clock after END and takes the next STP in
+  // that same clock (#4). A TLP with a bad LCRC, or cut short by an STP, is
+  // rewound, so the ring holds good TLPs only, back to back.
+  localparam int ROOM   = 64;  // words an STP needs free: over a largest TLP
+  localparam int DESC_N = 4;   // TLPs checked and not yet forwarded
+
+  pipe_data_t rx_buffer [DEPTH];
 
   pipe_data_t data_tl;
   logic       tlp_en;
   logic       tlp_first;
   logic       tlp_last;
 
-  bram_addr_t write_ptr;
-  bram_addr_t read_ptr;
-  bram_addr_t word_cnt;
-  bram_addr_t read_cnt;
-  pipe_data_t buffer_data;
+  // ---- Writer ----------------------------------------------------------------
+  typedef enum logic [1:0] {
+    W_IDLE  = 2'd0,
+    W_STORE = 2'd1,
+    W_CHECK = 2'd2   // the clock after END: the LCRC is checked, an STP taken
+  } w_state_e;
+  w_state_e   w_state;
 
-
-  typedef enum logic [2:0] {
-    IDLE        = 3'd0,
-    STORE_TLP   = 3'd1,
-    DISCARD_TLP = 3'd2,
-    CHECK_CRC   = 3'd3,
-    PRE_WRITE   = 3'd4,
-    WRITE_START = 3'd5,
-    SEND_TLP    = 3'd6
-  } state_e;
-  state_e state;
-
+  bram_addr_t write_ptr;  // next word to write
+  bram_addr_t tlp_start;  // first word of the TLP being stored
+  bram_addr_t word_cnt;  // its words so far
+  bram_addr_t base;  // where an STP's word goes: write_ptr, or the rewound start
+  bram_addr_t free_words;  // the ring's free words from base on
+  logic       crc_ok;  // in W_CHECK: the stored TLP's LCRC is good
+  logic       stp_take;  // an STP the writer looks at
+  logic       seq_next;  // its sequence number is the next one expected
+  logic       room_ok;  // and the ring has room for it
+  logic       we;
+  bram_addr_t waddr;
+  seq_num_t   exp_seq;  // the next sequence number, with the TLPs just accepted
 
   // CRC also takes sequence number into account
   // Feed sequence number first
   logic  crc_en;
   // enabled when sequence number and TLP available
-  assign crc_en = tlp_valid & (stp_detected | state == STORE_TLP);
+  assign crc_en = tlp_valid & (stp_detected | (w_state == W_STORE));
 
   logic     [LFSR_WIDTH-1:0] crc_state;  // the words through the clock before (lcrc_pipe)
   logic     [LFSR_WIDTH-1:0] rx_lcrc;  // store received LCRC for comparison
@@ -118,7 +127,8 @@ module tlp_rx_buffer
 
   // two stages; the half-word end of a TLP: the upper DW is no part of the
   // CRC. An STP restarts it, so a dropped TLP leaves nothing behind. The
-  // last word, with END, is in crc_state in CHECK_CRC
+  // last word, with END, is in crc_state in W_CHECK, while an STP in that
+  // clock starts the next TLP's CRC
   lcrc_pipe u_lcrc (
       .clk       (clk),
       .reset     (reset),
@@ -142,26 +152,89 @@ module tlp_rx_buffer
     end
   endgenerate
 
-  // Write, else read, so the RAM needs no read-first logic (GateMate block
-  // RAM has none, 4.build/README.md). At STP, the word holds the sequence
-  // number and the start of the TLP. buffer_data is used only from
-  // CHECK_CRC on, where nothing is written
+  // ---- Reader ----------------------------------------------------------------
+  typedef enum logic {
+    R_IDLE = 1'b0,
+    R_SEND = 1'b1
+  } r_state_e;
+  r_state_e r_state;
+
+  bram_addr_t rd_ptr;  // next word to read
+  bram_addr_t r_len;  // words of the TLP being forwarded
+  bram_addr_t r_cnt;  // the word out now, from 1
+  logic r_go;  // a checked TLP waits: start it
+  logic r_last;
+  pipe_data_t buffer_data;
+
+  bram_addr_t desc_len[DESC_N];  // the checked TLPs' lengths, oldest first
+  logic [1:0] desc_wr;
+  logic [1:0] desc_rd;
+  logic [2:0] desc_cnt;
+  logic push;
+  logic pop;
+
+  assign crc_ok = (crc_computed == rx_lcrc);
+  assign exp_seq    = next_rcv_seq
+                    + seq_num_t'(new_tlp_accepted)
+                    + seq_num_t'((w_state == W_CHECK) & crc_ok);
+  assign base = ((w_state == W_CHECK) & ~crc_ok) ? tlp_start : write_ptr;
+  assign free_words = rd_ptr - base - 1'b1;
+  assign stp_take = stp_detected & link_active & (w_state != W_STORE);
+  assign seq_next = (sequence_number.num == exp_seq);
+  assign room_ok = (free_words >= bram_addr_t'(ROOM)) & (desc_cnt < 3'(DESC_N - 1));
+
+  assign we         = tlp_valid
+                    & ((stp_take & seq_next & room_ok) | ((w_state == W_STORE) & ~stp_detected));
+  assign waddr = (w_state == W_STORE) ? write_ptr : base;
+
+  assign push = (w_state == W_CHECK) & crc_ok;
+  assign r_go = (r_state == R_IDLE) & (desc_cnt != '0);
+  assign r_last = (r_state == R_SEND) & (r_cnt == r_len);
+  assign pop = r_last;
+
+  // GateMate block RAM has no read-first mode, so a read that meets a write
+  // of the same word reads X here, as it does in the RAM: Yosys then needs
+  // no read-first logic, and simulation matches the hardware (4.build/
+  // README.md, "Block RAM without read-first"). The reader reads checked
+  // TLPs only, which the writer never writes (a_ring_rw below).
   always_ff @(posedge clk) begin
-    if ((stp_detected || state == STORE_TLP) && tlp_valid) begin
-      rx_buffer[write_ptr] <= data_tl_in;
-    end
-    else begin
-      buffer_data <= rx_buffer[read_ptr];
+    if (we) begin
+      rx_buffer[waddr] <= data_tl_in;
     end
   end
 
-  //assign tlp_first = (state == SEND_TLP || state == WRITE_START) && (read_cnt == 0);
-  //assign tlp_last  = (state == SEND_TLP || state == WRITE_START) && (read_cnt == word_cnt - 1);
+  always_ff @(posedge clk) begin
+    buffer_data <= (we & (waddr == rd_ptr)) ? 'x : rx_buffer[rd_ptr];
+  end
 
-  assign data_tl   = (state == SEND_TLP) ? buffer_data : {DATA_WIDTH{1'b0}};
-  assign tlp_en    = (state == SEND_TLP) & (read_cnt <= word_cnt);
-  assign tlp_first = (state == SEND_TLP) & (read_cnt == 1);
-  assign tlp_last  = (state == SEND_TLP) & (read_cnt == word_cnt);
+`ifndef SYNTHESIS
+  always @(posedge clk) begin : a_ring_rw
+    if (we && (waddr == rd_ptr) && (r_go || ((r_state == R_SEND) && !r_last))) begin
+      $error("tlp_rx_buffer: a write meets the read of word %0d", rd_ptr);
+    end
+  end
+
+  always @(posedge clk) begin : a_desc_full
+    if (push && !pop && (desc_cnt == 3'(DESC_N))) begin
+      $error("tlp_rx_buffer: more than %0d checked TLPs wait", DESC_N);
+    end
+  end
+
+  // An STP the ring has no room for is Naked (ep_sva's RXBUSY reads it)
+  logic  stp_no_room;
+  assign stp_no_room = stp_take & seq_next & ~room_ok;
+
+  always @(posedge clk) begin : a_room
+    if (stp_no_room) begin
+      $error("tlp_rx_buffer: no room for the TLP of STP %0d", sequence_number.num);
+    end
+  end
+`endif
+
+  assign data_tl   = (r_state == R_SEND) ? buffer_data : {DATA_WIDTH{1'b0}};
+  assign tlp_en    = (r_state == R_SEND);
+  assign tlp_first = (r_state == R_SEND) & (r_cnt == bram_addr_t'(1));
+  assign tlp_last  = r_last;
 
   always_ff @(posedge clk or posedge reset) begin
     if (reset) begin
@@ -178,14 +251,71 @@ module tlp_rx_buffer
     end
   end
 
-  // FSM
+  // ---- Checked TLPs: their lengths, for the reader ---------------------------
+  always_ff @(posedge clk) begin
+    if (push) begin
+      desc_len[desc_wr] <= word_cnt;
+    end
+  end
+
   always_ff @(posedge clk or posedge reset) begin
     if (reset) begin
-      state            <= IDLE;
-      write_ptr        <= 0;
-      read_ptr         <= 0;
-      read_cnt         <= 0;
-      word_cnt         <= 0;
+      desc_wr  <= '0;
+      desc_rd  <= '0;
+      desc_cnt <= '0;
+    end
+    else begin
+      if (push) begin
+        desc_wr <= desc_wr + 1'b1;
+      end
+      if (pop) begin
+        desc_rd <= desc_rd + 1'b1;
+      end
+      desc_cnt <= desc_cnt + 3'(push) - 3'(pop);
+    end
+  end
+
+  // ---- Reader FSM: a checked TLP out, word by word ---------------------------
+  // r_go reads its first word; the next clocks put one word a clock out while
+  // the following one is read. On the last, rd_ptr is the next TLP's start
+  always_ff @(posedge clk or posedge reset) begin
+    if (reset) begin
+      r_state <= R_IDLE;
+      rd_ptr  <= '0;
+      r_len   <= '0;
+      r_cnt   <= '0;
+    end
+    else begin
+      unique case (r_state)
+        R_IDLE: begin
+          if (r_go) begin
+            r_len   <= desc_len[desc_rd];
+            r_cnt   <= bram_addr_t'(1);
+            rd_ptr  <= rd_ptr + 1'b1;
+            r_state <= R_SEND;
+          end
+        end
+        R_SEND: begin
+          if (r_last) begin
+            r_state <= R_IDLE;
+          end
+          else begin
+            r_cnt  <= r_cnt + 1'b1;
+            rd_ptr <= rd_ptr + 1'b1;
+          end
+        end
+        default: r_state <= R_IDLE;
+      endcase
+    end
+  end
+
+  // ---- Writer FSM ------------------------------------------------------------
+  always_ff @(posedge clk or posedge reset) begin
+    if (reset) begin
+      w_state          <= W_IDLE;
+      write_ptr        <= '0;
+      tlp_start        <= '0;
+      word_cnt         <= '0;
       rx_lcrc          <= {LFSR_WIDTH{1'b0}};
       rx_seq_num       <= 12'b0;
       nak_scheduled    <= 1'b0;
@@ -199,101 +329,59 @@ module tlp_rx_buffer
       ack_scheduled    <= 1'b0;
       new_tlp_accepted <= 1'b0;
 
-      unique case (state)
-
-        IDLE: begin
-          if (stp_detected && link_active) begin  // only process TLP when link is active
-            // Check sequence number
-            if (sequence_number.num == next_rcv_seq) begin
-              write_ptr  <= 1;  // first word has already been written in this cycle
-              word_cnt   <= 1;
-              rx_seq_num <= sequence_number.num;
-              state      <= STORE_TLP;
-            end
-            else if ((next_rcv_seq - sequence_number.num) <= SEQ_HALF) begin
-              // (NEXT_RCV_SEQ - sequence number) mod 4096 <= 2048: a duplicate, Ack it
-              ack_scheduled <= 1'b1;
-              ack_seq_num   <= next_rcv_seq - 1'b1;
-              state         <= DISCARD_TLP;
-            end
-            else begin
-              nak_scheduled <= 1'b1;
-              nak_seq_num   <= next_rcv_seq - 1'b1;
-              state         <= DISCARD_TLP;
-            end
-          end
+      // the TLP that ended: its LCRC, one clock after END
+      if (w_state == W_CHECK) begin
+        if (crc_ok) begin
+          // TODO: issue ACK when AckNak_LATENCY_TIMER exceeds a default value
+          ack_scheduled    <= 1'b1;
+          ack_seq_num      <= rx_seq_num;
+          new_tlp_accepted <= 1'b1;
         end
-
-        STORE_TLP: begin
-          if (stp_detected) begin  // detect STP before END
-            nak_scheduled <= 1'b1;
-            //nak_seq_num <= rx_seq_num;
-            nak_seq_num   <= next_rcv_seq - 1'b1;
-            write_ptr     <= 0;
-            word_cnt      <= 0;
-            state         <= IDLE;
-          end
-          else begin
-            if (tlp_valid) begin
-              write_ptr <= write_ptr + 1;
-              word_cnt  <= word_cnt + 1;
-            end
-            if (end_detected) begin
-              rx_lcrc <= lcrc;
-              state   <= CHECK_CRC;
-            end
-            // TODO: What if END has not been detected and buffer is full
-          end
+        else begin  // crc wrong: rewind
+          nak_scheduled <= 1'b1;
+          nak_seq_num   <= exp_seq - 1'b1;
+          write_ptr     <= tlp_start;
         end
+        w_state <= W_IDLE;
+      end
 
-        DISCARD_TLP: begin
-          state <= IDLE;
+      if (stp_take) begin  // in W_IDLE or W_CHECK; only when link is active
+        if (seq_next && room_ok) begin
+          tlp_start  <= base;
+          write_ptr  <= base + 1'b1;  // its first word is written this clock
+          word_cnt   <= bram_addr_t'(1);
+          rx_seq_num <= sequence_number.num;
+          w_state    <= W_STORE;
         end
-
-        CHECK_CRC: begin
-          if (crc_computed == rx_lcrc) begin
-            // TODO: issue ACK when AckNak_LATENCY_TIMER exceeds a default value
-            ack_scheduled    <= 1'b1;
-            ack_seq_num      <= rx_seq_num;
-            new_tlp_accepted <= 1'b1;
-            read_ptr         <= 0;
-            state            <= PRE_WRITE;
+        else if (!seq_next && ((exp_seq - sequence_number.num) <= SEQ_HALF)) begin
+          // (NEXT_RCV_SEQ - sequence number) mod 4096 <= 2048: a duplicate, Ack it
+          ack_scheduled <= 1'b1;
+          ack_seq_num   <= exp_seq - 1'b1;
+        end
+        else begin  // out of sequence, or no room
+          nak_scheduled <= 1'b1;
+          nak_seq_num   <= exp_seq - 1'b1;
+        end
+      end
+      else if (w_state == W_STORE) begin
+        if (stp_detected) begin  // detect STP before END: rewind
+          nak_scheduled <= 1'b1;
+          nak_seq_num   <= exp_seq - 1'b1;
+          write_ptr     <= tlp_start;
+          w_state       <= W_IDLE;
+        end
+        else begin
+          if (tlp_valid) begin
+            write_ptr <= write_ptr + 1'b1;
+            word_cnt  <= word_cnt + 1'b1;
           end
-          else begin  // crc wrong
-            nak_scheduled <= 1'b1;
-            //nak_seq_num <= rx_seq_num;
-            nak_seq_num   <= next_rcv_seq - 1'b1;
-            write_ptr     <= 0;
-            word_cnt      <= 0;
-            state         <= IDLE;
+          if (end_detected) begin
+            rx_lcrc <= lcrc;
+            w_state <= W_CHECK;
           end
+          // TODO: What if END has not been detected and buffer is full
         end
-
-        // buffer data 0 available here
-        PRE_WRITE: begin
-          state <= WRITE_START;
-        end
-
-        WRITE_START: begin  // TODO: Check timing here
-          read_ptr <= 1;  // first word has already been read in this cycle
-          read_cnt <= 1;
-          state    <= SEND_TLP;
-        end
-
-        SEND_TLP: begin
-          if (read_cnt == word_cnt) begin
-            write_ptr <= 0;
-            word_cnt  <= 0;
-            state     <= IDLE;
-          end
-          else begin
-            read_ptr <= read_ptr + 1;
-            read_cnt <= read_cnt + 1;
-          end
-        end
-
-        default: state <= IDLE;
-      endcase
+      end
     end
   end
 
