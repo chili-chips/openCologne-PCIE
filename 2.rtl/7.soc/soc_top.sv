@@ -254,6 +254,16 @@ module soc_top
 `endif
 `endif
 
+  // GateMate block RAM has no read-first mode, so a read that meets a write
+  // of the same word reads X here, as it does in the RAM: Yosys then needs
+  // no read-first logic, and simulation matches the hardware (4.build/
+  // README.md, "Block RAM without read-first"). The data port is write,
+  // else read; the instruction port meets a store only if the firmware
+  // overwrote the instruction it fetches, which it does not (a_ram_rw).
+  logic [3:0] ram_wr;  // the byte lanes a store writes
+
+  assign ram_wr = {4{mem.valid & ~addr.bridge}} & mem.wstrb;
+
   logic [31:0] ram[2048];
   initial begin
     $readmemh("firmware.hex", ram);
@@ -262,7 +272,10 @@ module soc_top
 `ifndef SOC_CPU_VPROC
   // eduBOS5's instruction port: read-only, one cycle
   always_ff @(posedge clk) begin
-    imem_rdat <= ram[imem_addr[12:2]];
+    for (int b = 0; b < 4; b++) begin  // a byte that meets its store reads X
+      imem_rdat[8*b+:8] <= (ram_wr[b] & (addr.word == imem_addr[12:2])) ? 'x :
+          ram[imem_addr[12:2]][8*b+:8];
+    end
   end
 `endif
 
@@ -287,6 +300,17 @@ module soc_top
       end
     end
   end
+
+`ifndef SYNTHESIS
+`ifndef SOC_CPU_VPROC
+  always @(posedge clk) begin : a_ram_rw
+    if (resetn && mem.valid && !addr.bridge && (mem.wstrb != '0) &&
+        (addr.word == imem_addr[12:2])) begin
+      $error("soc_top: a store to word %0d meets its instruction fetch", addr.word);
+    end
+  end
+`endif
+`endif
 
   // the RAM answers every access, load or store, one clock later
   always_ff @(posedge clk or negedge resetn) begin
@@ -342,7 +366,7 @@ module soc_top
 
   // ---- Tx: the TLP the firmware wrote into tx_payload ---------------------
   // Entry i of tx_payload is DW i, header first. Writing tx.send launches the
-  // transfer ("swmod", the strobe PeakRDL raises on a software write). Beat k
+  // transfer (an external register: its write strobe, nothing stored). Beat k
   // carries DW 2k (low half) and DW 2k+1. tx_payload is two banks, even and
   // odd entries, so that both DWORDs of a beat are read in one clock; the
   // read is registered, so beat tx_ra is read a clock ahead.
@@ -362,17 +386,19 @@ module soc_top
   logic     [ 4:0] tx_pl_widx;
   logic            tx_pl_we;
 
-  assign tx_start     = csr_out.tx.send.go.swmod;
+  assign tx_start = csr_out.tx.send.req & csr_out.tx.send.req_is_wr;  // no storage
+
+  assign csr_in.tx.send.wr_ack = tx_start;
 
   // Fmt[0]: 4-DW header; Fmt[1]: with data, Length DWORDs (0: 1024)
-  assign tx_dws_now   = (tx_state == PREP) ? tlp_body_dw(tx_pl_even_q)     : tx_dws;  // no digest
+  assign tx_dws_now = (tx_state == PREP) ? tlp_body_dw(tx_pl_even_q) : tx_dws;  // no digest
   assign tx_beats_now = (tx_state == PREP) ? 6'((tx_dws_now + 12'd1) >> 1) : tx_beats;
 
-  assign tx_take      = s_axis_tx.tvalid & s_axis_tx.tready;
-  assign tx_adv       = (tx_state == PREP) | ((tx_state == SEND) & tx_take & (tx_nb < tx_beats));
-  assign tx_ra        = 5'(tx_adv ? tx_nb + 6'd1 : tx_nb);
-  assign tx_pl_widx   = csr_out.tx_payload.addr[7:3];
-  assign tx_pl_we     = csr_out.tx_payload.req & csr_out.tx_payload.req_is_wr;
+  assign tx_take = s_axis_tx.tvalid & s_axis_tx.tready;
+  assign tx_adv = (tx_state == PREP) | ((tx_state == SEND) & tx_take & (tx_nb < tx_beats));
+  assign tx_ra = 5'(tx_adv ? tx_nb + 6'd1 : tx_nb);
+  assign tx_pl_widx = csr_out.tx_payload.addr[7:3];
+  assign tx_pl_we = csr_out.tx_payload.req & csr_out.tx_payload.req_is_wr;
 
   // the two banks: even entries 0, 2, 4 ..., odd entries 1, 3, 5 ...
   logic [31:0] tx_pl_even[PAYLOAD_DW/2];
@@ -453,36 +479,38 @@ module soc_top
   // The firmware's contract: at most Max_Payload_Size (128 bytes, 32 DWORDs)
   // of payload. The hardware does not check it: a longer TLP goes out as its
   // header says (the host sees a Malformed TLP), and past 64 DWORDs the
-  // tx_payload index wraps
-  // verilog_format: off
-  a_tx_max_payload :
-  assert property (@(posedge clk) disable iff (!resetn)
-      (tx_state == PREP) |-> !tlp_has_data(tx_pl_even_q) || (tlp_length_dw(tx_pl_even_q) <= 11'd32))
-  else begin
-    $error("SOC_TX_CHECK: payload of %0d DWORDs, over Max_Payload_Size (32)",
-           tlp_length_dw(tx_pl_even_q));
+  // tx_payload index wraps. A clocked check, not an assert property, which
+  // Icarus does not support (iverilog#120)
+  always @(posedge clk) begin : a_tx_max_payload
+    if (resetn && (tx_state == PREP) && tlp_has_data(
+            tx_pl_even_q
+        ) && (tlp_length_dw(
+            tx_pl_even_q
+        ) > 11'd32)) begin
+      $error("SOC_TX_CHECK: payload of %0d DWORDs, over Max_Payload_Size (32)", tlp_length_dw(
+             tx_pl_even_q));
+    end
   end
-  // verilog_format: on
 `endif
 
   // ---- Rx: a TLP written into rx_payload as-is ----------------------------
   // Beat k carries DW 2k (low half) and DW 2k+1, so entry i of rx_payload is
-  // DW i, header first. Two banks, even and odd entries, take a beat in one
-  // clock. DWORDs past the last entry are dropped. rx.valid is set at the end
-  // of the TLP and holds the link off until the firmware clears it.
-  localparam int RX_BEATS = PAYLOAD_DW / 2;  // beats the banks hold
+  // DW i, header first. One true-dual-port RAM of 32-bit entries takes a
+  // beat in one clock: DW 2k on port A, DW 2k+1 on port B. The firmware reads
+  // one DWORD on port A, so there is no bank mux on the read. DWORDs past the
+  // last entry are dropped. rx.valid is set at the end of the TLP and holds
+  // the link off until the firmware clears it.
+  localparam int RX_BEATS = PAYLOAD_DW / 2;  // beats the RAM holds
 
   logic        rx_valid;
   logic        rx_beat;
   logic        rx_we;
   logic [ 5:0] rx_k;  // beat k of the TLP, held at RX_BEATS past the last
 
-  logic [31:0] rx_pl_even_q;
-  logic [31:0] rx_pl_odd_q;
-  logic        rx_pl_odd_sel;
+  logic [31:0] rx_pl_q;
   logic        rx_pl_rd;
   logic        rx_pl_ack;
-  logic [ 4:0] rx_pl_ridx;
+  logic [ 5:0] rx_pl_aaddr;  // port A: the beat's DW 2k, or the firmware's read
 
   // an RX beat: DW 2k in the low half, an even entry; DW 2k+1, an odd one
   typedef struct packed {
@@ -509,33 +537,27 @@ module soc_top
     end
   end
 
-  assign rx_pl_rd   = csr_out.rx_payload.req & ~csr_out.rx_payload.req_is_wr;
-  assign rx_pl_ridx = csr_out.rx_payload.addr[7:3];
+  assign rx_pl_rd    = csr_out.rx_payload.req & ~csr_out.rx_payload.req_is_wr;
+  assign rx_pl_aaddr = rx_we ? {5'(rx_k), 1'b0} : csr_out.rx_payload.addr[7:2];
 
-  // the two banks: even entries 0, 2, 4 ..., odd entries 1, 3, 5 ...
-  logic [31:0] rx_pl_even[RX_BEATS];
-  logic [31:0] rx_pl_odd [RX_BEATS];
+  logic [31:0] rx_pl[PAYLOAD_DW];
 
-  // Write, else read, as in Tx: the firmware reads only while rx.valid holds
-  // the link off, so no read meets a write
+  // Port A: write, else read. The firmware reads only while rx.valid holds
+  // the link off, so no read meets a write, and Yosys sees the two ports
+  // never collide
   always_ff @(posedge clk) begin
     if (rx_we) begin
-      rx_pl_even[5'(rx_k)] <= rx_data.even;
-      rx_pl_odd[5'(rx_k)]  <= rx_data.odd;
+      rx_pl[rx_pl_aaddr] <= rx_data.even;
     end
     else begin
-      rx_pl_even_q <= rx_pl_even[rx_pl_ridx];
-      rx_pl_odd_q  <= rx_pl_odd[rx_pl_ridx];
+      rx_pl_q <= rx_pl[rx_pl_aaddr];
     end
   end
 
-  // the bank select of the read: a select, reset
-  always_ff @(posedge clk or negedge resetn) begin
-    if (!resetn) begin
-      rx_pl_odd_sel <= 1'b0;
-    end
-    else begin
-      rx_pl_odd_sel <= csr_out.rx_payload.addr[2];
+  // Port B: DW 2k+1 of the beat
+  always_ff @(posedge clk) begin
+    if (rx_we) begin
+      rx_pl[{5'(rx_k), 1'b1}] <= rx_data.odd;
     end
   end
 
@@ -549,7 +571,7 @@ module soc_top
   end
 
   assign csr_in.rx_payload.rd_ack       = rx_pl_ack;
-  assign csr_in.rx_payload.rd_data      = rx_pl_odd_sel ? rx_pl_odd_q : rx_pl_even_q;
+  assign csr_in.rx_payload.rd_data      = rx_pl_q;
   assign csr_in.rx_payload.wr_ack       = 1'b0;  // read-only
 
   assign csr_in.rx.valid.valid.hwset    = rx_beat & m_axis_rx.tlast;

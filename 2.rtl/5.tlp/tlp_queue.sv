@@ -55,6 +55,11 @@ module tlp_queue
 
   localparam int DEPTH = 1 << ADDR_W;
 
+  // GateMate block RAM has no read-first mode, so a read that meets a write
+  // of the same word reads X here, as it does in the RAM: Yosys then needs
+  // no read-first logic, and simulation matches the hardware (4.build/
+  // README.md, "Block RAM without read-first"). They never meet: a fetch
+  // reads a committed word, a write goes past commit_ptr (a_mem_rw below).
   tl_qword_t              mem         [DEPTH];
 
   logic      [ADDR_W-1:0] wr_ptr;
@@ -91,6 +96,14 @@ module tlp_queue
   assign rd.head     = out0;
   assign rd.next     = out1.data;
 
+`ifndef SYNTHESIS
+  always @(posedge clk) begin : a_mem_rw
+    if (rst_n && write && fetch && (wr_ptr == fetch_ptr)) begin
+      $error("tlp_queue: write and fetch of word %0d meet", wr_ptr);
+    end
+  end
+`endif
+
   always_ff @(posedge clk) begin
     if (write) begin
       mem[wr_ptr] <= wr.word;
@@ -99,7 +112,7 @@ module tlp_queue
 
   always_ff @(posedge clk) begin
     if (fetch) begin
-      ram_q <= mem[fetch_ptr];
+      ram_q <= (write & (wr_ptr == fetch_ptr)) ? 'x : mem[fetch_ptr];
     end
   end
 

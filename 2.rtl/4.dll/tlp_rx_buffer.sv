@@ -142,17 +142,17 @@ module tlp_rx_buffer
     end
   endgenerate
 
-  // Write port
-  // At STP, the word holds the sequence number and the start of the TLP
+  // Write, else read, so the RAM needs no read-first logic (GateMate block
+  // RAM has none, 4.build/README.md). At STP, the word holds the sequence
+  // number and the start of the TLP. buffer_data is used only from
+  // CHECK_CRC on, where nothing is written
   always_ff @(posedge clk) begin
     if ((stp_detected || state == STORE_TLP) && tlp_valid) begin
       rx_buffer[write_ptr] <= data_tl_in;
     end
-  end
-
-  // Read port
-  always_ff @(posedge clk) begin
-    buffer_data <= rx_buffer[read_ptr];
+    else begin
+      buffer_data <= rx_buffer[read_ptr];
+    end
   end
 
   //assign tlp_first = (state == SEND_TLP || state == WRITE_START) && (read_cnt == 0);

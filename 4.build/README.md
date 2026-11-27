@@ -135,7 +135,30 @@ For eduBOS5's 32x32 register file, with two read ports, `synth_gatemate` gives:
 
 **Use `else if`.** A write excludes the read in the same clock, so there is nothing to emulate, and simulation matches the hardware. `edubos5_rf.sv` does this; its core never reads while writing anyway.
 
-**`(* no_rw_check *)` is only a band-aid.** It tells Yosys to ignore collisions, so on a collision the RTL simulates read-first while the hardware returns undefined data.
+**`(* no_rw_check *)` is only a band-aid.** It tells Yosys to ignore collisions, so on a collision the RTL simulates read-first while the hardware returns undefined data. We don't use it.
+
+**A FIFO must read and write in one clock**, so `else` does not fit. There, read X on a collision: that is what the RAM does, so Yosys builds no logic and simulation matches the hardware (Yosys's own [pattern](https://yosyshq.readthedocs.io/projects/yosys/en/latest/using_yosys/synthesis/memory.html#synchronous-sdp-with-undefined-collision-behavior)):
+
+```systemverilog
+if (we) m[wa] <= d;
+if (re) q <= (we & (wa == ra)) ? 'x : m[ra];
+```
+
+| 128x64 FIFO RAM, read and write every clock | Besides 1 CC_BRAM_40K |
+|---|---|
+| read-first, as written | 137 DFF, 74 LUT/MX |
+| collision reads X | none |
+
+**With byte enables, X per byte.** Yosys matches the collision condition by structure, byte lane by byte lane, so each lane must use the very enable its write uses. One condition for the whole word, such as "any byte written", is not recognised, and the read-first logic comes back without a word:
+
+```systemverilog
+for (int b = 0; b < 4; b++)
+  q[8*b+:8] <= (wstrb[b] & (wa == ra)) ? 'x : m[ra][8*b+:8];
+```
+
+Here: the TL queues, the DLL retry buffer and the SOC RAM read X on a collision, with a check that it never happens where the read is used (`a_mem_rw`, `a_buffer_rw`, `a_ram_rw`; Verilator turns X into a constant, so the checks catch what X would show); the SOC RAM per byte. The DLL RX buffer and the SOC RX window use `else`.
+
+**`run-lint.sh ram` checks it.** It flags every memory that Yosys maps to block RAM with read-first or transparency logic ([`run-lint-ram.py`](hw_build/run-lint-ram.py)).
 
 ### Gen2 on the A1
 

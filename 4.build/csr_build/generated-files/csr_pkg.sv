@@ -12,6 +12,14 @@ package csr_pkg;
     localparam CSR_SIZE = 'h300;
 
     typedef struct {
+        logic wr_ack;
+    } csr__tx__send__external__in_t;
+
+    typedef struct {
+        csr__tx__send__external__in_t send;
+    } csr__tx__in_t;
+
+    typedef struct {
         logic hwset;
     } csr__rx__valid__valid__in_t;
 
@@ -62,23 +70,27 @@ package csr_pkg;
     } csr__tx_payload__external__in_t;
 
     typedef struct {
+        csr__tx__in_t tx;
         csr__rx__in_t rx;
         csr__status__in_t status;
         csr__rx_payload__external__in_t rx_payload;
         csr__tx_payload__external__in_t tx_payload;
     } csr__in_t;
 
-    typedef struct {
-        logic value;
-        logic swmod;
-    } csr__tx__send__go__out_t;
+    typedef struct packed {
+        logic [30:0] _reserved_31_1;
+        logic go;
+    } csr__tx__send__external__fields__out_t;
 
     typedef struct {
-        csr__tx__send__go__out_t go;
-    } csr__tx__send__out_t;
+        logic req;
+        logic req_is_wr;
+        csr__tx__send__external__fields__out_t wr_data;
+        csr__tx__send__external__fields__out_t wr_biten;
+    } csr__tx__send__external__out_t;
 
     typedef struct {
-        csr__tx__send__out_t send;
+        csr__tx__send__external__out_t send;
     } csr__tx__out_t;
 
     typedef struct {

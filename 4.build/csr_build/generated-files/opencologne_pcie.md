@@ -78,8 +78,8 @@ tx_payload, header first; writing tx.send launches it.</p>
 
 <p>Any write launches the Tx FSM on the TLP in tx_payload, so
 it comes LAST, after every entry of the TLP. The FSM takes
-the length from DW0 (Fmt and Length). The write strobe is
-exported to logic as the 'swmod' output of this field.</p>
+the length from DW0 (Fmt and Length). External: nothing is
+stored, the write strobe (req) starts the FSM.</p>
 
 ## rx register file
 

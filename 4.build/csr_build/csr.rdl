@@ -73,7 +73,7 @@ addrmap csr {
       desc = "TLP Transmit CSR (CPU --> PCIe link). The TLP goes in
               tx_payload, header first; writing tx.send launches it.";
 
-      reg {
+      external reg {
          name = "csr.tx.send";
          desc = "TLP Send -- writing this register STARTS the transfer";
 
@@ -81,11 +81,10 @@ addrmap csr {
             name = "csr.tx.send.go";
             desc = "Any write launches the Tx FSM on the TLP in tx_payload, so
                     it comes LAST, after every entry of the TLP. The FSM takes
-                    the length from DW0 (Fmt and Length). The write strobe is
-                    exported to logic as the 'swmod' output of this field.";
+                    the length from DW0 (Fmt and Length). External: nothing is
+                    stored, the write strobe (req) starts the FSM.";
             sw = w;
             hw = r;
-            swmod = true;
          } go[0:0] = 0;
       } send @ 0x0C;  // 0x00 to 0x08: free, they held the header
    } tx @ 0x00;

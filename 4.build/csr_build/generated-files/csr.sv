@@ -104,6 +104,7 @@ module csr (
         is_valid_addr = '1; // No valid address check
         is_valid_rw = '1; // No valid RW check
         decoded_reg_strb.tx.send = cpuif_req_masked & (cpuif_addr == 10'hc) & cpuif_req_is_wr;
+        is_external |= cpuif_req_masked & (cpuif_addr == 10'hc) & cpuif_req_is_wr;
         decoded_reg_strb.rx.valid = cpuif_req_masked & (cpuif_addr == 10'h20);
         decoded_reg_strb.status.phy = cpuif_req_masked & (cpuif_addr == 10'h28) & !cpuif_req_is_wr;
         decoded_reg_strb.status.result = cpuif_req_masked & (cpuif_addr == 10'h2c) & cpuif_req_is_wr;
@@ -149,14 +150,6 @@ module csr (
                 struct {
                     logic next;
                     logic load_next;
-                } go;
-            } send;
-        } tx;
-        struct {
-            struct {
-                struct {
-                    logic next;
-                    logic load_next;
                 } valid;
             } valid;
         } rx;
@@ -168,43 +161,18 @@ module csr (
             struct {
                 struct {
                     logic value;
-                } go;
-            } send;
-        } tx;
-        struct {
-            struct {
-                struct {
-                    logic value;
                 } valid;
             } valid;
         } rx;
     } field_storage_t;
     field_storage_t field_storage;
 
-    // Field: csr.tx.send.go
-    always_comb begin
-        automatic logic [0:0] next_c;
-        automatic logic load_next_c;
-        next_c = field_storage.tx.send.go.value;
-        load_next_c = '0;
-        if(decoded_reg_strb.tx.send && decoded_req_is_wr) begin // SW write
-            next_c = (field_storage.tx.send.go.value & ~decoded_wr_biten[0:0]) | (decoded_wr_data[0:0] & decoded_wr_biten[0:0]);
-            load_next_c = '1;
-        end
-        field_combo.tx.send.go.next = next_c;
-        field_combo.tx.send.go.load_next = load_next_c;
-    end
-    always_ff @(posedge clk or negedge arst_n) begin
-        if(~arst_n) begin
-            field_storage.tx.send.go.value <= 1'h0;
-        end else begin
-            if(field_combo.tx.send.go.load_next) begin
-                field_storage.tx.send.go.value <= field_combo.tx.send.go.next;
-            end
-        end
-    end
-    assign hwif_out.tx.send.go.value = field_storage.tx.send.go.value;
-    assign hwif_out.tx.send.go.swmod = decoded_reg_strb.tx.send && decoded_req_is_wr && |(decoded_wr_biten[0:0]);
+    // External register: csr.tx.send
+
+    assign hwif_out.tx.send.req = decoded_req_is_wr ? decoded_reg_strb.tx.send : '0;
+    assign hwif_out.tx.send.req_is_wr = decoded_req_is_wr;
+    assign hwif_out.tx.send.wr_data = decoded_wr_data;
+    assign hwif_out.tx.send.wr_biten = decoded_wr_biten;
     // Field: csr.rx.valid.valid
     always_comb begin
         automatic logic [0:0] next_c;
@@ -256,6 +224,7 @@ module csr (
     always_comb begin
         automatic logic wr_ack;
         wr_ack = '0;
+        wr_ack |= hwif_in.tx.send.wr_ack;
         wr_ack |= hwif_in.status.result.wr_ack;
         wr_ack |= hwif_in.rx_payload.wr_ack;
         wr_ack |= hwif_in.tx_payload.wr_ack;

@@ -70,6 +70,11 @@ module retry_buffer
 
   // K characters
 
+  // GateMate block RAM has no read-first mode, so a read that meets a write
+  // of the same word reads X here, as it does in the RAM: Yosys then needs
+  // no read-first logic, and simulation matches the hardware (4.build/
+  // README.md, "Block RAM without read-first"). They meet only while a TLP
+  // is stored, where the read is not used (a_buffer_rw below).
   pipe_data_t buffer    [DEPTH];
 
   bram_addr_t write_ptr;
@@ -108,8 +113,21 @@ module retry_buffer
     if (mem_we) begin
       buffer[mem_waddr] <= mem_wdata;
     end
-    mem_rdata <= buffer[mem_raddr];
+    mem_rdata <= (mem_we & (mem_waddr == mem_raddr)) ? 'x : buffer[mem_raddr];
   end
+
+`ifndef SYNTHESIS
+  // a_buffer_rw: mem_rdata is used in WRITE_START and SEND_TLP only, so a
+  // read that meets a write is harmless while a TLP is stored, but for the
+  // prefetch of word 0 with its last word (a TLP is at least 3 words, so
+  // that word is never word 0)
+  always @(posedge clk) begin : a_buffer_rw
+    if (!reset && mem_we && (mem_waddr == mem_raddr) &&
+        !(((state == IDLE) || (state == STORE_TLP)) && !tlp_last)) begin
+      $error("retry_buffer: read and write of word %0d meet in state %0d", mem_waddr, state);
+    end
+  end
+`endif
 
   always_comb begin
     mem_raddr = read_ptr;
