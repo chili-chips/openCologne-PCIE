@@ -11,7 +11,7 @@ module csr (
 
         input wire s_cpuif_req,
         input wire s_cpuif_req_is_wr,
-        input wire [9:0] s_cpuif_addr,
+        input wire [13:0] s_cpuif_addr,
         input wire [31:0] s_cpuif_wr_data,
         input wire [31:0] s_cpuif_wr_biten,
         output wire s_cpuif_req_stall_wr,
@@ -31,7 +31,7 @@ module csr (
     //--------------------------------------------------------------------------
     logic cpuif_req;
     logic cpuif_req_is_wr;
-    logic [9:0] cpuif_addr;
+    logic [13:0] cpuif_addr;
     logic [31:0] cpuif_wr_data;
     logic [31:0] cpuif_wr_biten;
     logic cpuif_req_stall_wr;
@@ -90,7 +90,7 @@ module csr (
     logic decoded_err;
     logic decoded_req_is_external;
 
-    logic [9:0] decoded_addr;
+    logic [13:0] decoded_addr;
     logic decoded_req;
     logic decoded_req_is_wr;
     logic [31:0] decoded_wr_data;
@@ -103,17 +103,17 @@ module csr (
         is_external = '0;
         is_valid_addr = '1; // No valid address check
         is_valid_rw = '1; // No valid RW check
-        decoded_reg_strb.tx.send = cpuif_req_masked & (cpuif_addr == 10'hc) & cpuif_req_is_wr;
-        is_external |= cpuif_req_masked & (cpuif_addr == 10'hc) & cpuif_req_is_wr;
-        decoded_reg_strb.rx.valid = cpuif_req_masked & (cpuif_addr == 10'h20);
-        decoded_reg_strb.status.phy = cpuif_req_masked & (cpuif_addr == 10'h28) & !cpuif_req_is_wr;
-        decoded_reg_strb.status.result = cpuif_req_masked & (cpuif_addr == 10'h2c) & cpuif_req_is_wr;
-        is_external |= cpuif_req_masked & (cpuif_addr == 10'h2c) & cpuif_req_is_wr;
-        decoded_reg_strb.status.cfg_id = cpuif_req_masked & (cpuif_addr == 10'h30) & !cpuif_req_is_wr;
-        decoded_reg_strb.rx_payload = cpuif_req_masked & (cpuif_addr >= 10'h100) & (cpuif_addr <= 10'h100 + 10'hff) & !cpuif_req_is_wr;
-        is_external |= cpuif_req_masked & (cpuif_addr >= 10'h100) & (cpuif_addr <= 10'h100 + 10'hff) & !cpuif_req_is_wr;
-        decoded_reg_strb.tx_payload = cpuif_req_masked & (cpuif_addr >= 10'h200) & (cpuif_addr <= 10'h200 + 10'hff) & cpuif_req_is_wr;
-        is_external |= cpuif_req_masked & (cpuif_addr >= 10'h200) & (cpuif_addr <= 10'h200 + 10'hff) & cpuif_req_is_wr;
+        decoded_reg_strb.tx.send = cpuif_req_masked & (cpuif_addr == 14'hc) & cpuif_req_is_wr;
+        is_external |= cpuif_req_masked & (cpuif_addr == 14'hc) & cpuif_req_is_wr;
+        decoded_reg_strb.rx.valid = cpuif_req_masked & (cpuif_addr == 14'h20);
+        decoded_reg_strb.status.phy = cpuif_req_masked & (cpuif_addr == 14'h28) & !cpuif_req_is_wr;
+        decoded_reg_strb.status.result = cpuif_req_masked & (cpuif_addr == 14'h2c) & cpuif_req_is_wr;
+        is_external |= cpuif_req_masked & (cpuif_addr == 14'h2c) & cpuif_req_is_wr;
+        decoded_reg_strb.status.cfg_id = cpuif_req_masked & (cpuif_addr == 14'h30) & !cpuif_req_is_wr;
+        decoded_reg_strb.rx_payload = cpuif_req_masked & (cpuif_addr >= 14'h1000) & (cpuif_addr <= 14'h1000 + 14'hff) & !cpuif_req_is_wr;
+        is_external |= cpuif_req_masked & (cpuif_addr >= 14'h1000) & (cpuif_addr <= 14'h1000 + 14'hff) & !cpuif_req_is_wr;
+        decoded_reg_strb.tx_payload = cpuif_req_masked & (cpuif_addr >= 14'h2000) & (cpuif_addr <= 14'h2000 + 14'hfff) & cpuif_req_is_wr;
+        is_external |= cpuif_req_masked & (cpuif_addr >= 14'h2000) & (cpuif_addr <= 14'h2000 + 14'hfff) & cpuif_req_is_wr;
         decoded_err = '0;
         decoded_req_is_external = is_external;
     end
@@ -213,7 +213,7 @@ module csr (
     assign hwif_out.rx_payload.wr_biten = decoded_wr_biten;
     // External region: csr.tx_payload
     assign hwif_out.tx_payload.req = decoded_reg_strb.tx_payload;
-    assign hwif_out.tx_payload.addr = decoded_addr[7:0];
+    assign hwif_out.tx_payload.addr = decoded_addr[11:0];
     assign hwif_out.tx_payload.req_is_wr = decoded_req_is_wr;
     assign hwif_out.tx_payload.wr_data = decoded_wr_data;
     assign hwif_out.tx_payload.wr_biten = decoded_wr_biten;
@@ -250,8 +250,8 @@ module csr (
 
     assign readback_external_rd_ack = readback_external_rd_ack_c;
 
-    logic [9:0] rd_mux_addr;
-    logic [9:0] pending_rd_addr;
+    logic [13:0] rd_mux_addr;
+    logic [13:0] pending_rd_addr;
     // Hold read mux address to guarantee it is stable throughout any external accesses
     always_ff @(posedge clk or negedge arst_n) begin
         if(~arst_n) begin
@@ -268,19 +268,19 @@ module csr (
     always_comb begin
         automatic logic [31:0] readback_data_var;
         readback_data_var = '0;
-        if(rd_mux_addr == 10'h20) begin
+        if(rd_mux_addr == 14'h20) begin
             readback_data_var[0] = field_storage.rx.valid.valid.value;
         end
-        if(rd_mux_addr == 10'h28) begin
+        if(rd_mux_addr == 14'h28) begin
             readback_data_var[0] = hwif_in.status.phy.tx_busy.next;
         end
-        if(rd_mux_addr == 10'h30) begin
+        if(rd_mux_addr == 14'h30) begin
             readback_data_var[15:0] = hwif_in.status.cfg_id.id.next;
         end
-        if((rd_mux_addr >= 10'h100) && (rd_mux_addr <= 10'h100 + 10'hff)) begin
+        if((rd_mux_addr >= 14'h1000) && (rd_mux_addr <= 14'h1000 + 14'hff)) begin
             readback_data_var = hwif_in.rx_payload.rd_data;
         end
-        if((rd_mux_addr >= 10'h200) && (rd_mux_addr <= 10'h200 + 10'hff)) begin
+        if((rd_mux_addr >= 14'h2000) && (rd_mux_addr <= 14'h2000 + 14'hfff)) begin
             readback_data_var = hwif_in.tx_payload.rd_data;
         end
         readback_data = readback_data_var;

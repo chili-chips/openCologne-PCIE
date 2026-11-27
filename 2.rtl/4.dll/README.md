@@ -148,7 +148,7 @@ Field layout: `type | Reserved | AckNak_Seq_Num | 16-bit CRC`.
   - LCRC match → the control data is removed and the TLP is forwarded to the TL: the DLL marks the start and end of the TLP, `NEXT_RCV_SEQ` is incremented, and an ACK is scheduled.
 - A NAK is scheduled for every bad TLP: there is no `NAK_SCHEDULED` flag holding back a second one.
 - An ACK is sent as soon as it is scheduled; there is no `AckNak_LATENCY_TIMER` yet.
-- An STP is taken only while no TLP is being checked or forwarded; a TLP right behind another one is lost ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4)).
+- The RX buffer is a ring: an STP is taken in the clock after the END before it, while the TLPs before it are forwarded; a TLP with a bad LCRC is rewound ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4), fixed). A nullified TLP (EDB) is Naked, not dropped ([#29](https://github.com/chili-chips/openCologne-PCIE/issues/29)).
 - Nullification of a TLP with `EDB` is **not** supported in this first version.
 
 ## DLLP Handler
@@ -177,7 +177,7 @@ Field layout: `type | Reserved | AckNak_Seq_Num | 16-bit CRC`.
 | The DLL frames its packets (STP, SDP, END); the spec puts framing in the Physical Layer | 4.2.2 | |
 | No `REPLAY_TIMER`, no `REPLAY_NUM`: a TLP lost on the line is never replayed | 3.5.2.1 | [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3) |
 | No Receiver Error input from the Physical Layer, so no Nak on that ground | 3.5.3.1 | [#3](https://github.com/chili-chips/openCologne-PCIE/issues/3) |
-| A TLP right behind another one is dropped without a Nak | 3.5.3.1 | [#4](https://github.com/chili-chips/openCologne-PCIE/issues/4) |
+| A nullified TLP (EDB) is Naked, not dropped | 3.5.3.1 | [#29](https://github.com/chili-chips/openCologne-PCIE/issues/29) |
 | Sequence number checked before the LCRC: a duplicate with a bad LCRC is answered with an Ack, not a Nak | 3.5.3.1 | |
 | No `NAK_SCHEDULED`: a Nak for every bad TLP, not one until a good TLP arrives | 3.5.3.1 | |
 | No `AckNak_LATENCY_TIMER`: one Ack per TLP, sent at once | 3.5.3.1 | |

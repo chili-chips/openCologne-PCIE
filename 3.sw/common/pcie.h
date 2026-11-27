@@ -71,6 +71,7 @@
 #define PCIE_RX_PAYLOAD(i)   CSR_REG32(rx_payload.mem[i])
 #define PCIE_TX_PAYLOAD(i)   CSR_REG32(tx_payload.mem[i])
 #define PAYLOAD_DW           (sizeof(((csr_t *)0)->rx_payload.mem) / sizeof(uint32_t))
+#define TX_PAYLOAD_DW        (sizeof(((csr_t *)0)->tx_payload.mem) / sizeof(uint32_t))
 
 // Field masks come from the generated csr.h
 #define TX_BUSY_MASK         CSR__STATUS__PHY__TX_BUSY_bm
@@ -126,6 +127,11 @@ uint32_t completer_id(void);
 void     send_completion(const tlp_t *req, uint32_t status, int with_data, uint32_t data);
 void     send_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
                    const uint32_t *data, uint32_t n);
+// A batch: several TLPs into tx_payload, then one tx.send for them all
+void     tx_begin(void);
+void     tx_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
+                 const uint32_t *data, uint32_t n);
+void     tx_go(void);
 uint32_t tlp_length(const tlp_t *req);
 uint32_t req_addr(const tlp_t *req);
 int      is_posted(const tlp_t *req);

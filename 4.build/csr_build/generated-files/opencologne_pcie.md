@@ -15,7 +15,7 @@ Don't override. Generated from: opencologne_pcie
 
 - Absolute Address: 0x0
 - Base Offset: 0x0
-- Size: 0x30000300
+- Size: 0x30003000
 
 |  Offset  |Identifier|Name|
 |----------|----------|----|
@@ -37,17 +37,17 @@ No supported members.
 
 - Absolute Address: 0x30000000
 - Base Offset: 0x30000000
-- Size: 0x300
+- Size: 0x3000
 
 <p>openCologne-PCIE EndPoint CSR</p>
 
 |Offset|Identifier|     Name     |
 |------|----------|--------------|
-| 0x000|    tx    |    csr.tx    |
-| 0x010|    rx    |    csr.rx    |
-| 0x024|  status  |  csr.status  |
-| 0x100|rx_payload|csr.rx_payload|
-| 0x200|tx_payload|csr.tx_payload|
+|0x0000|    tx    |    csr.tx    |
+|0x0010|    rx    |    csr.rx    |
+|0x0024|  status  |  csr.status  |
+|0x1000|rx_payload|csr.rx_payload|
+|0x2000|tx_payload|csr.tx_payload|
 
 ## tx register file
 
@@ -70,16 +70,17 @@ tx_payload, header first; writing tx.send launches it.</p>
 
 <p>TLP Send -- writing this register STARTS the transfer</p>
 
-|Bits|Identifier|Access|Reset|     Name     |
-|----|----------|------|-----|--------------|
-|  0 |    go    |   w  | 0x0 |csr.tx.send.go|
+|Bits|Identifier|Access|Reset|         Name         |
+|----|----------|------|-----|----------------------|
+| 7:0|   count  |   w  | 0x0 |csr.tx.send.count[7:0]|
 
-#### go field
+#### count field
 
-<p>Any write launches the Tx FSM on the TLP in tx_payload, so
-it comes LAST, after every entry of the TLP. The FSM takes
-the length from DW0 (Fmt and Length). External: nothing is
-stored, the write strobe (req) starts the FSM.</p>
+<p>The number of TLPs to send. The firmware writes them back
+to back into tx_payload from entry 0, header first, then
+their number here, LAST: the Tx FSM sends them in order,
+each one's length from its DW0 (Fmt and Length).
+External: nothing is stored, the write starts the FSM.</p>
 
 ## rx register file
 
@@ -188,8 +189,8 @@ a direct link.</p>
 
 ## rx_payload memory
 
-- Absolute Address: 0x30000100
-- Base Offset: 0x100
+- Absolute Address: 0x30001000
+- Base Offset: 0x1000
 - Size: 0x100
 
 <p>DWORDs of the received TLP, header first, captured with
@@ -201,13 +202,14 @@ No supported members.
 
 ## tx_payload memory
 
-- Absolute Address: 0x30000200
-- Base Offset: 0x200
-- Size: 0x100
+- Absolute Address: 0x30002000
+- Base Offset: 0x2000
+- Size: 0x1000
 
-<p>DWORDs of the outgoing TLP, header first: entry i is DW i.
-Writing tx.send then launches it. The TLP's Fmt and Length say
-how many entries go out.</p>
+<p>The TLPs to send, back to back from entry 0, header first:
+entry i is DW i of the batch. Writing their number into tx.send
+then launches them; each one's Fmt and Length say how many
+entries it takes.</p>
 
 No supported members.
 

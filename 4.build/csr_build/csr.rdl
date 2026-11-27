@@ -46,7 +46,7 @@
 //   Register map:
 //
 //     0x3000_0000  -               free (was tx.header0..2)
-//     0x3000_000C  tx.send         send the TLP in tx_payload (W, triggers)
+//     0x3000_000C  tx.send         send N TLPs from tx_payload (W, triggers)
 //     0x3000_0010  -               free (was rx.header0..2, rx.data)
 //     0x3000_0020  rx.valid        a TLP is waiting          (R, W1C)
 //     0x3000_0024  -               free (was status.err)
@@ -78,14 +78,15 @@ addrmap csr {
          desc = "TLP Send -- writing this register STARTS the transfer";
 
          field {
-            name = "csr.tx.send.go";
-            desc = "Any write launches the Tx FSM on the TLP in tx_payload, so
-                    it comes LAST, after every entry of the TLP. The FSM takes
-                    the length from DW0 (Fmt and Length). External: nothing is
-                    stored, the write strobe (req) starts the FSM.";
+            name = "csr.tx.send.count[7:0]";
+            desc = "The number of TLPs to send. The firmware writes them back
+                    to back into tx_payload from entry 0, header first, then
+                    their number here, LAST: the Tx FSM sends them in order,
+                    each one's length from its DW0 (Fmt and Length).
+                    External: nothing is stored, the write starts the FSM.";
             sw = w;
             hw = r;
-         } go[0:0] = 0;
+         } count[7:0] = 0;
       } send @ 0x0C;  // 0x00 to 0x08: free, they held the header
    } tx @ 0x00;
 
@@ -182,17 +183,18 @@ addrmap csr {
       mementries = 64;
       memwidth = 32;
       sw = r;
-   } rx_payload @ 0x100;
+   } rx_payload @ 0x1000;
 
    external mem {
       name = "csr.tx_payload";
-      desc = "DWORDs of the outgoing TLP, header first: entry i is DW i.
-              Writing tx.send then launches it. The TLP's Fmt and Length say
-              how many entries go out.";
-      mementries = 64;
+      desc = "The TLPs to send, back to back from entry 0, header first:
+              entry i is DW i of the batch. Writing their number into tx.send
+              then launches them; each one's Fmt and Length say how many
+              entries it takes.";
+      mementries = 1024;
       memwidth = 32;
       sw = w;
-   } tx_payload @ 0x200;
+   } tx_payload @ 0x2000;
 };
 
 //==========================================================================

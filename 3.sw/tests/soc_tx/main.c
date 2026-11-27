@@ -34,17 +34,24 @@ int main(void) {
     PCIE_TX_PAYLOAD(4) = 0x11223344u;
     send_tlp(MWR4(1), 0x0000020Fu, 0x00000001u, 0x00002000u);
 
-    // 4-DW MWr, 2 DW
+    // A batch of three, one tx.send: a 4-DW MWr of 2 DW (entries 0 to 5), a
+    // 3-DW MRd (6 to 8), then a 4-DW MRd from an odd entry (9 to 12)
     tx_idle();
-    PCIE_TX_PAYLOAD(4) = 0x55667788u;
-    PCIE_TX_PAYLOAD(5) = 0x99AABBCCu;
-    send_tlp(MWR4(2), 0x000003FFu, 0x00000002u, 0x00003000u);
-
-    // 4-DW MRd, 1 DW
-    send_tlp(MRD4(1), 0x0000040Fu, 0x00000003u, 0x00004000u);
-
-    // 3-DW MRd, 1 DW: no H3
-    send_tlp(MRD3(1), 0x0000050Fu, 0x00005000u, 0x00000000u);
+    PCIE_TX_PAYLOAD(0)  = MWR4(2);
+    PCIE_TX_PAYLOAD(1)  = 0x000003FFu;
+    PCIE_TX_PAYLOAD(2)  = 0x00000002u;
+    PCIE_TX_PAYLOAD(3)  = 0x00003000u;
+    PCIE_TX_PAYLOAD(4)  = 0x55667788u;
+    PCIE_TX_PAYLOAD(5)  = 0x99AABBCCu;
+    PCIE_TX_PAYLOAD(6)  = MRD3(1);
+    PCIE_TX_PAYLOAD(7)  = 0x0000050Fu;
+    PCIE_TX_PAYLOAD(8)  = 0x00005000u;
+    PCIE_TX_PAYLOAD(9)  = MRD4(1);
+    PCIE_TX_PAYLOAD(10) = 0x0000040Fu;
+    PCIE_TX_PAYLOAD(11) = 0x00000003u;
+    PCIE_TX_PAYLOAD(12) = 0x00004000u;
+    PCIE_TX_SEND        = 3;
+    tx_idle();
 
     halt(0x0000FACEu);
 }

@@ -59,8 +59,8 @@ static void wait_tx_ready(void) {
     while ((PCIE_PHY_STATUS & TX_BUSY_MASK) != 0);
 }
 
-// Loads DW0 to DW3 into tx_payload, then tx.send sends the TLP. A 4-DW
-// header's payload goes in from entry 4 on, before the call.
+// Loads DW0 to DW3 into tx_payload, then tx.send sends the TLP: a batch of
+// one. A 4-DW header's payload goes in from entry 4 on, before the call.
 void send_tlp(uint32_t h0, uint32_t h1, uint32_t h2, uint32_t data) {
     wait_tx_ready();
 
@@ -69,6 +69,24 @@ void send_tlp(uint32_t h0, uint32_t h1, uint32_t h2, uint32_t data) {
     PCIE_TX_PAYLOAD(2) = h2;
     PCIE_TX_PAYLOAD(3) = data;
     PCIE_TX_SEND       = 1;
+}
+
+// A batch: TLPs back to back in tx_payload from entry 0, then their number
+// into tx.send. tx_payload must not change while the Tx FSM sends, so a batch
+// starts only once it is idle.
+static uint32_t tx_pos;   // next free entry
+static uint32_t tx_tlps;  // TLPs in the batch
+
+void tx_begin(void) {
+    wait_tx_ready();
+    tx_pos  = 0;
+    tx_tlps = 0;
+}
+
+void tx_go(void) {
+    if (tx_tlps != 0) {
+        PCIE_TX_SEND = tx_tlps;
+    }
 }
 
 // Waits for the next TLP from the host. While rx.valid is set, the SOC holds
@@ -170,26 +188,36 @@ void send_completion(const tlp_t *req, uint32_t status, int with_data, uint32_t 
     send_tlp(dw0, dw1, dw2, data);
 }
 
-// A Completion with Data of n DWORDs (1 to PAYLOAD_DW), Successful: the
+// A Completion with Data of n DWORDs, Successful, added to the batch: the
 // caller gives the Byte Count and Lower Address, as a read longer than 1 DW
-// may take several Completions. The header goes into tx_payload entries 0
-// to 2, data[i] into entry 3+i, then tx.send launches it.
-void send_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
-               const uint32_t *data, uint32_t n) {
+// takes several Completions. A batch that is full goes out first.
+void tx_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
+             const uint32_t *data, uint32_t n) {
     uint32_t dw0 = TLP_CPLD | (n & 0x3FF) | TLP_TC_ATTR(req->dw0);
     uint32_t dw1 = (completer_id() << 16) | (byte_count & 0xFFF);
     uint32_t dw2 = (REQ_REQUESTER_ID(req->dw1) << 16) | (REQ_TAG(req->dw1) << 8) |
                    (lower_addr & 0x7F);
 
-    wait_tx_ready();
-
-    PCIE_TX_PAYLOAD(0) = dw0;
-    PCIE_TX_PAYLOAD(1) = dw1;
-    PCIE_TX_PAYLOAD(2) = dw2;
-    for (uint32_t i = 0; i < n; i++) {
-        PCIE_TX_PAYLOAD(3 + i) = data[i];
+    if (tx_pos + 3 + n > TX_PAYLOAD_DW || tx_tlps == 255) {
+        tx_go();
+        tx_begin();
     }
-    PCIE_TX_SEND = 1;
+    PCIE_TX_PAYLOAD(tx_pos)     = dw0;
+    PCIE_TX_PAYLOAD(tx_pos + 1) = dw1;
+    PCIE_TX_PAYLOAD(tx_pos + 2) = dw2;
+    for (uint32_t i = 0; i < n; i++) {
+        PCIE_TX_PAYLOAD(tx_pos + 3 + i) = data[i];
+    }
+    tx_pos += 3 + n;
+    tx_tlps++;
+}
+
+// One Completion with Data on its own: a batch of one
+void send_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
+               const uint32_t *data, uint32_t n) {
+    tx_begin();
+    tx_cpld(req, byte_count, lower_addr, data, n);
+    tx_go();
 }
 
 // -----------------------------------------------------------------------------

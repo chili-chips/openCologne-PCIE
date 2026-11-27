@@ -108,6 +108,7 @@ static void mem_read(const tlp_t *req) {
     uint32_t left = len * 4 - lo - (3 - hi);  // Byte Count of the whole read
     uint32_t dw   = 0;
 
+    tx_begin();  // all Completions of the read, one tx.send
     while (dw < len) {
         uint32_t a = addr + dw * 4;
         uint32_t n = (RCB_BYTES - (a & (RCB_BYTES - 1))) / 4;
@@ -118,11 +119,12 @@ static void mem_read(const tlp_t *req) {
         for (uint32_t i = 0; i < n; i++) {
             data[i] = pio_mem[PIO_INDEX(a + i * 4)];
         }
-        send_cpld(req, left, (dw == 0) ? (a | lo) : a, data, n);
+        tx_cpld(req, left, (dw == 0) ? (a | lo) : a, data, n);
 
         left -= n * 4 - ((dw == 0) ? lo : 0);
         dw   += n;
     }
+    tx_go();
 }
 
 int main() {

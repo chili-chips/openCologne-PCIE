@@ -331,8 +331,9 @@ module soc_top
 
   typedef enum logic [1:0] {
     IDLE = 2'd0,
-    PREP = 2'd1,  // beat 0 is out of the banks: decode DW0, load beat 0
-    SEND = 2'd2   // beats out, one per take
+    PREP = 2'd1,  // beat 0 is out of the RAM: decode DW0, load beat 0
+    SEND = 2'd2,  // beats out, one per take
+    NEXT = 2'd3   // read beat 0 of the next TLP of the batch
   } tx_state_e;
   tx_state_e tx_state;
 
@@ -363,73 +364,82 @@ module soc_top
       .csr_out (csr_out)
   );
 
-  // ---- Tx: the TLP the firmware wrote into tx_payload ---------------------
-  // Entry i of tx_payload is DW i, header first. Writing tx.send launches the
-  // transfer (an external register: its write strobe, nothing stored). Beat k
-  // carries DW 2k (low half) and DW 2k+1. tx_payload is two banks, even and
-  // odd entries, so that both DWORDs of a beat are read in one clock; the
-  // read is registered, so beat tx_ra is read a clock ahead.
-  localparam int PAYLOAD_DW = 64;  // csr.rdl: tx_payload, rx_payload entries
+  // ---- Tx: a batch of TLPs the firmware wrote into tx_payload -------------
+  // The firmware writes TLPs back to back from entry 0, header first (entry
+  // i is DW i of the batch), then their number into tx.send, whose write
+  // starts the FSM (an external register: its write strobe, nothing stored).
+  // Each TLP's DW0 gives its length, so the next one starts right after it.
+  // One true-dual-port RAM of 32-bit entries: the CPU writes on port A; a
+  // beat's DW 2k is read on port A, DW 2k+1 on port B, so a TLP may start at
+  // any entry, odd or even. The read is registered: beat tx_ra is read a
+  // clock ahead.
+  localparam int PAYLOAD_DW = 64;             // csr.rdl: rx_payload entries
+  localparam int TX_DW      = 1024;           // csr.rdl: tx_payload entries
+  localparam int TX_AW      = $clog2(TX_DW);
+
+  typedef logic [TX_AW-1:0] tx_addr_t;
 
   logic            tx_start;
-  logic     [31:0] tx_pl_even_q;  // DW 2k of beat tx_ra, a clock later
-  logic     [31:0] tx_pl_odd_q;  // DW 2k+1
+  logic     [ 7:0] tx_left;  // TLPs of the batch still to send, this one too
+  tx_addr_t        tx_base;  // entry of the DW0 of the TLP being sent
+  logic     [31:0] tx_pl_a_q;  // DW 2k of beat tx_ra, a clock later
+  logic     [31:0] tx_pl_b_q;  // DW 2k+1
   tlp_dws_t        tx_dws;  // DWORDs in the TLP
   tlp_dws_t        tx_dws_now;  // the same, from DW0 itself in PREP
   logic     [ 5:0] tx_beats;  // beats in the TLP, at most 18 (a_tx_max_payload)
   logic     [ 5:0] tx_beats_now;
   logic     [ 5:0] tx_nb;  // next beat to load
-  logic     [ 4:0] tx_ra;  // beat whose two DWORDs are read from the banks
+  logic     [ 5:0] tx_ra;  // beat whose two DWORDs are read
   logic            tx_take;
   logic            tx_adv;  // load beat tx_nb
-  logic     [ 4:0] tx_pl_widx;
   logic            tx_pl_we;
+  tx_addr_t        tx_pl_waddr;
+  tx_addr_t        tx_a_raddr;  // DW 2k of beat tx_ra
+  tx_addr_t        tx_b_raddr;  // DW 2k+1
+  tx_addr_t        tx_a_addr;  // port A: the CPU's write, else DW 2k
 
   assign tx_start = csr_out.tx.send.req & csr_out.tx.send.req_is_wr;  // no storage
 
   assign csr_in.tx.send.wr_ack = tx_start;
 
   // Fmt[0]: 4-DW header; Fmt[1]: with data, Length DWORDs (0: 1024)
-  assign tx_dws_now = (tx_state == PREP) ? tlp_body_dw(tx_pl_even_q) : tx_dws;  // no digest
+  assign tx_dws_now = (tx_state == PREP) ? tlp_body_dw(tx_pl_a_q) : tx_dws;  // no digest
   assign tx_beats_now = (tx_state == PREP) ? 6'((tx_dws_now + 12'd1) >> 1) : tx_beats;
 
   assign tx_take = s_axis_tx.tvalid & s_axis_tx.tready;
   assign tx_adv = (tx_state == PREP) | ((tx_state == SEND) & tx_take & (tx_nb < tx_beats));
-  assign tx_ra = 5'(tx_adv ? tx_nb + 6'd1 : tx_nb);
-  assign tx_pl_widx = csr_out.tx_payload.addr[7:3];
+  assign tx_ra = tx_adv ? tx_nb + 6'd1 : tx_nb;
+  assign tx_a_raddr = tx_base + tx_addr_t'({tx_ra, 1'b0});
+  assign tx_b_raddr = tx_a_raddr + 1'b1;
   assign tx_pl_we = csr_out.tx_payload.req & csr_out.tx_payload.req_is_wr;
+  assign tx_pl_waddr = csr_out.tx_payload.addr[TX_AW+1:2];
+  assign tx_a_addr = tx_pl_we ? tx_pl_waddr : tx_a_raddr;
 
-  // the two banks: even entries 0, 2, 4 ..., odd entries 1, 3, 5 ...
-  logic [31:0] tx_pl_even[PAYLOAD_DW/2];
-  logic [31:0] tx_pl_odd [PAYLOAD_DW/2];
+  logic [31:0] tx_pl[TX_DW];
 
-  // Write, else read, so each bank maps to block RAM with no read-first
-  // logic (4.build/README.md, "Block RAM without read-first"). The firmware
-  // writes tx_payload only while the Tx FSM is idle, so no read is lost
+  // Port A: the CPU's write, else DW 2k. The firmware writes tx_payload only
+  // while the FSM is idle, so no read it needs is lost
   always_ff @(posedge clk) begin
-    if (tx_pl_we && csr_out.tx_payload.addr[2]) begin
-      tx_pl_odd[tx_pl_widx] <= csr_out.tx_payload.wr_data;
+    if (tx_pl_we) begin
+      tx_pl[tx_a_addr] <= csr_out.tx_payload.wr_data;
     end
     else begin
-      tx_pl_odd_q <= tx_pl_odd[tx_ra];
+      tx_pl_a_q <= tx_pl[tx_a_addr];
     end
   end
 
+  // Port B: DW 2k+1. A read that meets a CPU write is one the idle FSM does
+  // not use; it reads X, as the RAM does, so Yosys needs no read-first logic
+  // (4.build/README.md, "Block RAM without read-first")
   always_ff @(posedge clk) begin
-    if (tx_pl_we && !csr_out.tx_payload.addr[2]) begin
-      tx_pl_even[tx_pl_widx] <= csr_out.tx_payload.wr_data;
-    end
-    else begin
-      tx_pl_even_q <= tx_pl_even[tx_ra];
-    end
+    tx_pl_b_q <= (tx_pl_we & (tx_pl_waddr == tx_b_raddr)) ? 'x : tx_pl[tx_b_raddr];
   end
 
   assign csr_in.tx_payload.wr_ack  = tx_pl_we;
   assign csr_in.tx_payload.rd_ack  = 1'b0;  // write-only
   assign csr_in.tx_payload.rd_data = '0;
 
-  // IDLE reads beat 0 (tx_nb 0), so it is out of the banks in PREP, a clock
-  // after the tx.send write (the CPU bus does one access a clock)
+  // NEXT reads beat 0 of the TLP at tx_base, so it is out of the RAM in PREP
   always_ff @(posedge clk or negedge resetn) begin
     if (!resetn) begin
       tx_state         <= IDLE;
@@ -437,13 +447,15 @@ module soc_top
       s_axis_tx.tdata  <= '0;
       s_axis_tx.tkeep  <= '0;
       s_axis_tx.tlast  <= 1'b0;
+      tx_left          <= '0;
+      tx_base          <= '0;
       tx_dws           <= '0;
       tx_beats         <= '0;
       tx_nb            <= '0;
     end
     else begin
       if (tx_adv) begin
-        s_axis_tx.tdata  <= {tx_pl_odd_q, tx_pl_even_q};
+        s_axis_tx.tdata  <= {tx_pl_b_q, tx_pl_a_q};
         s_axis_tx.tkeep  <= (12'({tx_nb, 1'b1}) < tx_dws_now) ? KEEP_ALL : KEEP_LO;  // DW 2k+1?
         s_axis_tx.tlast  <= (tx_nb == tx_beats_now - 6'd1);
         s_axis_tx.tvalid <= 1'b1;
@@ -452,9 +464,14 @@ module soc_top
 
       unique case (tx_state)
         IDLE: begin
-          if (tx_start) begin
-            tx_state <= PREP;
+          if (tx_start && (csr_out.tx.send.wr_data.count != '0)) begin
+            tx_left  <= csr_out.tx.send.wr_data.count;
+            tx_base  <= '0;
+            tx_state <= NEXT;
           end
+        end
+        NEXT: begin
+          tx_state <= PREP;
         end
         PREP: begin
           tx_dws   <= tx_dws_now;
@@ -466,7 +483,15 @@ module soc_top
             s_axis_tx.tvalid <= 1'b0;
             s_axis_tx.tlast  <= 1'b0;
             tx_nb            <= '0;
-            tx_state         <= IDLE;
+            if (tx_left > 8'd1) begin  // the next TLP of the batch
+              tx_left  <= tx_left - 8'd1;
+              tx_base  <= tx_base + tx_addr_t'(tx_dws);
+              tx_state <= NEXT;
+            end
+            else begin
+              tx_left  <= '0;
+              tx_state <= IDLE;
+            end
           end
         end
         default: tx_state <= IDLE;
@@ -476,18 +501,17 @@ module soc_top
 
 `ifndef SYNTHESIS
   // The firmware's contract: at most Max_Payload_Size (128 bytes, 32 DWORDs)
-  // of payload. The hardware does not check it: a longer TLP goes out as its
-  // header says (the host sees a Malformed TLP), and past 64 DWORDs the
-  // tx_payload index wraps. A clocked check, not an assert property, which
-  // Icarus does not support (iverilog#120)
+  // of payload, and the batch within tx_payload. The hardware checks neither:
+  // a longer TLP goes out as its header says (the host sees a Malformed TLP),
+  // and past the last entry the index wraps. Clocked checks, not an assert
+  // property, which Icarus does not support (iverilog#120)
   always @(posedge clk) begin : a_tx_max_payload
-    if ((tx_state == PREP) && tlp_has_data(
-            tx_pl_even_q
-        ) && (tlp_length_dw(
-            tx_pl_even_q
-        ) > 11'd32)) begin
+    if ((tx_state == PREP) && tlp_has_data(tx_pl_a_q) && (tlp_length_dw(tx_pl_a_q) > 11'd32)) begin
       $error("SOC_TX_CHECK: payload of %0d DWORDs, over Max_Payload_Size (32)", tlp_length_dw(
-             tx_pl_even_q));
+             tx_pl_a_q));
+    end
+    if ((tx_state == PREP) && (32'(tx_base) + 32'(tx_dws_now) > 32'(TX_DW))) begin
+      $error("SOC_TX_CHECK: the batch runs past tx_payload (%0d entries)", TX_DW);
     end
   end
 `endif

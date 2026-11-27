@@ -24,7 +24,7 @@ fails=0
 
 # the runs that fail today, and why
 declare -A KNOWN=(
-    [rtl-tester]="#3 #13, nullified TLP Naked"  # #4 (back to back) fixed 2026-11-27
+    [rtl-tester]="#3 #13 #29"  # #4 (back to back) fixed 2026-11-27
     [dll-stp]="#3"
     [dll-end]="#3"
     [fault-nocpl]="by design"                  # SIM_FAULT=nocpl: the request is never completed

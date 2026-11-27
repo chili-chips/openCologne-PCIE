@@ -194,7 +194,8 @@ More in the [DLL README](4.dll/README.md): [packet structures](4.dll/README.md#p
 | LCRC (32-bit), DLLP CRC (16-bit) | ✅ | |
 | Sequence numbers, duplicates | ✅ | a duplicate TLP is Acked and dropped |
 | Retry buffer | ✅ | one TLP, in block RAM |
-| Back-to-back TLPs | ❌ | a TLP right behind another one is dropped without a Nak ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4)) |
+| Back-to-back TLPs | ✅ | an RX ring: an STP right after an END is taken ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4)) |
+| Nullified TLPs | ❌ | a TLP ended with EDB is Naked, not dropped ([#29](https://github.com/chili-chips/openCologne-PCIE/issues/29)) |
 | Replay on Nak | ✅ | |
 | Replay timer | ❌ | a lost TLP is never replayed ([#3](https://github.com/chili-chips/openCologne-PCIE/issues/3)) |
 | Nullified TLP (EDB) | ❌ | |
@@ -261,7 +262,7 @@ The CSR block (`soc_csr`, at 0x3000_0000 on the CPU bus) is where the firmware m
 **Handshake:** one TLP at a time each way, the firmware polls.
 
 - **Rx:** the SOC captures a TLP into `rx_payload`, header first, and sets `rx.valid` at its last beat. While `rx.valid` is set, `tready` is low and the next TLP waits in the TL's queues (posted/completion 128 × 64 bit, non-posted 64 × 64 bit, 8 header credits each), its credits held, so nothing is lost. The firmware reads the window, answers, and writes 1 to `rx.valid` to open it again.
-- **Tx:** the firmware waits for the Tx FSM to be idle (`status.phy`), writes the TLP into `tx_payload`, header first, then `tx.send`. That write starts the FSM, which sends the TLP two DWORDs a beat. A full TL Tx queue (64 × 64 bit, 3 TLPs) holds the FSM, so it also waits for room.
+- **Tx:** the firmware waits for the Tx FSM to be idle (`status.phy`), writes one or more TLPs into `tx_payload`, back to back, header first, then their number into `tx.send`. That write starts the FSM, which sends them in order, two DWORDs a beat. A full TL Tx queue (64 × 64 bit, 3 TLPs) holds the FSM, so it also waits for room.
 
 <div align="center"><img src="../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></div>
 

@@ -20,14 +20,14 @@ typedef struct __attribute__ ((__packed__)) {
 } opencologne_pcie__imem_t;
 
 // reg - csr::tx::send
-#define CSR__TX__SEND__GO_bm 0x1
-#define CSR__TX__SEND__GO_bp 0
-#define CSR__TX__SEND__GO_bw 1
-#define CSR__TX__SEND__GO_reset 0x0
+#define CSR__TX__SEND__COUNT_bm 0xff
+#define CSR__TX__SEND__COUNT_bp 0
+#define CSR__TX__SEND__COUNT_bw 8
+#define CSR__TX__SEND__COUNT_reset 0x0
 typedef union {
     struct __attribute__ ((__packed__)) {
-        uint32_t go :1;
-        uint32_t :31;
+        uint32_t count :8;
+        uint32_t :24;
     } f;
     uint32_t w;
 } csr__tx__send_t;
@@ -110,7 +110,7 @@ typedef struct __attribute__ ((__packed__)) {
 
 // mem - csr::tx_payload
 typedef struct __attribute__ ((__packed__)) {
-    uint32_t mem[64];
+    uint32_t mem[1024];
 } csr__tx_payload_t;
 
 // addrmap - csr
@@ -118,8 +118,9 @@ typedef struct __attribute__ ((__packed__)) {
     csr__tx_t tx;
     csr__rx_t rx;
     csr__status_t status;
-    uint8_t RESERVED_34_ff[0xcc];
+    uint8_t RESERVED_34_fff[0xfcc];
     csr__rx_payload_t rx_payload;
+    uint8_t RESERVED_1100_1fff[0xf00];
     csr__tx_payload_t tx_payload;
 } csr_t;
 
@@ -131,7 +132,7 @@ typedef struct __attribute__ ((__packed__)) {
 } opencologne_pcie_t;
 
 
-static_assert(sizeof(opencologne_pcie_t) == 0x30000300, "Packing error");
+static_assert(sizeof(opencologne_pcie_t) == 0x30003000, "Packing error");
 
 #ifdef __cplusplus
 }

@@ -80,8 +80,11 @@ slang ^2\.rtl/.*\.sv:[0-9]+:[0-9]+: warning: .case[zx]?. marked .(unique|priorit
 reset 'u_pcie_top\.u_soc\.cpu\.(rs1_reg|ls_offset_reg|dmem_addr|u_alu\.(alu_minus_reg|aluin_[12]_31_reg))'
 reset 'u_pcie_top\.u_soc\.imem_rdat'
 # the Tx payload RAM's output: DW0 is decoded for the TLP length in PREP only,
-# a clock after a defined read of entry 0
-reset 'u_pcie_top\.u_soc\.tx_pl_even_q'
+# a clock after LOAD read it
+reset 'u_pcie_top\.u_soc\.tx_pl_a_q'
+# eduBOS5's store data: tx.send's TLP count, loaded into tx_left (which has
+# a reset) only on the tx.send write strobe
+reset 'u_pcie_top\.u_soc\.cpu\.dmem_wdat'
 # eduBOS5 checked alone (USE_HW_MUL=1, EN_COUNTERS=1), as on openPCIE: the
 # same data flops, plus rs2_reg and the RV32M divider's data path
 reset '(rs1_reg|rs2_reg|ls_offset_reg|dmem_addr|g_md\.(div_res|dvs|r_sh))'

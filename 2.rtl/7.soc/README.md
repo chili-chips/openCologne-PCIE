@@ -26,14 +26,14 @@
 
 | Offset | Register | Use |
 |---|---|---|
-| 0x0C | `tx.send` | writing it sends the TLP in `tx_payload` |
+| 0x0C | `tx.send` | writing N sends the N TLPs in `tx_payload`, in order |
 | 0x10 – 0x1C | – | free |
 | 0x20 | `rx.valid` | a TLP is waiting; write 1 to clear |
 | 0x28 | `status.phy` | `tx_busy`: the Tx FSM is sending |
 | 0x2C | `status.result` | firmware result marker, write-only; 0x0000_FACE lights `fw_pass` |
 | 0x30 | `status.cfg_id` | our own Bus/Device/Function |
-| 0x100 – 0x1FC | `rx_payload` | the last TLP received, as it came, header first, 64 DWORDs: entry i is DW i |
-| 0x200 – 0x2FC | `tx_payload` | the TLP to send, header first, 64 DWORDs: entry i is DW i |
+| 0x1000 – 0x10FC | `rx_payload` | the last TLP received, as it came, header first, 64 DWORDs: entry i is DW i |
+| 0x2000 – 0x2FFC | `tx_payload` | a batch of TLPs to send, back to back from entry 0, header first, 1024 DWORDs: entry i is DW i |
 
 Things worth knowing:
 
@@ -41,7 +41,7 @@ Things worth knowing:
 - **The payload windows are RAMs.** `rx_payload` and `tx_payload` are PeakRDL external memories, each two banks of 32 DWORDs, odd and even entries, so that a 64-bit beat writes (Rx) or reads (Tx) both its DWORDs in one clock. Their read is registered, so they fit block RAM.
 - **`rx.valid` is the flow control.** Set at the end of a TLP, it holds `m_axis_rx.tready` low until the firmware clears it: a slow CPU never loses a request; the PCIE core waits.
 - **Configuration requests never get here.** The TL answers them itself, as the AMD hard macro does. `status.cfg_id` is the Bus/Device/Function the host gave us, captured from its Type 0 Configuration Writes (UG477 `cfg_bus_number`, `cfg_device_number`, `cfg_function_number`); every Completion carries it as the Completer ID.
-- **`tx.send` is a trigger.** PeakRDL's `swmod` strobe on that field starts the Tx FSM, so the firmware writes the whole TLP into `tx_payload` first and `tx.send` last. The Tx FSM sends as many DWORDs as the header's Fmt and Length say. The payload must not exceed Max_Payload_Size (32 DWORDs): the hardware does not check it, the simulation assertion `a_tx_max_payload` does. A longer TLP would reach the host as a Malformed TLP.
+- **`tx.send` is a trigger.** Its write starts the Tx FSM (an external register: nothing is stored), so the firmware writes the whole batch into `tx_payload` first and `tx.send` last, with the number of TLPs. Each TLP's DW0 gives its length, so the next starts right after it, at any entry; a MemRd sends all its Completions in one batch. The Tx FSM sends as many DWORDs as the header's Fmt and Length say. The payload must not exceed Max_Payload_Size (32 DWORDs): the hardware does not check it, the simulation assertion `a_tx_max_payload` does. A longer TLP would reach the host as a Malformed TLP.
 
 ### What the firmware needs to know
 

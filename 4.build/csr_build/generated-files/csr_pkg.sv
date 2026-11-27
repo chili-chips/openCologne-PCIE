@@ -8,8 +8,8 @@
 package csr_pkg;
 
     localparam CSR_DATA_WIDTH = 32;
-    localparam CSR_MIN_ADDR_WIDTH = 10;
-    localparam CSR_SIZE = 'h300;
+    localparam CSR_MIN_ADDR_WIDTH = 14;
+    localparam CSR_SIZE = 'h3000;
 
     typedef struct {
         logic wr_ack;
@@ -78,8 +78,8 @@ package csr_pkg;
     } csr__in_t;
 
     typedef struct packed {
-        logic [30:0] _reserved_31_1;
-        logic go;
+        logic [23:0] _reserved_31_8;
+        logic [7:0] count;
     } csr__tx__send__external__fields__out_t;
 
     typedef struct {
@@ -130,7 +130,7 @@ package csr_pkg;
 
     typedef struct {
         logic req;
-        logic [7:0] addr;
+        logic [11:0] addr;
         logic req_is_wr;
         logic [31:0] wr_data;
         logic [31:0] wr_biten;

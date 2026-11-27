@@ -110,12 +110,12 @@ module tb_soc
       {64'h000003FF_60000002, 8'hFF, 1'b0},
       {64'h00003000_00000002, 8'hFF, 1'b0},
       {64'h99AABBCC_55667788, 8'hFF, 1'b1},
-      // 4-DW MRd, 1 DW
-      {64'h0000040F_20000001, 8'hFF, 1'b0},
-      {64'h00004000_00000003, 8'hFF, 1'b1},
-      // 3-DW MRd, 1 DW
+      // 3-DW MRd, 1 DW (the batch's second)
       {64'h0000050F_00000001, 8'hFF, 1'b0},
-      {64'h00000000_00005000, 8'h0F, 1'b1}
+      {64'h00000000_00005000, 8'h0F, 1'b1},
+      // 4-DW MRd, 1 DW (the batch's third, from an odd entry)
+      {64'h0000040F_20000001, 8'hFF, 1'b0},
+      {64'h00004000_00000003, 8'hFF, 1'b1}
   };
 
   logic tx_check;
