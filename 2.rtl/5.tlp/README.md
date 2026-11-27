@@ -78,7 +78,7 @@ InitFC credits: the DLL used to send InitFC1 and InitFC2 with fixed credits (P 3
   - Credit type and length come from the header: no `rem`, and no TX qualifier.
   - SOC memory and I/O requests wait in the buffer until Bus Master Enable is set.
 - The SOC must answer every memory read with a completion, Completer ID `cfg.id` (`pcie_id_t`: bus, device, function 0). Completions are advertised with infinite credits, so always taken from the link; a SOC that issues requests must keep accepting their completions.
-- **cfg**: `id` (`pcie_id_t`): bus and device are captured from Type 0 configuration writes, the function is 0; `tx_buf_avail` is the number of largest TLPs that fit in `free_words` (`trn_tlps_fit`, as UG477's `tbuf_av`), `msg_err_fatal` is 0 (an Endpoint does not receive ERR_FATAL).
+- **cfg**: `id` (`pcie_id_t`): bus and device are captured from Type 0 configuration writes, the function is 0.
 
 #### TRN mapping
 

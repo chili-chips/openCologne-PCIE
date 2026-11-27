@@ -708,20 +708,6 @@ module tb_tl_top
         end
     end
 
-    // tl_top's tx_buf_avail is trn_tlps_fit(free_words) three clocks late
-    trn_words_t free_d1, free_d2, free_d3;
-    integer     up_clks;
-    always @(posedge clk) begin
-        free_d1 <= trn_tx.free_words;
-        free_d2 <= free_d1;
-        free_d3 <= free_d2;
-        up_clks <= (reset || !dut.dl_up) ? 0 : up_clks + 1;
-        if (!reset && dut.dl_up && up_clks >= 3 && cfg.tx_buf_avail !== trn_tlps_fit(free_d3)) begin
-            errors = errors + 1;
-            $display("[%0t] ERROR: tx_buf_avail %0d, free_words %0d three clocks before", $time, cfg.tx_buf_avail, free_d3);
-        end
-    end
-
     always @(posedge clk) begin
         if (!reset && bridge_rst_n && trn_tx.vld && !trn_tx.rdy) begin
             errors = errors + 1;
@@ -1351,7 +1337,7 @@ module tb_tl_top
         end
         expect_no_tx(800);
         check("TX buffer full: free_words", trn_tx.free_words, 9'd9);
-        check("TX buffer full: tx_buf_avail", cfg.tx_buf_avail, 6'd0);
+        check("TX buffer full: trn_compat tbuf_av", trn_tbuf_av, 6'd0);
         check("trn_bridge holds the SOC back", atx_rd < atx_wr, 1'b1);
         rx_dllp(DLLP_UPDATEFC, FC_P, 8'd72, 12'd768);  // posted credits for the 30 MWrs
         cfg_wr(8'd3, 3'd0, 10'h001, 4'b0011, 32'h0000_0006, 8'h15);
@@ -1365,7 +1351,7 @@ module tb_tl_top
         check("application MWrs sent in order after BME", seen_mwr, 30);
         check("completion of the Command write", seen_cpl, 1);
         check("TX buffer empty again: free_words", trn_tx.free_words, 9'd511);
-        check("TX buffer empty again: tx_buf_avail", cfg.tx_buf_avail, 6'd28);
+        check("TX buffer empty again: trn_compat tbuf_av", trn_tbuf_av, 6'd28);
 
         $display("=== Step 19: random traffic with application back-pressure ===");
         for (n = 0; n < 1024; n = n + 1) shadow[n] = app_mem[n];

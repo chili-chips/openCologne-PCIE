@@ -73,20 +73,12 @@ module csr (
     //--------------------------------------------------------------------------
     typedef struct {
         struct {
-            logic header0;
-            logic header1;
-            logic header2;
-            logic data;
+            logic send;
         } tx;
         struct {
-            logic header0;
-            logic header1;
-            logic header2;
-            logic data;
             logic valid;
         } rx;
         struct {
-            logic err;
             logic phy;
             logic result;
             logic cfg_id;
@@ -111,18 +103,11 @@ module csr (
         is_external = '0;
         is_valid_addr = '1; // No valid address check
         is_valid_rw = '1; // No valid RW check
-        decoded_reg_strb.tx.header0 = cpuif_req_masked & (cpuif_addr == 10'h0);
-        decoded_reg_strb.tx.header1 = cpuif_req_masked & (cpuif_addr == 10'h4);
-        decoded_reg_strb.tx.header2 = cpuif_req_masked & (cpuif_addr == 10'h8);
-        decoded_reg_strb.tx.data = cpuif_req_masked & (cpuif_addr == 10'hc);
-        decoded_reg_strb.rx.header0 = cpuif_req_masked & (cpuif_addr == 10'h10) & !cpuif_req_is_wr;
-        decoded_reg_strb.rx.header1 = cpuif_req_masked & (cpuif_addr == 10'h14) & !cpuif_req_is_wr;
-        decoded_reg_strb.rx.header2 = cpuif_req_masked & (cpuif_addr == 10'h18) & !cpuif_req_is_wr;
-        decoded_reg_strb.rx.data = cpuif_req_masked & (cpuif_addr == 10'h1c) & !cpuif_req_is_wr;
+        decoded_reg_strb.tx.send = cpuif_req_masked & (cpuif_addr == 10'hc) & cpuif_req_is_wr;
         decoded_reg_strb.rx.valid = cpuif_req_masked & (cpuif_addr == 10'h20);
-        decoded_reg_strb.status.err = cpuif_req_masked & (cpuif_addr == 10'h24) & !cpuif_req_is_wr;
         decoded_reg_strb.status.phy = cpuif_req_masked & (cpuif_addr == 10'h28) & !cpuif_req_is_wr;
-        decoded_reg_strb.status.result = cpuif_req_masked & (cpuif_addr == 10'h2c);
+        decoded_reg_strb.status.result = cpuif_req_masked & (cpuif_addr == 10'h2c) & cpuif_req_is_wr;
+        is_external |= cpuif_req_masked & (cpuif_addr == 10'h2c) & cpuif_req_is_wr;
         decoded_reg_strb.status.cfg_id = cpuif_req_masked & (cpuif_addr == 10'h30) & !cpuif_req_is_wr;
         decoded_reg_strb.rx_payload = cpuif_req_masked & (cpuif_addr >= 10'h100) & (cpuif_addr <= 10'h100 + 10'hff) & !cpuif_req_is_wr;
         is_external |= cpuif_req_masked & (cpuif_addr >= 10'h100) & (cpuif_addr <= 10'h100 + 10'hff) & !cpuif_req_is_wr;
@@ -162,54 +147,12 @@ module csr (
         struct {
             struct {
                 struct {
-                    logic [31:0] next;
+                    logic next;
                     logic load_next;
-                } hdr;
-            } header0;
-            struct {
-                struct {
-                    logic [31:0] next;
-                    logic load_next;
-                } hdr;
-            } header1;
-            struct {
-                struct {
-                    logic [31:0] next;
-                    logic load_next;
-                } hdr;
-            } header2;
-            struct {
-                struct {
-                    logic [31:0] next;
-                    logic load_next;
-                } payload;
-            } data;
+                } go;
+            } send;
         } tx;
         struct {
-            struct {
-                struct {
-                    logic [31:0] next;
-                    logic load_next;
-                } hdr;
-            } header0;
-            struct {
-                struct {
-                    logic [31:0] next;
-                    logic load_next;
-                } hdr;
-            } header1;
-            struct {
-                struct {
-                    logic [31:0] next;
-                    logic load_next;
-                } hdr;
-            } header2;
-            struct {
-                struct {
-                    logic [31:0] next;
-                    logic load_next;
-                } payload;
-            } data;
             struct {
                 struct {
                     logic next;
@@ -217,14 +160,6 @@ module csr (
                 } valid;
             } valid;
         } rx;
-        struct {
-            struct {
-                struct {
-                    logic [31:0] next;
-                    logic load_next;
-                } marker;
-            } result;
-        } status;
     } field_combo_t;
     field_combo_t field_combo;
 
@@ -232,243 +167,44 @@ module csr (
         struct {
             struct {
                 struct {
-                    logic [31:0] value;
-                } hdr;
-            } header0;
-            struct {
-                struct {
-                    logic [31:0] value;
-                } hdr;
-            } header1;
-            struct {
-                struct {
-                    logic [31:0] value;
-                } hdr;
-            } header2;
-            struct {
-                struct {
-                    logic [31:0] value;
-                } payload;
-            } data;
+                    logic value;
+                } go;
+            } send;
         } tx;
         struct {
-            struct {
-                struct {
-                    logic [31:0] value;
-                } hdr;
-            } header0;
-            struct {
-                struct {
-                    logic [31:0] value;
-                } hdr;
-            } header1;
-            struct {
-                struct {
-                    logic [31:0] value;
-                } hdr;
-            } header2;
-            struct {
-                struct {
-                    logic [31:0] value;
-                } payload;
-            } data;
             struct {
                 struct {
                     logic value;
                 } valid;
             } valid;
         } rx;
-        struct {
-            struct {
-                struct {
-                    logic [31:0] value;
-                } marker;
-            } result;
-        } status;
     } field_storage_t;
     field_storage_t field_storage;
 
-    // Field: csr.tx.header0.hdr
+    // Field: csr.tx.send.go
     always_comb begin
-        automatic logic [31:0] next_c;
+        automatic logic [0:0] next_c;
         automatic logic load_next_c;
-        next_c = field_storage.tx.header0.hdr.value;
+        next_c = field_storage.tx.send.go.value;
         load_next_c = '0;
-        if(decoded_reg_strb.tx.header0 && decoded_req_is_wr) begin // SW write
-            next_c = (field_storage.tx.header0.hdr.value & ~decoded_wr_biten[31:0]) | (decoded_wr_data[31:0] & decoded_wr_biten[31:0]);
+        if(decoded_reg_strb.tx.send && decoded_req_is_wr) begin // SW write
+            next_c = (field_storage.tx.send.go.value & ~decoded_wr_biten[0:0]) | (decoded_wr_data[0:0] & decoded_wr_biten[0:0]);
             load_next_c = '1;
         end
-        field_combo.tx.header0.hdr.next = next_c;
-        field_combo.tx.header0.hdr.load_next = load_next_c;
+        field_combo.tx.send.go.next = next_c;
+        field_combo.tx.send.go.load_next = load_next_c;
     end
     always_ff @(posedge clk or negedge arst_n) begin
         if(~arst_n) begin
-            field_storage.tx.header0.hdr.value <= 32'h0;
+            field_storage.tx.send.go.value <= 1'h0;
         end else begin
-            if(field_combo.tx.header0.hdr.load_next) begin
-                field_storage.tx.header0.hdr.value <= field_combo.tx.header0.hdr.next;
+            if(field_combo.tx.send.go.load_next) begin
+                field_storage.tx.send.go.value <= field_combo.tx.send.go.next;
             end
         end
     end
-    assign hwif_out.tx.header0.hdr.value = field_storage.tx.header0.hdr.value;
-    // Field: csr.tx.header1.hdr
-    always_comb begin
-        automatic logic [31:0] next_c;
-        automatic logic load_next_c;
-        next_c = field_storage.tx.header1.hdr.value;
-        load_next_c = '0;
-        if(decoded_reg_strb.tx.header1 && decoded_req_is_wr) begin // SW write
-            next_c = (field_storage.tx.header1.hdr.value & ~decoded_wr_biten[31:0]) | (decoded_wr_data[31:0] & decoded_wr_biten[31:0]);
-            load_next_c = '1;
-        end
-        field_combo.tx.header1.hdr.next = next_c;
-        field_combo.tx.header1.hdr.load_next = load_next_c;
-    end
-    always_ff @(posedge clk or negedge arst_n) begin
-        if(~arst_n) begin
-            field_storage.tx.header1.hdr.value <= 32'h0;
-        end else begin
-            if(field_combo.tx.header1.hdr.load_next) begin
-                field_storage.tx.header1.hdr.value <= field_combo.tx.header1.hdr.next;
-            end
-        end
-    end
-    assign hwif_out.tx.header1.hdr.value = field_storage.tx.header1.hdr.value;
-    // Field: csr.tx.header2.hdr
-    always_comb begin
-        automatic logic [31:0] next_c;
-        automatic logic load_next_c;
-        next_c = field_storage.tx.header2.hdr.value;
-        load_next_c = '0;
-        if(decoded_reg_strb.tx.header2 && decoded_req_is_wr) begin // SW write
-            next_c = (field_storage.tx.header2.hdr.value & ~decoded_wr_biten[31:0]) | (decoded_wr_data[31:0] & decoded_wr_biten[31:0]);
-            load_next_c = '1;
-        end
-        field_combo.tx.header2.hdr.next = next_c;
-        field_combo.tx.header2.hdr.load_next = load_next_c;
-    end
-    always_ff @(posedge clk or negedge arst_n) begin
-        if(~arst_n) begin
-            field_storage.tx.header2.hdr.value <= 32'h0;
-        end else begin
-            if(field_combo.tx.header2.hdr.load_next) begin
-                field_storage.tx.header2.hdr.value <= field_combo.tx.header2.hdr.next;
-            end
-        end
-    end
-    assign hwif_out.tx.header2.hdr.value = field_storage.tx.header2.hdr.value;
-    // Field: csr.tx.data.payload
-    always_comb begin
-        automatic logic [31:0] next_c;
-        automatic logic load_next_c;
-        next_c = field_storage.tx.data.payload.value;
-        load_next_c = '0;
-        if(decoded_reg_strb.tx.data && decoded_req_is_wr) begin // SW write
-            next_c = (field_storage.tx.data.payload.value & ~decoded_wr_biten[31:0]) | (decoded_wr_data[31:0] & decoded_wr_biten[31:0]);
-            load_next_c = '1;
-        end
-        field_combo.tx.data.payload.next = next_c;
-        field_combo.tx.data.payload.load_next = load_next_c;
-    end
-    always_ff @(posedge clk or negedge arst_n) begin
-        if(~arst_n) begin
-            field_storage.tx.data.payload.value <= 32'h0;
-        end else begin
-            if(field_combo.tx.data.payload.load_next) begin
-                field_storage.tx.data.payload.value <= field_combo.tx.data.payload.next;
-            end
-        end
-    end
-    assign hwif_out.tx.data.payload.value = field_storage.tx.data.payload.value;
-    assign hwif_out.tx.data.payload.swmod = decoded_reg_strb.tx.data && decoded_req_is_wr && |(decoded_wr_biten[31:0]);
-    // Field: csr.rx.header0.hdr
-    always_comb begin
-        automatic logic [31:0] next_c;
-        automatic logic load_next_c;
-        next_c = field_storage.rx.header0.hdr.value;
-        load_next_c = '0;
-        if(hwif_in.rx.header0.hdr.we) begin // HW Write - we
-            next_c = hwif_in.rx.header0.hdr.next;
-            load_next_c = '1;
-        end
-        field_combo.rx.header0.hdr.next = next_c;
-        field_combo.rx.header0.hdr.load_next = load_next_c;
-    end
-    always_ff @(posedge clk or negedge arst_n) begin
-        if(~arst_n) begin
-            field_storage.rx.header0.hdr.value <= 32'h0;
-        end else begin
-            if(field_combo.rx.header0.hdr.load_next) begin
-                field_storage.rx.header0.hdr.value <= field_combo.rx.header0.hdr.next;
-            end
-        end
-    end
-    // Field: csr.rx.header1.hdr
-    always_comb begin
-        automatic logic [31:0] next_c;
-        automatic logic load_next_c;
-        next_c = field_storage.rx.header1.hdr.value;
-        load_next_c = '0;
-        if(hwif_in.rx.header1.hdr.we) begin // HW Write - we
-            next_c = hwif_in.rx.header1.hdr.next;
-            load_next_c = '1;
-        end
-        field_combo.rx.header1.hdr.next = next_c;
-        field_combo.rx.header1.hdr.load_next = load_next_c;
-    end
-    always_ff @(posedge clk or negedge arst_n) begin
-        if(~arst_n) begin
-            field_storage.rx.header1.hdr.value <= 32'h0;
-        end else begin
-            if(field_combo.rx.header1.hdr.load_next) begin
-                field_storage.rx.header1.hdr.value <= field_combo.rx.header1.hdr.next;
-            end
-        end
-    end
-    // Field: csr.rx.header2.hdr
-    always_comb begin
-        automatic logic [31:0] next_c;
-        automatic logic load_next_c;
-        next_c = field_storage.rx.header2.hdr.value;
-        load_next_c = '0;
-        if(hwif_in.rx.header2.hdr.we) begin // HW Write - we
-            next_c = hwif_in.rx.header2.hdr.next;
-            load_next_c = '1;
-        end
-        field_combo.rx.header2.hdr.next = next_c;
-        field_combo.rx.header2.hdr.load_next = load_next_c;
-    end
-    always_ff @(posedge clk or negedge arst_n) begin
-        if(~arst_n) begin
-            field_storage.rx.header2.hdr.value <= 32'h0;
-        end else begin
-            if(field_combo.rx.header2.hdr.load_next) begin
-                field_storage.rx.header2.hdr.value <= field_combo.rx.header2.hdr.next;
-            end
-        end
-    end
-    // Field: csr.rx.data.payload
-    always_comb begin
-        automatic logic [31:0] next_c;
-        automatic logic load_next_c;
-        next_c = field_storage.rx.data.payload.value;
-        load_next_c = '0;
-        if(hwif_in.rx.data.payload.we) begin // HW Write - we
-            next_c = hwif_in.rx.data.payload.next;
-            load_next_c = '1;
-        end
-        field_combo.rx.data.payload.next = next_c;
-        field_combo.rx.data.payload.load_next = load_next_c;
-    end
-    always_ff @(posedge clk or negedge arst_n) begin
-        if(~arst_n) begin
-            field_storage.rx.data.payload.value <= 32'h0;
-        end else begin
-            if(field_combo.rx.data.payload.load_next) begin
-                field_storage.rx.data.payload.value <= field_combo.rx.data.payload.next;
-            end
-        end
-    end
+    assign hwif_out.tx.send.go.value = field_storage.tx.send.go.value;
+    assign hwif_out.tx.send.go.swmod = decoded_reg_strb.tx.send && decoded_req_is_wr && |(decoded_wr_biten[0:0]);
     // Field: csr.rx.valid.valid
     always_comb begin
         automatic logic [0:0] next_c;
@@ -495,29 +231,12 @@ module csr (
         end
     end
     assign hwif_out.rx.valid.valid.value = field_storage.rx.valid.valid.value;
-    // Field: csr.status.result.marker
-    always_comb begin
-        automatic logic [31:0] next_c;
-        automatic logic load_next_c;
-        next_c = field_storage.status.result.marker.value;
-        load_next_c = '0;
-        if(decoded_reg_strb.status.result && decoded_req_is_wr) begin // SW write
-            next_c = (field_storage.status.result.marker.value & ~decoded_wr_biten[31:0]) | (decoded_wr_data[31:0] & decoded_wr_biten[31:0]);
-            load_next_c = '1;
-        end
-        field_combo.status.result.marker.next = next_c;
-        field_combo.status.result.marker.load_next = load_next_c;
-    end
-    always_ff @(posedge clk or negedge arst_n) begin
-        if(~arst_n) begin
-            field_storage.status.result.marker.value <= 32'h0;
-        end else begin
-            if(field_combo.status.result.marker.load_next) begin
-                field_storage.status.result.marker.value <= field_combo.status.result.marker.next;
-            end
-        end
-    end
-    assign hwif_out.status.result.marker.value = field_storage.status.result.marker.value;
+    // External register: csr.status.result
+
+    assign hwif_out.status.result.req = decoded_req_is_wr ? decoded_reg_strb.status.result : '0;
+    assign hwif_out.status.result.req_is_wr = decoded_req_is_wr;
+    assign hwif_out.status.result.wr_data = decoded_wr_data;
+    assign hwif_out.status.result.wr_biten = decoded_wr_biten;
     // External region: csr.rx_payload
     assign hwif_out.rx_payload.req = decoded_reg_strb.rx_payload;
     assign hwif_out.rx_payload.addr = decoded_addr[7:0];
@@ -537,6 +256,7 @@ module csr (
     always_comb begin
         automatic logic wr_ack;
         wr_ack = '0;
+        wr_ack |= hwif_in.status.result.wr_ack;
         wr_ack |= hwif_in.rx_payload.wr_ack;
         wr_ack |= hwif_in.tx_payload.wr_ack;
         external_wr_ack = wr_ack;
@@ -579,42 +299,11 @@ module csr (
     always_comb begin
         automatic logic [31:0] readback_data_var;
         readback_data_var = '0;
-        if(rd_mux_addr == 10'h0) begin
-            readback_data_var[31:0] = field_storage.tx.header0.hdr.value;
-        end
-        if(rd_mux_addr == 10'h4) begin
-            readback_data_var[31:0] = field_storage.tx.header1.hdr.value;
-        end
-        if(rd_mux_addr == 10'h8) begin
-            readback_data_var[31:0] = field_storage.tx.header2.hdr.value;
-        end
-        if(rd_mux_addr == 10'hc) begin
-            readback_data_var[31:0] = field_storage.tx.data.payload.value;
-        end
-        if(rd_mux_addr == 10'h10) begin
-            readback_data_var[31:0] = field_storage.rx.header0.hdr.value;
-        end
-        if(rd_mux_addr == 10'h14) begin
-            readback_data_var[31:0] = field_storage.rx.header1.hdr.value;
-        end
-        if(rd_mux_addr == 10'h18) begin
-            readback_data_var[31:0] = field_storage.rx.header2.hdr.value;
-        end
-        if(rd_mux_addr == 10'h1c) begin
-            readback_data_var[31:0] = field_storage.rx.data.payload.value;
-        end
         if(rd_mux_addr == 10'h20) begin
             readback_data_var[0] = field_storage.rx.valid.valid.value;
         end
-        if(rd_mux_addr == 10'h24) begin
-            readback_data_var[16] = hwif_in.status.err.msg_err_fatal.next;
-        end
         if(rd_mux_addr == 10'h28) begin
-            readback_data_var[5:0] = hwif_in.status.phy.tx_buf_avail.next;
-            readback_data_var[7:6] = hwif_in.status.phy.tx_state.next;
-        end
-        if(rd_mux_addr == 10'h2c) begin
-            readback_data_var[31:0] = field_storage.status.result.marker.value;
+            readback_data_var[0] = hwif_in.status.phy.tx_busy.next;
         end
         if(rd_mux_addr == 10'h30) begin
             readback_data_var[15:0] = hwif_in.status.cfg_id.id.next;

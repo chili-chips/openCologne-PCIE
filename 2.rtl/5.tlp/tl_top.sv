@@ -105,11 +105,6 @@ module tl_top
   trn_words_t         app_q_free_next;
   logic               app_q_mid;
   logic               app_q_mid_next;
-  trn_words_t         fit_free;
-  trn_fit_t           fit_ge;
-  trn_fit_t           fit_hit;
-  trn_tlps_t          tx_buf_avail;
-  trn_tlps_t          tx_buf_avail_next;
   logic               tx_room;
   tl_beat_t           app_tx;
   logic               app_tx_ready;
@@ -197,36 +192,6 @@ module tl_top
 
   assign trn_tx.free_words = app_q_free;
 
-  // tx_buf_avail: trn_tlps_fit(app_q_free) in three stages, not a divider
-  // (#15): fit_free, then one constant compare per k in fit_ge, then the
-  // highest k set. It lags three clocks; only the SOC's CSR reads it.
-  // fit_ge is a thermometer, so fit_hit has the one bit whose k+1 is clear
-  assign fit_hit           = fit_ge & ~(fit_ge >> 1);
-
-  always_comb begin
-    tx_buf_avail_next = '0;
-    for (int k = 1; k <= TRN_TLPS_MAX; k++) begin
-      if (fit_hit[k]) begin
-        tx_buf_avail_next = tx_buf_avail_next | trn_tlps_t'(k);
-      end
-    end
-  end
-
-  always_ff @(posedge clk or negedge dl_up) begin
-    if (!dl_up) begin
-      fit_free     <= '0;
-      fit_ge       <= '0;
-      tx_buf_avail <= '0;
-    end
-    else begin
-      fit_free <= app_q_free;
-      for (int k = 1; k <= TRN_TLPS_MAX; k++) begin
-        fit_ge[k] <= (fit_free >= trn_words_t'(k * TRN_TLP_MAX_BEATS));
-      end
-      tx_buf_avail <= tx_buf_avail_next;
-    end
-  end
-
   always_ff @(posedge clk or negedge dl_up) begin
     if (!dl_up) begin
       app_tx_mid <= 1'b0;
@@ -236,20 +201,18 @@ module tl_top
     end
   end
 
-  assign app_tx.valid      = app_tx_mid ? app_q_rd.valid : app_q_rd.avail;
-  assign app_tx.first      = ~app_tx_mid;
-  assign app_tx.last       = app_q_rd.head.last;
-  assign app_tx.data       = app_q_rd.head.data;
+  assign app_tx.valid  = app_tx_mid ? app_q_rd.valid : app_q_rd.avail;
+  assign app_tx.first  = ~app_tx_mid;
+  assign app_tx.last   = app_q_rd.head.last;
+  assign app_tx.data   = app_q_rd.head.data;
 
-  assign trn_rx.dat        = trn_dw_swap(app_rx.data);
-  assign trn_rx.eof        = app_rx.last;
-  assign trn_rx.vld        = app_rx.valid;
+  assign trn_rx.dat    = trn_dw_swap(app_rx.data);
+  assign trn_rx.eof    = app_rx.last;
+  assign trn_rx.vld    = app_rx.valid;
 
-  assign cfg.msg_err_fatal = 1'b0;
-  assign cfg.tx_buf_avail  = tx_buf_avail;
-  assign cfg.id.bus        = tl_cfg.bus_number;
-  assign cfg.id.device     = tl_cfg.device_number;
-  assign cfg.id.func       = 3'd0;
+  assign cfg.id.bus    = tl_cfg.bus_number;
+  assign cfg.id.device = tl_cfg.device_number;
+  assign cfg.id.func   = 3'd0;
 
   tlp_rx_handler u_rx_handler (
       .clk              (clk),

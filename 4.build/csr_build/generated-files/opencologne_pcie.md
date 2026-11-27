@@ -55,82 +55,30 @@ No supported members.
 - Base Offset: 0x0
 - Size: 0x10
 
-<p>TLP Transmit CSR (CPU --&gt; PCIe link)</p>
+<p>TLP Transmit CSR (CPU --&gt; PCIe link). The TLP goes in
+tx_payload, header first; writing tx.send launches it.</p>
 
-|Offset|Identifier|     Name     |
-|------|----------|--------------|
-|  0x0 |  header0 |csr.tx.header0|
-|  0x4 |  header1 |csr.tx.header1|
-|  0x8 |  header2 |csr.tx.header2|
-|  0xC |   data   |  csr.tx.data |
+|Offset|Identifier|    Name   |
+|------|----------|-----------|
+|  0xC |   send   |csr.tx.send|
 
-### header0 register
-
-- Absolute Address: 0x30000000
-- Base Offset: 0x0
-- Size: 0x4
-
-<p>TLP Header DW0 -- Fmt/Type, TC, attributes and Length</p>
-
-|Bits|Identifier|Access|Reset|          Name          |
-|----|----------|------|-----|------------------------|
-|31:0|    hdr   |  rw  | 0x0 |csr.tx.header0.hdr[31:0]|
-
-#### hdr field
-
-<p>1st header DWORD of the outgoing TLP</p>
-
-### header1 register
-
-- Absolute Address: 0x30000004
-- Base Offset: 0x4
-- Size: 0x4
-
-<p>TLP Header DW1 -- for a Completion: Completer ID, status and Byte Count</p>
-
-|Bits|Identifier|Access|Reset|          Name          |
-|----|----------|------|-----|------------------------|
-|31:0|    hdr   |  rw  | 0x0 |csr.tx.header1.hdr[31:0]|
-
-#### hdr field
-
-<p>2nd header DWORD of the outgoing TLP</p>
-
-### header2 register
-
-- Absolute Address: 0x30000008
-- Base Offset: 0x8
-- Size: 0x4
-
-<p>TLP Header DW2 -- for a Completion: Requester ID, Tag and Lower Address</p>
-
-|Bits|Identifier|Access|Reset|          Name          |
-|----|----------|------|-----|------------------------|
-|31:0|    hdr   |  rw  | 0x0 |csr.tx.header2.hdr[31:0]|
-
-#### hdr field
-
-<p>3rd header DWORD of the outgoing TLP</p>
-
-### data register
+### send register
 
 - Absolute Address: 0x3000000C
 - Base Offset: 0xC
 - Size: 0x4
 
-<p>TLP Payload DWORD -- writing this register STARTS the transfer</p>
+<p>TLP Send -- writing this register STARTS the transfer</p>
 
-|Bits|Identifier|Access|Reset|           Name          |
-|----|----------|------|-----|-------------------------|
-|31:0|  payload |  rw  | 0x0 |csr.tx.data.payload[31:0]|
+|Bits|Identifier|Access|Reset|     Name     |
+|----|----------|------|-----|--------------|
+|  0 |    go    |   w  | 0x0 |csr.tx.send.go|
 
-#### payload field
+#### go field
 
-<p>4th DWORD of the outgoing TLP: the 1st payload DWORD of a
-3-DW TLP, or DW3 of a 4-DW header. Further DWORDs come from
-tx_payload. A software write to this register is what
-launches the Tx FSM, so it must be written LAST, after the
-three header registers and tx_payload. The write strobe is
+<p>Any write launches the Tx FSM on the TLP in tx_payload, so
+it comes LAST, after every entry of the TLP. The FSM takes
+the length from DW0 (Fmt and Length). The write strobe is
 exported to logic as the 'swmod' output of this field.</p>
 
 ## rx register file
@@ -140,83 +88,12 @@ exported to logic as the 'swmod' output of this field.</p>
 - Size: 0x14
 
 <p>TLP Receive CSR (PCIe link --&gt; CPU). An incoming TLP is captured
-as it is: the 3 header DWORDs here, DW3 in rx.data and, from DW3
-on, every DWORD in rx_payload. The firmware decodes them, then
-clears rx.valid to take the next TLP.</p>
+as it is, every DWORD in rx_payload (entry i is DW i). The
+firmware decodes it, then clears rx.valid to take the next TLP.</p>
 
-|Offset|Identifier|     Name     |
-|------|----------|--------------|
-| 0x00 |  header0 |csr.rx.header0|
-| 0x04 |  header1 |csr.rx.header1|
-| 0x08 |  header2 |csr.rx.header2|
-| 0x0C |   data   |  csr.rx.data |
-| 0x10 |   valid  | csr.rx.valid |
-
-### header0 register
-
-- Absolute Address: 0x30000010
-- Base Offset: 0x0
-- Size: 0x4
-
-<p>TLP Header DW0 -- Fmt/Type, TC, attributes and Length</p>
-
-|Bits|Identifier|Access|Reset|          Name          |
-|----|----------|------|-----|------------------------|
-|31:0|    hdr   |   r  | 0x0 |csr.rx.header0.hdr[31:0]|
-
-#### hdr field
-
-<p>1st header DWORD of the received TLP</p>
-
-### header1 register
-
-- Absolute Address: 0x30000014
-- Base Offset: 0x4
-- Size: 0x4
-
-<p>TLP Header DW1 -- for a request: Requester ID, Tag and byte enables</p>
-
-|Bits|Identifier|Access|Reset|          Name          |
-|----|----------|------|-----|------------------------|
-|31:0|    hdr   |   r  | 0x0 |csr.rx.header1.hdr[31:0]|
-
-#### hdr field
-
-<p>2nd header DWORD of the received TLP</p>
-
-### header2 register
-
-- Absolute Address: 0x30000018
-- Base Offset: 0x8
-- Size: 0x4
-
-<p>TLP Header DW2 -- for a Memory request: the address</p>
-
-|Bits|Identifier|Access|Reset|          Name          |
-|----|----------|------|-----|------------------------|
-|31:0|    hdr   |   r  | 0x0 |csr.rx.header2.hdr[31:0]|
-
-#### hdr field
-
-<p>3rd header DWORD of the received TLP</p>
-
-### data register
-
-- Absolute Address: 0x3000001C
-- Base Offset: 0xC
-- Size: 0x4
-
-<p>TLP Payload DWORD, or DW3 of a 4-DW header</p>
-
-|Bits|Identifier|Access|Reset|           Name          |
-|----|----------|------|-----|-------------------------|
-|31:0|  payload |   r  | 0x0 |csr.rx.data.payload[31:0]|
-
-#### payload field
-
-<p>4th DWORD of the received TLP: the 1st payload DWORD of a
-3-DW MemWr, or the low address of a 4-DW request. The same
-DWORD is entry 0 of rx_payload.</p>
+|Offset|Identifier|    Name    |
+|------|----------|------------|
+| 0x10 |   valid  |csr.rx.valid|
 
 ### valid register
 
@@ -246,26 +123,9 @@ writes 1 to clear it once it has read the TLP.</p>
 
 |Offset|Identifier|       Name      |
 |------|----------|-----------------|
-|  0x0 |    err   |  csr.status.err |
 |  0x4 |    phy   |  csr.status.phy |
 |  0x8 |  result  |csr.status.result|
 |  0xC |  cfg_id  |csr.status.cfg_id|
-
-### err register
-
-- Absolute Address: 0x30000024
-- Base Offset: 0x0
-- Size: 0x4
-
-<p>PCIe Error Status Register</p>
-
-|Bits|  Identifier |Access|Reset|            Name            |
-|----|-------------|------|-----|----------------------------|
-| 16 |msg_err_fatal|   r  | 0x0 |csr.status.err.msg_err_fatal|
-
-#### msg_err_fatal field
-
-<p>A fatal-error Message TLP has been received</p>
 
 ### phy register
 
@@ -273,24 +133,16 @@ writes 1 to clear it once it has read the TLP.</p>
 - Base Offset: 0x4
 - Size: 0x4
 
-<p>PCIe PHY / Tx FSM Status Register</p>
+<p>Tx FSM Status Register</p>
 
-|Bits| Identifier |Access|Reset|              Name              |
-|----|------------|------|-----|--------------------------------|
-| 5:0|tx_buf_avail|   r  | 0x0 |csr.status.phy.tx_buf_avail[5:0]|
-| 7:6|  tx_state  |   r  | 0x0 |  csr.status.phy.tx_state[1:0]  |
+|Bits|Identifier|Access|Reset|         Name         |
+|----|----------|------|-----|----------------------|
+|  0 |  tx_busy |   r  | 0x0 |csr.status.phy.tx_busy|
 
-#### tx_buf_avail field
+#### tx_busy field
 
-<p>Number of free transmit buffers in the PCIe core
-(tx_buf_avail). Software waits for a non-zero value.</p>
-
-#### tx_state field
-
-<p>State of the Tx FSM: 0 = IDLE, 1 = SEND_CYCLE_1,
-2 = SEND_CYCLE_2, 3 = SEND_REST (beats out of tx_payload).
-Software polls for 0 before it starts loading the next
-TLP.</p>
+<p>The Tx FSM is sending a TLP. Software polls for 0 before
+it writes the next TLP into tx_payload.</p>
 
 ### result register
 
@@ -302,13 +154,14 @@ TLP.</p>
 
 |Bits|Identifier|Access|Reset|             Name             |
 |----|----------|------|-----|------------------------------|
-|31:0|  marker  |  rw  | 0x0 |csr.status.result.marker[31:0]|
+|31:0|  marker  |   w  | 0x0 |csr.status.result.marker[31:0]|
 
 #### marker field
 
 <p>Result marker the firmware writes when it stops, e.g.
-0x0000FACE for PASS. Unlike tx.data, writing it launches
-no TLP: the value goes to logic only, to the PASS LED.</p>
+0x0000FACE for PASS. Unlike tx.send, writing it launches
+no TLP. The SOC keeps only one bit, whether the marker
+is PASS, for the PASS LED.</p>
 
 ### cfg_id register
 
@@ -339,9 +192,9 @@ a direct link.</p>
 - Base Offset: 0x100
 - Size: 0x100
 
-<p>DWORDs of the received TLP from DW3 on, captured with rx.valid:
-entry i is DW 3+i, so entry 0 is rx.data. DWORDs past the last
-entry are dropped.</p>
+<p>DWORDs of the received TLP, header first, captured with
+rx.valid: entry i is DW i. DWORDs past the last entry are
+dropped.</p>
 
 No supported members.
 
@@ -352,9 +205,9 @@ No supported members.
 - Base Offset: 0x200
 - Size: 0x100
 
-<p>DWORDs of the outgoing TLP from DW4 on: entry i is DW 3+i. DW3
-is tx.data, written last to launch the transfer, so entry 0 is
-not sent. The TLP's Fmt and Length say how many entries go out.</p>
+<p>DWORDs of the outgoing TLP, header first: entry i is DW i.
+Writing tx.send then launches it. The TLP's Fmt and Length say
+how many entries go out.</p>
 
 No supported members.
 

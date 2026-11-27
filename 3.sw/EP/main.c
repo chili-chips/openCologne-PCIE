@@ -78,10 +78,10 @@ static uint32_t be_last(uint32_t be) {
     return i;
 }
 
-// MemWr: payload DWORD i is rx_payload entry i, or i+1 behind a 4-DW header
+// MemWr: payload DWORD i is rx_payload entry 3+i, or 4+i behind a 4-DW header
 static void mem_write(const tlp_t *req) {
     uint32_t len   = tlp_length(req);
-    uint32_t first = TLP_FMT(req->dw0) & 0x1;
+    uint32_t first = 3 + (TLP_FMT(req->dw0) & 0x1);
     uint32_t idx   = PIO_INDEX(req_addr(req));
 
     for (uint32_t i = 0; i < len && first + i < PAYLOAD_DW; i++) {

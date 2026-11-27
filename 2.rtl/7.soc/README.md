@@ -12,7 +12,7 @@
 
 ### CPU
 
-- **eduBOS5** (default): Chili.CHIPS' RV32I core, copied here in [`CPU.eduBOS5`](CPU.eduBOS5). The master is on [openPCIE](https://github.com/chili-chips/openPCIE/tree/main/2.rtl/0.common.opensource/src/CPU.eduBOS5): before major work here, update the copy from it ([how](CPU.eduBOS5/README.md)). `` `define SOC_EDUBOS5_3STG `` selects its 3-stage pipeline.
+- **eduBOS5** (default): Chili.CHIPS' RV32I core, copied here in [`CPU.eduBOS5`](CPU.eduBOS5). The master is on [openPCIE](https://github.com/chili-chips/openPCIE/tree/main/2.rtl/0.common.opensource/src/CPU.eduBOS5): before major work here, update the copy from it ([how](CPU.eduBOS5/README.md)). It builds the 3-stage core, with its register file in block RAM; `` `define SOC_EDUBOS5_2STG `` selects the 2-stage one.
 - **VProc** (`` `define SOC_CPU_VPROC ``, co-simulation only): the same bus driven by native C/C++ or by the rv32 ISS, see [5.sim](../../5.sim).
 
 ### Address map
@@ -26,22 +26,22 @@
 
 | Offset | Register | Use |
 |---|---|---|
-| 0x00 – 0x0C | `tx.header0..2`, `tx.data` | the TLP to send, DW0 to DW3; writing `tx.data` sends it |
-| 0x10 – 0x1C | `rx.header0..2`, `rx.data` | the last TLP received, as it came, DW0 to DW3 |
+| 0x0C | `tx.send` | writing it sends the TLP in `tx_payload` |
+| 0x10 – 0x1C | – | free |
 | 0x20 | `rx.valid` | a TLP is waiting; write 1 to clear |
-| 0x24, 0x28 | `status.err`, `status.phy` | fatal-error message, always 0 on an EP; Tx FSM state and free core buffers |
-| 0x2C | `status.result` | firmware result marker; 0x0000_FACE lights `fw_pass` |
+| 0x28 | `status.phy` | `tx_busy`: the Tx FSM is sending |
+| 0x2C | `status.result` | firmware result marker, write-only; 0x0000_FACE lights `fw_pass` |
 | 0x30 | `status.cfg_id` | our own Bus/Device/Function |
-| 0x100 – 0x1FC | `rx_payload` | the received TLP from DW3 on, 64 DWORDs: entry i is DW 3+i |
-| 0x200 – 0x2FC | `tx_payload` | the TLP to send from DW4 on, 64 DWORDs: entry i is DW 3+i (DW3 is `tx.data`) |
+| 0x100 – 0x1FC | `rx_payload` | the last TLP received, as it came, header first, 64 DWORDs: entry i is DW i |
+| 0x200 – 0x2FC | `tx_payload` | the TLP to send, header first, 64 DWORDs: entry i is DW i |
 
 Things worth knowing:
 
-- **The Rx window takes any TLP as-is.** The RC version decoded only Completions; an EP must see Memory requests. Every incoming TLP lands in `rx.header0..2`, `rx.data` and `rx_payload`, up to a MemWr of Max_Payload_Size (128 bytes) behind a 4-DW header, and the firmware decodes it. So the window is generic: the same RTL could serve the RC too.
+- **The Rx window takes any TLP as-is.** The RC version decoded only Completions; an EP must see Memory requests. Every incoming TLP lands in `rx_payload`, header first, up to a MemWr of Max_Payload_Size (128 bytes) behind a 4-DW header, and the firmware decodes it. So the window is generic: the same RTL could serve the RC too.
 - **The payload windows are RAMs.** `rx_payload` and `tx_payload` are PeakRDL external memories, each two banks of 32 DWORDs, odd and even entries, so that a 64-bit beat writes (Rx) or reads (Tx) both its DWORDs in one clock. Their read is registered, so they fit block RAM.
 - **`rx.valid` is the flow control.** Set at the end of a TLP, it holds `m_axis_rx.tready` low until the firmware clears it: a slow CPU never loses a request; the PCIE core waits.
 - **Configuration requests never get here.** The TL answers them itself, as the AMD hard macro does. `status.cfg_id` is the Bus/Device/Function the host gave us, captured from its Type 0 Configuration Writes (UG477 `cfg_bus_number`, `cfg_device_number`, `cfg_function_number`); every Completion carries it as the Completer ID.
-- **`tx.data` is a trigger.** PeakRDL's `swmod` strobe on that field starts the Tx FSM, so the firmware writes `tx_payload` and the three headers first and `tx.data` last. The Tx FSM sends as many DWORDs as the header's Fmt and Length say. The payload must not exceed Max_Payload_Size (32 DWORDs): the hardware does not check it, the simulation assertion `a_tx_max_payload` does. A longer TLP would reach the host as a Malformed TLP.
+- **`tx.send` is a trigger.** PeakRDL's `swmod` strobe on that field starts the Tx FSM, so the firmware writes the whole TLP into `tx_payload` first and `tx.send` last. The Tx FSM sends as many DWORDs as the header's Fmt and Length say. The payload must not exceed Max_Payload_Size (32 DWORDs): the hardware does not check it, the simulation assertion `a_tx_max_payload` does. A longer TLP would reach the host as a Malformed TLP.
 
 ### What the firmware needs to know
 
@@ -49,7 +49,7 @@ Things worth knowing:
 
 <div align="center"><img src="../../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></div>
 
-**The headers** in `rx.header0..2` and `tx.header0..2`, one DW per register: H0 in `header0`, byte 0 of every DW in bits [31:24], payload included. The firmware decodes requests and builds completions:
+**The headers**, in entries 0 to 2 (3 for a 4-DW header) of `rx_payload` and `tx_payload`, one DW each: H0 first, byte 0 of every DW in bits [31:24], payload included. The firmware decodes requests and builds completions:
 
 <table align="center">
   <tr><th>Request: MWr32, MRd32 (decoded)</th><th>Completion: CplD (built)</th></tr>
@@ -59,7 +59,7 @@ Things worth knowing:
   </tr>
 </table>
 
-Payload DWORD i is `rx_payload` entry i. A 4-DW request (64-bit address) has the upper address half in H2 and the lower in H3 (`rx.data`), so its payload starts one entry later, at entry 1. The firmware handles both ([3.sw](../../3.sw/README.md#ep-firmware)).
+Payload DWORD i is `rx_payload` entry 3+i. A 4-DW request (64-bit address) has the upper address half in H2 and the lower in H3 (entry 3), so its payload starts one entry later, at entry 4. The firmware handles both ([3.sw](../../3.sw/README.md#ep-firmware)).
 
 Lint: [`4.build/hw_build/run-lint.sh`](../../4.build/hw_build/run-lint.sh) checks the SOC as part of `top`.
 

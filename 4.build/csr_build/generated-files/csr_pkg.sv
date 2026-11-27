@@ -12,42 +12,6 @@ package csr_pkg;
     localparam CSR_SIZE = 'h300;
 
     typedef struct {
-        logic [31:0] next;
-        logic we;
-    } csr__rx__header0__hdr__in_t;
-
-    typedef struct {
-        csr__rx__header0__hdr__in_t hdr;
-    } csr__rx__header0__in_t;
-
-    typedef struct {
-        logic [31:0] next;
-        logic we;
-    } csr__rx__header1__hdr__in_t;
-
-    typedef struct {
-        csr__rx__header1__hdr__in_t hdr;
-    } csr__rx__header1__in_t;
-
-    typedef struct {
-        logic [31:0] next;
-        logic we;
-    } csr__rx__header2__hdr__in_t;
-
-    typedef struct {
-        csr__rx__header2__hdr__in_t hdr;
-    } csr__rx__header2__in_t;
-
-    typedef struct {
-        logic [31:0] next;
-        logic we;
-    } csr__rx__data__payload__in_t;
-
-    typedef struct {
-        csr__rx__data__payload__in_t payload;
-    } csr__rx__data__in_t;
-
-    typedef struct {
         logic hwset;
     } csr__rx__valid__valid__in_t;
 
@@ -56,33 +20,20 @@ package csr_pkg;
     } csr__rx__valid__in_t;
 
     typedef struct {
-        csr__rx__header0__in_t header0;
-        csr__rx__header1__in_t header1;
-        csr__rx__header2__in_t header2;
-        csr__rx__data__in_t data;
         csr__rx__valid__in_t valid;
     } csr__rx__in_t;
 
     typedef struct {
         logic next;
-    } csr__status__err__msg_err_fatal__in_t;
+    } csr__status__phy__tx_busy__in_t;
 
     typedef struct {
-        csr__status__err__msg_err_fatal__in_t msg_err_fatal;
-    } csr__status__err__in_t;
-
-    typedef struct {
-        logic [5:0] next;
-    } csr__status__phy__tx_buf_avail__in_t;
-
-    typedef struct {
-        logic [1:0] next;
-    } csr__status__phy__tx_state__in_t;
-
-    typedef struct {
-        csr__status__phy__tx_buf_avail__in_t tx_buf_avail;
-        csr__status__phy__tx_state__in_t tx_state;
+        csr__status__phy__tx_busy__in_t tx_busy;
     } csr__status__phy__in_t;
+
+    typedef struct {
+        logic wr_ack;
+    } csr__status__result__external__in_t;
 
     typedef struct {
         logic [15:0] next;
@@ -93,8 +44,8 @@ package csr_pkg;
     } csr__status__cfg_id__in_t;
 
     typedef struct {
-        csr__status__err__in_t err;
         csr__status__phy__in_t phy;
+        csr__status__result__external__in_t result;
         csr__status__cfg_id__in_t cfg_id;
     } csr__status__in_t;
 
@@ -118,43 +69,16 @@ package csr_pkg;
     } csr__in_t;
 
     typedef struct {
-        logic [31:0] value;
-    } csr__tx__header0__hdr__out_t;
-
-    typedef struct {
-        csr__tx__header0__hdr__out_t hdr;
-    } csr__tx__header0__out_t;
-
-    typedef struct {
-        logic [31:0] value;
-    } csr__tx__header1__hdr__out_t;
-
-    typedef struct {
-        csr__tx__header1__hdr__out_t hdr;
-    } csr__tx__header1__out_t;
-
-    typedef struct {
-        logic [31:0] value;
-    } csr__tx__header2__hdr__out_t;
-
-    typedef struct {
-        csr__tx__header2__hdr__out_t hdr;
-    } csr__tx__header2__out_t;
-
-    typedef struct {
-        logic [31:0] value;
+        logic value;
         logic swmod;
-    } csr__tx__data__payload__out_t;
+    } csr__tx__send__go__out_t;
 
     typedef struct {
-        csr__tx__data__payload__out_t payload;
-    } csr__tx__data__out_t;
+        csr__tx__send__go__out_t go;
+    } csr__tx__send__out_t;
 
     typedef struct {
-        csr__tx__header0__out_t header0;
-        csr__tx__header1__out_t header1;
-        csr__tx__header2__out_t header2;
-        csr__tx__data__out_t data;
+        csr__tx__send__out_t send;
     } csr__tx__out_t;
 
     typedef struct {
@@ -169,16 +93,19 @@ package csr_pkg;
         csr__rx__valid__out_t valid;
     } csr__rx__out_t;
 
-    typedef struct {
-        logic [31:0] value;
-    } csr__status__result__marker__out_t;
+    typedef struct packed {
+        logic [31:0] marker;
+    } csr__status__result__external__fields__out_t;
 
     typedef struct {
-        csr__status__result__marker__out_t marker;
-    } csr__status__result__out_t;
+        logic req;
+        logic req_is_wr;
+        csr__status__result__external__fields__out_t wr_data;
+        csr__status__result__external__fields__out_t wr_biten;
+    } csr__status__result__external__out_t;
 
     typedef struct {
-        csr__status__result__out_t result;
+        csr__status__result__external__out_t result;
     } csr__status__out_t;
 
     typedef struct {

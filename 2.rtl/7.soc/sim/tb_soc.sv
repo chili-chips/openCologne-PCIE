@@ -51,8 +51,6 @@ module tb_soc
   assign m_axis_rx.tuser     = '0;
   assign m_axis_rx.tlast     = 1'b0;
   assign m_axis_rx.tvalid    = 1'b0;
-  assign cfg.msg_err_fatal   = 1'b0;
-  assign cfg.tx_buf_avail    = 6'd8;  // the core always has room
   assign cfg.id              = '0;
 
   logic fw_pass;

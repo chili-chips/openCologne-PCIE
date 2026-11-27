@@ -376,9 +376,12 @@ A sampler of relevant posts:
 | Tool / project | Issue | What | State |
 |---|---|---|---|
 | nextpnr | [nextpnr#1909](https://github.com/YosysHQ/nextpnr/issues/1909) | report utilization per hierarchy level | open |
+| nextpnr | [nextpnr#1942](https://github.com/YosysHQ/nextpnr/issues/1942) | router2 diverges: overuse falls, then rises ([#28](https://github.com/chili-chips/openCologne-PCIE/issues/28)) | fixed for us by [nextpnr#1943](https://github.com/YosysHQ/nextpnr/pull/1943), OSS CAD Suite 2026-11-26 |
 | nextpnr | [nextpnr#1732](https://github.com/YosysHQ/nextpnr/issues/1732) (comment) | router2 never clears one overused wire: two nets take it in turns | open |
 | prjpeppercorn-test-cases | [#12](https://github.com/YosysHQ/prjpeppercorn-test-cases/issues/12) | offer: this design as a test case for their regression and QA runs | open |
 | Yosys | [yosys#6500](https://github.com/YosysHQ/yosys/issues/6500) | `read_slang --best-effort-hierarchy`: a modport output the module never assigns (per-block build) | open |
+| Yosys | [yosys#6566](https://github.com/YosysHQ/yosys/issues/6566) | no warning when `memory_libmap` adds fabric logic to emulate read-first (72 DFF, 76 LUT for the eduBOS5 register file; [workaround](4.build/README.md#block-ram-without-read-first)) | open |
+| fpgacapZero | [fpgacapZero#89](https://github.com/lcapossio/fpgacapZero/issues/89) | GateMate support for its UART logic analyzer (GateMate has no user JTAG); we offer this design as the test vehicle | open |
 | Verilator | [verilator#9144](https://github.com/verilator/verilator/issues/9144) (comment) | `=== 'z` on a tristate net driven to 0 ([#17](https://github.com/chili-chips/openCologne-PCIE/issues/17)) | open |
 | Verilator | [verilator#9347](https://github.com/verilator/verilator/issues/9347) | no lint for a variable used before its declaration (`tb_tl_top.sv`; [#25](https://github.com/chili-chips/openCologne-PCIE/issues/25)) | open (feature request) |
 | Icarus Verilog | iverilog#1703 | `?:` between values of one enum needs a cast ([#18](https://github.com/chili-chips/openCologne-PCIE/issues/18)) | open, as [iverilog#1048](https://github.com/steveicarus/iverilog/issues/1048) |

@@ -260,8 +260,8 @@ The CSR block (`soc_csr`, at 0x3000_0000 on the CPU bus) is where the firmware m
 
 **Handshake:** one TLP at a time each way, the firmware polls.
 
-- **Rx:** the SOC captures the first two beats of a TLP into the `rx` window and sets `rx.valid` at its last beat. While `rx.valid` is set, `tready` is low and the next TLP waits in the TL's queues (posted/completion 128 × 64 bit, non-posted 64 × 64 bit, 8 header credits each), its credits held, so nothing is lost. The firmware reads the window, answers, and writes 1 to `rx.valid` to open it again.
-- **Tx:** the firmware waits for the Tx FSM to be idle and the TL's Tx queue (64 × 64 bit, 3 TLPs) to have a free slot (`status.phy`), writes `tx.header0..2`, then `tx.data`. That last write starts the FSM, which sends the TLP in two beats.
+- **Rx:** the SOC captures a TLP into `rx_payload`, header first, and sets `rx.valid` at its last beat. While `rx.valid` is set, `tready` is low and the next TLP waits in the TL's queues (posted/completion 128 × 64 bit, non-posted 64 × 64 bit, 8 header credits each), its credits held, so nothing is lost. The firmware reads the window, answers, and writes 1 to `rx.valid` to open it again.
+- **Tx:** the firmware waits for the Tx FSM to be idle (`status.phy`), writes the TLP into `tx_payload`, header first, then `tx.send`. That write starts the FSM, which sends the TLP two DWORDs a beat. A full TL Tx queue (64 × 64 bit, 3 TLPs) holds the FSM, so it also waits for room.
 
 <div align="center"><img src="../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></div>
 
@@ -270,7 +270,7 @@ The CSR block (`soc_csr`, at 0x3000_0000 on the CPU bus) is where the firmware m
 The registers are written once, in SystemRDL ([`csr.rdl`](../4.build/csr_build/csr.rdl)). [PeakRDL](https://peakrdl.readthedocs.io) compiles that one file into the CSR RTL (`csr.sv`, `csr_pkg.sv`), the C header of the HAL (`csr.h`) and the register map docs ([`opencologne_pcie.md`](../4.build/csr_build/generated-files/opencologne_pcie.md)). RTL, firmware and docs cannot drift apart.
 
 - **Generate:** [4.build](../4.build/README.md#build-environment), step 1 (`MakefileCSR`)
-- **Firmware use:** [3.sw](../3.sw/README.md#ep-firmware)
+- **Firmware use:** [3.sw](../3.sw/README.md#endpoint-firmware)
 - **Co-simulation:** [5.sim](../5.sim/README.md#hal): the same firmware compiled for the host, each CSR access a _VProc_ bus cycle
 
 ## 8) HW / SW Partitioning
@@ -287,7 +287,7 @@ Everything up to and including the TLP is hardware. The eduBOS5 firmware sees on
 | Unsupported Requests: a BAR0 miss, I/O, Type 1 configuration, a function other than 0 | 🟩 HW | TL `tlp_rx_dispatch`, `cpl_gen` |
 | TRN to and from AXI-Stream | 🟩 HW | `trn_bridge` |
 | One TLP in, one TLP out: Rx window, Tx FSM, `status` | 🟩 HW | SOC `soc_csr` ([7)](#7-csr-hal-and-sw-interface)) |
-| MemWr and MemRd to BAR0: decode, byte enables, the 4 KB PIO memory | 🟦 SW | `EP/main.c` ([3.sw](../3.sw/README.md#ep-firmware)) |
+| MemWr and MemRd to BAR0: decode, byte enables, the 4 KB PIO memory | 🟦 SW | `EP/main.c` ([3.sw](../3.sw/README.md#endpoint-firmware)) |
 | CplD: Completer ID from `status.cfg_id`, Requester ID and Tag from the request, split at the 64-byte RCB | 🟦 SW | `common/pcie.c` (header), `EP/main.c` (RCB split) |
 | Unsupported Request for any other non-posted request: a fallback, as the TL lets only MRd and MWr to BAR0 through | 🟦 SW | `EP/main.c` |
 | PASS: `status.result` = 0x0000_FACE, the `fw_pass` LED | 🟦 SW | `EP/main.c` |
@@ -311,7 +311,7 @@ By design: Gen1 and x1 only; no L0s, L1, L2, Disabled, Loopback, Hot Reset or Co
    - First, the GateMate SerDes must run reliably at 5 Gbps: it has trouble there today ([1.pcb](../1.pcb/README.md)).
    - The LTSSM negotiates speed in Recovery.Speed and drives a PIPE `Rate`, which our `pipe_if` and CC's PIPE logic would also need.
    - A fabric FSM reprograms the SerDes through its regfile: PLL off, `PLL_CFG1` (`PLL_OUT_DIVSEL` 1 → 0), PLL on, wait for lock, then `PhyStatus`.
-   - PCLK doubles to 62.5 MHz and stops during the relock, so everything above the PHY must close timing at Gen2.
+   - PCLK doubles to 62.5 MHz and stops during the relock, so everything above the PHY must close timing at Gen2, which the A1 can hardly reach ([Gen2 on the A1](../4.build/README.md#gen2-on-the-a1)).
 
 ---
 ---
@@ -345,10 +345,11 @@ IEEE 1800-2009 SystemVerilog, the same rules as on [openPCIE](https://github.com
 - **Resets:**
   - **Asynchronous, active low:** `always_ff @(posedge clk or negedge rst_n)`, the reset branch first: `if (!rst_n) begin ... end else begin ... end`. No synchronous reset: a sync clear from logic is no reset (`run-lint.sh` does not count it).
   - **Asserted at once, released on the clock:** [`clk_rst_gen.sv`](clk_rst_gen.sv) releases each clock domain's reset through two flops (`rst_pipe_n` on `clk_aon`, `mac_rst_n` on PCLK), so every flop leaves reset on the same edge. A reset is never used in a domain other than the one it was released on.
-  - **One tree:** CC_USR_RSTN and PERST# make `perst_por_n`; every other reset derives from it. A block reset may be a flop output in the same domain, never a combinational signal: e.g. `dl_up` resets the TL on DL_Down.
+  - **One tree:** CC_USR_RSTN and PERST# make `perst_por_n`; every other reset derives from it. A block reset may be a flop output in the same domain, never a combinational signal: e.g. `core_rst_n`, a flop that follows `dll_up`, resets `trn_bridge` and the SOC on DL_Down.
   - **Control flops get a reset, data flops need none:** a flop that reaches an enable, a reset, a mux select or a memory port enable has a reset, or an X there can lock the design up. Data and address flops may go without one, which saves routing on wide buses. `run-lint.sh` checks it ([`run-lint-reset.py`](../4.build/hw_build/run-lint-reset.py)); a data flop that ends up in a control input anyway is waived by name in `run-lint-waivers.txt`.
-  - **Our own blocks only:** `2.pipe`, `3.mac` and `4.dll` keep their active-high `reset` for now.
+  - **Exceptions:** `2.pipe`, `3.mac` and `4.dll` keep their active-high `reset` for now.
 - **Arrays, not flat buses:** arrays of lanes or structs, no index arithmetic on flat buses.
+- **Block RAM: write, else read.** GateMate block RAM has no read-first mode, so Yosys builds one in fabric for a memory that may read and write in one clock ([how to avoid it](../4.build/README.md#block-ram-without-read-first)).
 - **`/*LINT:OK*/`:** marks an unused *output* pin of a hard macro, primitive or third-party core as reviewed: `.PIN (/*LINT:OK*/)`, with a `// reason` if not obvious. Never on an input (`run-lint.sh` flags it); unused inputs are tied off.
 - **No-connects:** unused bits of a hard-macro or primitive output go to `NC_` signals: `{NC_x, used}` on a bus pin, or an `NC_` signal for an unused lane. `NC_` signals are never read.
 - **Lint:** fix findings at the root; waive only as a last resort, as described in [`run-lint-waivers.txt`](../4.build/hw_build/run-lint-waivers.txt). Don't mold legal, intended code around one tool's quirk (e.g. slang on `unique case` with a `default`, Verilator on unpacked-struct members written by separate processes): waive it with a reason.

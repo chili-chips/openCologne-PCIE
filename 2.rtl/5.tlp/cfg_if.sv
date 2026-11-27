@@ -41,17 +41,14 @@ interface cfg_if
   import tl_pkg::*;
 ();
 
-  // Status sideband from the PCIE core (TL) to the SOC CSRs.
-  logic           msg_err_fatal;  // ERR_FATAL message received
-  logic     [5:0] tx_buf_avail;  // free TX buffers in the core
+  // Sideband from the PCIE core (TL) to the SOC CSRs: the core ID, captured
+  // from every Type 0 Configuration Write (UG477 cfg_bus_number,
+  // cfg_device_number, cfg_function_number), the Completer ID of each
+  // Completion the EP sends
+  pcie_id_t id;
 
-  // Core ID, captured from every Type 0 Configuration Write (UG477
-  // cfg_bus_number, cfg_device_number, cfg_function_number): the Completer
-  // ID of each Completion the EP sends
-  pcie_id_t       id;
-
-  modport core(output msg_err_fatal, tx_buf_avail, id);
-  modport soc(input msg_err_fatal, tx_buf_avail, id);
+  modport core(output id);
+  modport soc(input id);
 endinterface
 // -----------------------------------------------------------------------------
 // Project:     openCologne-PCIE

@@ -44,9 +44,8 @@
 //   The TL answers the host's Configuration requests itself, as the AMD
 //   PCIE_2_1 hard macro does; only Memory requests (and anything the TL
 //   passes on) reach the firmware, one TLP at a time through the CSR Rx
-//   window: the header in rx.header0..2, the DWORDs from DW3 on in
-//   rx_payload. A Completion goes out the same way, through tx.header0..2,
-//   tx.data and tx_payload.
+//   window: every DWORD, header first, in rx_payload. A Completion goes
+//   out the same way, through tx_payload and tx.send.
 //==========================================================================
 
 #ifndef OPENCOLOGNE_PCIE_H
@@ -61,30 +60,20 @@
 // -------------------------------------------------------------------------
 #include "csr_regs.h"
 
-#define PCIE_TX_HEADER0      CSR_REG32(tx.header0)
-#define PCIE_TX_HEADER1      CSR_REG32(tx.header1)
-#define PCIE_TX_HEADER2      CSR_REG32(tx.header2)
-#define PCIE_TX_DATA         CSR_REG32(tx.data)
+#define PCIE_TX_SEND         CSR_REG32(tx.send)
 
-#define PCIE_RX_HEADER0      CSR_REG32(rx.header0)
-#define PCIE_RX_HEADER1      CSR_REG32(rx.header1)
-#define PCIE_RX_HEADER2      CSR_REG32(rx.header2)
-#define PCIE_RX_DATA         CSR_REG32(rx.data)
 #define PCIE_RX_VALID        CSR_REG32(rx.valid)
-#define PCIE_ERR_STATUS      CSR_REG32(status.err)
 #define PCIE_PHY_STATUS      CSR_REG32(status.phy)
 #define PCIE_RESULT          CSR_REG32(status.result)
 #define PCIE_CFG_ID          CSR_REG32(status.cfg_id)
 
-// The DWORDs of a TLP from DW3 on: entry i is DW 3+i (entry 0 is rx.data,
-// and on Tx tx.data stands for entry 0)
+// Entry i is DW i of the TLP, header first, on Rx and on Tx
 #define PCIE_RX_PAYLOAD(i)   CSR_REG32(rx_payload.mem[i])
 #define PCIE_TX_PAYLOAD(i)   CSR_REG32(tx_payload.mem[i])
 #define PAYLOAD_DW           (sizeof(((csr_t *)0)->rx_payload.mem) / sizeof(uint32_t))
 
 // Field masks come from the generated csr.h
-#define TX_STATE_MASK        CSR__STATUS__PHY__TX_STATE_bm
-#define TX_BUF_MASK          CSR__STATUS__PHY__TX_BUF_AVAIL_bm
+#define TX_BUSY_MASK         CSR__STATUS__PHY__TX_BUSY_bm
 #define RX_VALID_MASK        CSR__RX__VALID__VALID_bm
 #define CFG_ID_MASK          CSR__STATUS__CFG_ID__ID_bm
 

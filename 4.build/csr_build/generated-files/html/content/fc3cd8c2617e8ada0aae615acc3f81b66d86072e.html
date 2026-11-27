@@ -10,14 +10,14 @@
     <dt>Base Offset:</dt><dd class="address">0x200</dd>
     <dt>Size:</dt><dd class="address">0x100</dd>
     
-    <dt>Source:</dt><dd><a href="https://github.com/chili-chips/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L306" target="_blank">csr.rdl</a></dd>
+    <dt>Source:</dt><dd><a href="https://github.com/chili-chips/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L188" target="_blank">csr.rdl</a></dd>
     
 </dl>
 <h2>Description</h2>
 <div id="_Content.desc">
-<p>DWORDs of the outgoing TLP from DW4 on: entry i is DW 3+i. DW3
-is tx.data, written last to launch the transfer, so entry 0 is
-not sent. The TLP's Fmt and Length say how many entries go out.</p>
+<p>DWORDs of the outgoing TLP, header first: entry i is DW i.
+Writing tx.send then launches it. The TLP's Fmt and Length say
+how many entries go out.</p>
 </div>
 
 <h2>Contents</h2>

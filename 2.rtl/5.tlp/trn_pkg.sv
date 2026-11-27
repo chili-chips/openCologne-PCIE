@@ -62,17 +62,10 @@ package trn_pkg;
   // free beats in the TX buffer, 0 to 2^TRN_TX_ADDR_W - 1
   typedef logic [TRN_TX_ADDR_W-1:0] trn_words_t;
 
-  // largest TLPs in the empty TX buffer: 511 / 18 = 28
-  localparam int TRN_TLPS_MAX = (2 ** TRN_TX_ADDR_W - 1) / TRN_TLP_MAX_BEATS;
-
   // a count of largest TLPs. 6 bits, as tbuf_av: TRN_TX_ADDR_W up to 10
   typedef logic [5:0] trn_tlps_t;
 
-  // a bit per count 1 to TRN_TLPS_MAX
-  typedef logic [TRN_TLPS_MAX:1] trn_fit_t;
-
-  // the largest TLPs that fit in free_words: UG477 tbuf_av, and the SOC's
-  // csr.status.phy.tx_buf_avail
+  // the largest TLPs that fit in free_words: UG477 tbuf_av (trn_compat)
   function automatic trn_tlps_t trn_tlps_fit(input trn_words_t free_words);
     return trn_tlps_t'(free_words / trn_words_t'(TRN_TLP_MAX_BEATS));
   endfunction

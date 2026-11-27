@@ -53,20 +53,22 @@ __attribute__((noreturn)) void halt(uint32_t marker) {
 #endif
 }
 
-// Waits until the Tx FSM is idle and the core has a free buffer
+// Waits until the Tx FSM is idle. A full core TX buffer holds the FSM (no
+// tready), so this also waits for room.
 static void wait_tx_ready(void) {
-    while (((PCIE_PHY_STATUS & TX_STATE_MASK) != 0) ||
-           ((PCIE_PHY_STATUS & TX_BUF_MASK) == 0));
+    while ((PCIE_PHY_STATUS & TX_BUSY_MASK) != 0);
 }
 
-// Loads the three header DWORDs. Writing tx.data last is what sends the TLP.
+// Loads DW0 to DW3 into tx_payload, then tx.send sends the TLP. A 4-DW
+// header's payload goes in from entry 4 on, before the call.
 void send_tlp(uint32_t h0, uint32_t h1, uint32_t h2, uint32_t data) {
     wait_tx_ready();
 
-    PCIE_TX_HEADER0 = h0;
-    PCIE_TX_HEADER1 = h1;
-    PCIE_TX_HEADER2 = h2;
-    PCIE_TX_DATA    = data;
+    PCIE_TX_PAYLOAD(0) = h0;
+    PCIE_TX_PAYLOAD(1) = h1;
+    PCIE_TX_PAYLOAD(2) = h2;
+    PCIE_TX_PAYLOAD(3) = data;
+    PCIE_TX_SEND       = 1;
 }
 
 // Waits for the next TLP from the host. While rx.valid is set, the SOC holds
@@ -74,10 +76,10 @@ void send_tlp(uint32_t h0, uint32_t h1, uint32_t h2, uint32_t data) {
 void wait_for_request(tlp_t *req) {
     while ((PCIE_RX_VALID & RX_VALID_MASK) == 0);
 
-    req->dw0  = PCIE_RX_HEADER0;
-    req->dw1  = PCIE_RX_HEADER1;
-    req->dw2  = PCIE_RX_HEADER2;
-    req->data = PCIE_RX_DATA;
+    req->dw0  = PCIE_RX_PAYLOAD(0);
+    req->dw1  = PCIE_RX_PAYLOAD(1);
+    req->dw2  = PCIE_RX_PAYLOAD(2);
+    req->data = PCIE_RX_PAYLOAD(3);
 }
 
 // rx.valid is write-1-to-clear: the Rx window opens for the next TLP
@@ -170,8 +172,8 @@ void send_completion(const tlp_t *req, uint32_t status, int with_data, uint32_t 
 
 // A Completion with Data of n DWORDs (1 to PAYLOAD_DW), Successful: the
 // caller gives the Byte Count and Lower Address, as a read longer than 1 DW
-// may take several Completions. data[0] goes into tx.data, the rest into
-// tx_payload, before tx.data launches it.
+// may take several Completions. The header goes into tx_payload entries 0
+// to 2, data[i] into entry 3+i, then tx.send launches it.
 void send_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
                const uint32_t *data, uint32_t n) {
     uint32_t dw0 = TLP_CPLD | (n & 0x3FF) | TLP_TC_ATTR(req->dw0);
@@ -181,13 +183,13 @@ void send_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
 
     wait_tx_ready();
 
-    for (uint32_t i = 1; i < n; i++) {
-        PCIE_TX_PAYLOAD(i) = data[i];
+    PCIE_TX_PAYLOAD(0) = dw0;
+    PCIE_TX_PAYLOAD(1) = dw1;
+    PCIE_TX_PAYLOAD(2) = dw2;
+    for (uint32_t i = 0; i < n; i++) {
+        PCIE_TX_PAYLOAD(3 + i) = data[i];
     }
-    PCIE_TX_HEADER0 = dw0;
-    PCIE_TX_HEADER1 = dw1;
-    PCIE_TX_HEADER2 = dw2;
-    PCIE_TX_DATA    = data[0];
+    PCIE_TX_SEND = 1;
 }
 
 // -----------------------------------------------------------------------------

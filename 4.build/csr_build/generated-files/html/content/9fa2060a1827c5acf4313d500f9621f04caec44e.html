@@ -10,14 +10,14 @@
     <dt>Base Offset:</dt><dd class="address">0x100</dd>
     <dt>Size:</dt><dd class="address">0x100</dd>
     
-    <dt>Source:</dt><dd><a href="https://github.com/chili-chips/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L296" target="_blank">csr.rdl</a></dd>
+    <dt>Source:</dt><dd><a href="https://github.com/chili-chips/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L178" target="_blank">csr.rdl</a></dd>
     
 </dl>
 <h2>Description</h2>
 <div id="_Content.desc">
-<p>DWORDs of the received TLP from DW3 on, captured with rx.valid:
-entry i is DW 3+i, so entry 0 is rx.data. DWORDs past the last
-entry are dropped.</p>
+<p>DWORDs of the received TLP, header first, captured with
+rx.valid: entry i is DW i. DWORDs past the last entry are
+dropped.</p>
 </div>
 
 <h2>Contents</h2>

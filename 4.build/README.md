@@ -32,17 +32,17 @@ The versions this repo has been run with so far. "Runs" means the step completes
 | Tool | Version | Used for | Status |
 |---|---|---|---|
 | PeakRDL | 1.5.0 | CSR RTL, headers, docs (`MakefileCSR`) | generates |
-| xPack RISC-V GCC | 15.2.0-1 | firmware (`sw_build`) | builds |
+| xPack RISC-V GCC | 15.2.0-1 | firmware (`sw_build`), `-Os -flto`: 1,248 bytes of code, 3,228 at `-O0` | builds |
 | GCC | 15.2 | co-sim C/C++: VProc, pcieVHost, the RC model; `-O0`/`-O2`, UBSan, ASan | builds |
 | Yosys | 0.70, with `read_slang` | 8b/10b proofs, standalone SerDes test synthesis, `run-synth.sh`, `run-lint.sh`, `run-leq.sh` | runs |
 | Verible | v0.0-4296-g0f262651 | `run-lint.sh`, `run-format.sh` | runs |
 | Icarus Verilog | 14.0 (devel, master `addeab31d`, 2026-11-23) | PHY and DLL-over-PHY simulations, co-sim (`make SIM=icarus run`); 14 or later for the PIPE, MAC and DLL interface ports | runs |
 | Verilator | 5.055 (devel, `v5.054-260-gb9f22851`) | co-sim (`make run`, default), SOC lint; its FST writer needs `liblz4-dev` | runs, checks |
 | JanusHDL | 0.22.0 | co-sim (`make SIM=janushdl run`): `EP=model`; `EP=rtl` waits on [#24](https://github.com/chili-chips/openCologne-PCIE/issues/24); free, closed source | runs |
-| OSS CAD Suite | 2026-11-12 | Cologne Chip's toolchain package ([UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf)): nextpnr-himbaechel `nextpnr-0.11.1-91-gf934534a`, GateMate, for `run-pnr.sh` (`NEXTPNR=`); its Yosys is a development build, not used | places and routes; timing fails |
+| OSS CAD Suite | 2026-11-26 | Cologne Chip's toolchain package ([UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf)): nextpnr-himbaechel `nextpnr-0.11.1-127-gc54af70b`, GateMate chipdb 1.15, for `run-pnr.sh` (`NEXTPNR=`); router2 converges since [nextpnr#1943](https://github.com/YosysHQ/nextpnr/pull/1943). Its Yosys is a development build, not used | places and routes; timing fails |
 | gmpack | OSS CAD Suite, or Project Peppercorn v1.14 | bitstream (`run-pnr.sh`) | not yet run: P&R stops on timing |
-| openFPGALoader | 1.1.1 | loading the bitstream over JTAG | not yet used on the board |
-| WaveCrux Pro | 1.1.1 | waveforms; PIPE, DLL and serial-line decoding (wcx-pcie 0.3.0), TLP decoding (Pro, and [our plugin](https://github.com/Ferrite-Engineering/wavecrux-decoders/tree/main/decoders/pcie-tlp), pcie-tlp 0.1.1), RISC-V (Windows) | runs |
+| openFPGALoader | 1.2.0 | loading the bitstream over JTAG | not yet used on the board |
+| WaveCrux Pro | 1.2.0 | waveforms; PIPE, DLL and serial-line decoding (wcx-pcie 0.3.0), TLP decoding (Pro, and [our plugin](https://github.com/Ferrite-Engineering/wavecrux-decoders/tree/main/decoders/pcie-tlp), pcie-tlp 0.1.1), RISC-V (Windows) | runs |
 | Python | 3.12 | build scripts, `run-format.sh` | runs |
 
 ## Utilization
@@ -55,7 +55,8 @@ The versions this repo has been run with so far. "Runs" means the step completes
 | 2026-11-02 | retry buffer in block RAM | 22,076 (53%) | 7,261 (17%) | 22 / 64 | 12.2 MHz, 3 hold violations | routes; fails timing ([#15](https://github.com/chili-chips/openCologne-PCIE/issues/15)) |
 | 2026-11-02 | no latch in the MAC scrambler | 22,181 (54%) | 7,147 (17%) | 22 / 64 | 12.75 MHz, no hold violation | routes; fails setup ([#15](https://github.com/chili-chips/openCologne-PCIE/issues/15)) |
 | 2026-11-13 | the same RTL (renames and formatting only), OSS CAD Suite 2026-11-12 | 21,536 (52%) | 7,076 (17%) | 22 / 64 | 13.07 MHz | routes; fails setup ([#15](https://github.com/chili-chips/openCologne-PCIE/issues/15)) |
-| 2026-11-25 | eduBOS5 register file in block RAM, `packet_handler` rewrite, default router with `--tmg-ripup` | 19,608 (47%) | 6,199 (15%) | 24 / 64 | 22.28 MHz | routes; fails setup ([Timing closure difficulties](#timing-closure-difficulties)) |
+| 2026-11-25 | eduBOS5 register file in block RAM, `packet_handler` rewrite, OSS CAD Suite 2026-11-12, default router with `--tmg-ripup` | 19,608 (47%) | 6,199 (15%) | 24 / 64 | 22.28 MHz | routes; fails setup ([Timing closure difficulties](#timing-closure-difficulties)) |
+| 2026-11-26 | the same netlist, OSS CAD Suite 2026-11-26, static placer with `--tmg-ripup` | 19,608 (47%) | 6,199 (15%) | 24 / 64 | 24.54 MHz | routes; fails setup ([Timing closure difficulties](#timing-closure-difficulties)) |
 
 Out of 40,960 CPE_LT and CPE_FF, and 64 RAM_HALF.
 
@@ -74,10 +75,11 @@ Neither Yosys nor nextpnr reports a flat build per block. These numbers come fro
 ## Timing closure difficulties
 
 > **At a glance**
-> - **Routing-bound at half full.** Both GateMate PCIe designs use about 50% of CPE_LT, yet routing takes most of each clock period.
+> - **Routing-bound at half full.** Ours and Goran's pci_eerie port both use about 50% of CPE_LT, yet routing takes most of each clock period.
 > - **The routed ceiling is about 33 MHz.** The PCLK target is 31.25 MHz, so the margin is thin for anyone.
-> - **We went from 12.2 to 22.28 MHz in November.** The next 9 MHz starts with the TL TX arbiter, then the router.
-> - **A true Gen2 is hardly possible on the A1.** A "fake Gen2", with only the PIPE at 128 bits, can still test CC_SERDES training at 5 Gb/s ([details](#gen2-on-the-a1)).
+> - **We went from 12.2 to 24.54 MHz in November.** The next 7 MHz starts with the TL TX arbiter.
+> - **nextpnr fixed router2 for us.** Since OSS CAD Suite 2026-11-26 it converges in 65 iterations (7 min), where it diverged before (the chart below).
+> - **A true Gen2 is hardly possible on the A1.** A "fake Gen2", with only the PIPE at 128 bits, can still test CC_SERDES training at 5 GT/s ([details](#gen2-on-the-a1)).
 
 <div align="center"><img src="../0.doc/4.build/router2-divergence-heatmap.png" width="100%" alt="router2 overused wires per iteration for seeds 2 and 3: both fall to a minimum, then rise again. Below, seed 2 congestion maps at iterations 133 and 220: the overuse spreads over the left 60% of the chip"></div>
 
@@ -85,35 +87,55 @@ Neither Yosys nor nextpnr reports a flat build per block. These numbers come fro
 
 [Goran's GateMate port of eerie](https://github.com/goran-mahovlic/pci_eerie/tree/gatemate-w16) hits the same limit as ours.
 
-| | Ours (2026-11-25) | Goran's (EERIE_W8, 64-bit) |
+| | Ours (2026-11-26) | Goran's (EERIE_W8, 64-bit) |
 |---|---|---|
-| CPE_LT | 19,608 (47%) | 20,662 (51%) |
-| Routed PCLK | **22.28 MHz** (default router, `--tmg-ripup`)<br>20.51 MHz (router2) | **31.35 to 34.65 MHz** |
-| Placer estimate | 37.31 MHz | |
-| Worst path | TL TX arbiter credit check: 44.9 ns, of which **31.4 ns (70%) is routing** | closed |
+| CPE_LT | 19,608 (47%) | 20,662 (50%) |
+| Routed PCLK | **24.54 MHz** (static placer, router1, `--tmg-ripup`, 44 min)<br>24.22 MHz (HeAP placer, router1, `--tmg-ripup`, 49 min)<br>23.08 MHz (HeAP placer, router2, 7 min) | **31.35 to 34.65 MHz** |
+| Placer estimate | 16.06 MHz; it was 37.31 MHz before nextpnr#1943 fixed GateMate's delay estimate | |
+| Worst path | TL TX arbiter credit check: 40.8 ns, of which **28.4 ns (70%) is routing** | closed |
 
 ### Routing, not logic
 
-**One net shows it.** In the router2 run, `u_tlp_rx_buffer.u_lcrc.crc_q[2]` takes **14.3 ns** to route from tile (40,118) to (41,113). Its ends are only **5 rows apart**, so the delay is a routing detour, not logic depth.
+**One net shows it.** In a router2 run with OSS CAD Suite 2026-11-12, `u_tlp_rx_buffer.u_lcrc.crc_q[2]` takes **14.3 ns** to route from tile (40,118) to (41,113). Its ends are only **5 rows apart**, so the delay is a routing detour, not logic depth.
 
-**One seed is not a measurement.** router2 gets close, then falls apart (the chart above), and the default router took **84 min** to converge. Check a timing change on 2 or 3 seeds before trusting it.
+**One seed is not a measurement.** Until OSS CAD Suite 2026-11-26, router2 got close, then fell apart (the chart above), and the default router took **84 min** to converge. Check a timing change on 2 or 3 seeds before trusting it; router2's 7 min now makes that cheap.
 
 ### Progress
 
-| Date | Change | Routed PCLK |
-|---|---|---|
-| 2026-11-02 | retry buffer in block RAM | 12.2 MHz |
-| 2026-11-02 | no latch in the MAC scrambler | 12.75 MHz |
-| 2026-11-13 | OSS CAD Suite 2026-11-12 | 13.07 MHz |
-| 2026-11-25 | register file in block RAM, `packet_handler` rewrite, `--tmg-ripup` | **22.28 MHz** |
+| Date | Change | Routed PCLK | Gain | Of the 31.25 MHz target |
+|---|---|---|---|---|
+| 2026-11-02 | retry buffer in block RAM | 12.2 MHz | | `████░░░░░░` 39% |
+| 2026-11-02 | no latch in the MAC scrambler | 12.75 MHz | +0.55 | `████░░░░░░` 41% |
+| 2026-11-13 | OSS CAD Suite 2026-11-12 | 13.07 MHz | +0.32 | `████░░░░░░` 42% |
+| 2026-11-25 | register file in block RAM, `packet_handler` rewrite, `--tmg-ripup` | 22.28 MHz | **+9.21** | `███████░░░` 71% |
+| 2026-11-26 | OSS CAD Suite 2026-11-26 (nextpnr#1943) | 24.22 MHz | +1.94 | `████████░░` 78% |
+| 2026-11-26 | static placer | **24.54 MHz** | +0.32 | `████████░░` 79% |
+
+6.71 MHz to go. Same netlist since 2026-11-25: the last two rows are tool gains only.
 
 ### What helps
 
-1. **The default router with `--tmg-ripup`**, as Goran uses. On the same netlist it gives 22.28 MHz against router2's 20.51 MHz, and it converges. `run-pnr.sh` uses it.
+1. **An up-to-date nextpnr and the static placer**, with `--tmg-ripup`: +2.26 MHz on the same netlist, and 40 min faster. `run-pnr.sh` uses them; `PNR_OPTS="--router router2"` gives 23.08 MHz in 7 min, for a quick look.
 2. **No asynchronous-read memories.** GateMate has no LUT RAM, so such a memory becomes flip-flops and wide muxes, all of which must be routed. Moving eduBOS5's register file to block RAM cut DFF from 1,490 to 466 and MX from 1,101 to 405.
 3. **Fewer logic levels and lower fan-out.** Goran duplicates high-fan-out registers, decodes K symbols a clock early, and uses prefix ANDs, popcount trees, flat matrices and a CRC precomputed from the RAM output. He measures each change on its own, in a shift-register harness.
 4. **Register cuts on the worst paths.** The `packet_handler` rewrite took the DLL off the worst path. The TL TX arbiter is next.
-5. **Aim at the big blocks.** The DLL is 33% of the logic. The LCRC is only about 8% of the design, and its form hardly matters: 1,113 cells flat, 1,197 chained.
+5. **Aim at the big blocks.** The DLL is 32% of the logic (2026-11-03). The LCRC is only about 6%, and its form hardly matters: 1,113 cells flat, 1,197 chained.
+
+### Block RAM without read-first
+
+**GateMate block RAM has no read-first mode.** `WR_MODE` is `NO_CHANGE` or `WRITE_THROUGH`, and SDP mode, the one a register file needs, has no `WRITE_THROUGH`. A memory that reads and writes in the same clock simulates read-first, so Yosys rebuilds that behaviour in fabric, and says so only in its debug log ("emulate read-first behavior"; [yosys#6566](https://github.com/YosysHQ/yosys/issues/6566)).
+
+For eduBOS5's 32x32 register file, with two read ports, `synth_gatemate` gives:
+
+| RTL | Besides 2 CC_BRAM_20K |
+|---|---|
+| `if (we) m[wa] <= d;`<br>`if (re) q <= m[ra];` | 72 DFF, 76 LUT |
+| `(* no_rw_check *)` on `m` | none |
+| `if (we) m[wa] <= d;`<br>`else if (re) q <= m[ra];` | 1 LUT |
+
+**Use `else if`.** A write excludes the read in the same clock, so there is nothing to emulate, and simulation matches the hardware. `edubos5_rf.sv` does this; its core never reads while writing anyway.
+
+**`(* no_rw_check *)` is only a band-aid.** It tells Yosys to ignore collisions, so on a collision the RTL simulates read-first while the hardware returns undefined data.
 
 ### Gen2 on the A1
 
@@ -124,14 +146,14 @@ Neither Yosys nor nextpnr reports a flat build per block. These numbers come fro
 
 **A "fake Gen2" is possible.** Widen only the PIPE to 128 bits, and keep the DLL and TL at 64 bits behind a FIFO. That is Goran's `EERIE_W16`. The link trains at 5 GT/s but carries Gen1 throughput, 250 MB/s.
 
-Its use is to test CC_SERDES training at 5 Gb/s. That is not proven in silicon yet: on the ULX5M, the PLL path 5 Gb/s needs measured far worse than the current one, already at 2.4 Gb/s.
+Its use is to test CC_SERDES training at 5 GT/s, not yet proven in silicon. On the ULX5M, the PLL path that 5 GT/s needs was already far worse than the current one when measured at 2.4 Gb/s.
 
-### Router issues we filed
+### Router issues we reported
 
 | Issue | What happens |
 |---|---|
 | [nextpnr#1732](https://github.com/YosysHQ/nextpnr/issues/1732) (our comment) | **Oscillation:** router2 never clears one overused wire, because two nets take it in turns |
-| [nextpnr#1942](https://github.com/YosysHQ/nextpnr/issues/1942) | **Divergence:** overuse falls, then rises. Seed 2 bottoms at 1,770 (iteration 133) and climbs to 5,555 |
+| [nextpnr#1942](https://github.com/YosysHQ/nextpnr/issues/1942) | **Divergence:** overuse falls, then rises. Seed 2 bottoms at 1,770 (iteration 133) and climbs to 5,555. **Fixed for us** by [nextpnr#1943](https://github.com/YosysHQ/nextpnr/pull/1943) (OSS CAD Suite 2026-11-26): 65 iterations |
 | [#28](https://github.com/chili-chips/openCologne-PCIE/issues/28) | our tracker for the divergence |
 
 ## Porting to other FPGAs

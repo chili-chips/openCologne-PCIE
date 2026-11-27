@@ -10,12 +10,12 @@
     <dt>Base Offset:</dt><dd class="address">0x4</dd>
     <dt>Size:</dt><dd class="address">0x4</dd>
     
-    <dt>Source:</dt><dd><a href="https://github.com/chili-chips/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L235" target="_blank">csr.rdl</a></dd>
+    <dt>Source:</dt><dd><a href="https://github.com/chili-chips/openCologne-PCIE/blob/main/4.build/csr_build/csr.rdl#L126" target="_blank">csr.rdl</a></dd>
     
 </dl>
 <h2>Description</h2>
 <div id="_Content.desc">
-<p>PCIe PHY / Tx FSM Status Register</p>
+<p>Tx FSM Status Register</p>
 </div>
 
 <h2>Contents</h2>
@@ -30,7 +30,7 @@
         <th></th>
     </tr>
     <tr class="reserved-field">
-    <td>[31:8]</td>
+    <td>[31:1]</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -38,44 +38,24 @@
     <td>-</td>
     <td></td>
 </tr>
-    <tr id="tx_state">
-        <td>[7:6]</td>
-        <td><a href="#tx_state.desc">tx_state</a></td>
+    <tr id="tx_busy">
+        <td>[0]</td>
+        <td><a href="#tx_busy.desc">tx_busy</a></td>
         <td>
             <span title='Read-only'>r</span></td>
         <td>0x0
         </td>
         <td>
-            <input id="_FieldValueTestertx_state" class="field-value-tester"
+            <input id="_FieldValueTestertx_busy" class="field-value-tester"
                 type="text" autocomplete="off"
-                data-name="tx_state" oninput="onDecodedFieldInput(this)"/>
+                data-name="tx_busy" oninput="onDecodedFieldInput(this)"/>
         </td>
-        <td>csr.status.phy.tx_state[1:0]</td>
+        <td>csr.status.phy.tx_busy</td>
         <td>
-            <button type="button" id="_RadixButtontx_state" class="radix-button"
+            <button type="button" id="_RadixButtontx_busy" class="radix-button"
                 title="Switch radix" aria-label="Switch radix"
-                data-name="tx_state" onclick="onRadixSwitch(this)">H</button>
-            <a class="headerlink" href="#tx_state" title="Permalink to this row"></a>
-        </td>
-    </tr>
-    <tr id="tx_buf_avail">
-        <td>[5:0]</td>
-        <td><a href="#tx_buf_avail.desc">tx_buf_avail</a></td>
-        <td>
-            <span title='Read-only'>r</span></td>
-        <td>0x0
-        </td>
-        <td>
-            <input id="_FieldValueTestertx_buf_avail" class="field-value-tester"
-                type="text" autocomplete="off"
-                data-name="tx_buf_avail" oninput="onDecodedFieldInput(this)"/>
-        </td>
-        <td>csr.status.phy.tx_buf_avail[5:0]</td>
-        <td>
-            <button type="button" id="_RadixButtontx_buf_avail" class="radix-button"
-                title="Switch radix" aria-label="Switch radix"
-                data-name="tx_buf_avail" onclick="onRadixSwitch(this)">H</button>
-            <a class="headerlink" href="#tx_buf_avail" title="Permalink to this row"></a>
+                data-name="tx_busy" onclick="onRadixSwitch(this)">H</button>
+            <a class="headerlink" href="#tx_busy" title="Permalink to this row"></a>
         </td>
     </tr>
 </table>
@@ -88,21 +68,11 @@
 </p>
 <hr/><h2>Field Descriptions</h2>
 
-<h3 id="tx_state.desc">tx_state - csr.status.phy.tx_state[1:0]
-    <a class="headerlink" href="#tx_state.desc" title="Permalink to this headline"></a>
+<h3 id="tx_busy.desc">tx_busy - csr.status.phy.tx_busy
+    <a class="headerlink" href="#tx_busy.desc" title="Permalink to this headline"></a>
 </h3>
-<div id="_Content.tx_state.desc">
-<p>State of the Tx FSM: 0 = IDLE, 1 = SEND_CYCLE_1,
-2 = SEND_CYCLE_2, 3 = SEND_REST (beats out of tx_payload).
-Software polls for 0 before it starts loading the next
-TLP.</p>
-</div>
-
-<h3 id="tx_buf_avail.desc">tx_buf_avail - csr.status.phy.tx_buf_avail[5:0]
-    <a class="headerlink" href="#tx_buf_avail.desc" title="Permalink to this headline"></a>
-</h3>
-<div id="_Content.tx_buf_avail.desc">
-<p>Number of free transmit buffers in the PCIe core
-(tx_buf_avail). Software waits for a non-zero value.</p>
+<div id="_Content.tx_busy.desc">
+<p>The Tx FSM is sending a TLP. Software polls for 0 before
+it writes the next TLP into tx_payload.</p>
 </div>
 </div>

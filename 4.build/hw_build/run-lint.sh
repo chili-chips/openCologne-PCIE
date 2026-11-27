@@ -16,6 +16,9 @@
 #   reset      Yosys netlist and run-lint-reset.py: a control flop or flag with
 #              no reset (data and address flops need none: waived by name);
 #              top, then eduBOS5 alone with RV32M and the counters
+#   ram        Yosys memory_libmap and run-lint-ram.py: a memory mapped to block
+#              RAM with read-first or transparency logic built in fabric
+#              (GateMate block RAM has neither: write, else read)
 #   slang      read_slang -Wextra: strict IEEE parse, second opinion
 #   verible    Verible style rules (run-lint.verible) on all RTL (not the BFM, csr.sv, eduBOS5): our case
 #              rule -- signals and ports lower case, constants UPPER case --
@@ -81,7 +84,7 @@ case $VIEW in
 esac
 
 WAIVERS=${LINT_WAIVERS:-$HERE/run-lint-waivers.txt}
-PHASES=${*:-tags verilator yosys reset slang verible}
+PHASES=${*:-tags verilator yosys reset ram slang verible}
 W=${LINT_WORK:-$(mktemp -d)}
 mkdir -p "$W"
 
@@ -300,6 +303,25 @@ run_reset() {
   found reset < <(sort -u reset.out)
 }
 
+# A memory mapped to block RAM must need no read-first or transparency logic:
+# GateMate block RAM has neither, and Yosys builds them in fabric, saying so
+# only in its debug log. One finding per memory, at its source line; the
+# rules are in run-lint-ram.py.
+run_ram() {
+  [ -z "$SIM" ] || { skip ram "sim view: the SerDes BFM is behavioural, not for synthesis tools"; return; }
+  have "$YOSYS" || { skip ram "$YOSYS not found"; return; }
+  bb || { skip ram "no GateMate stubs"; return; }
+  "$YOSYS" $YOSYS_ARGS -q -l ram.log -p "read_slang $SL_DEFS --top $TOP bb.v $SV; \
+      synth_gatemate -top $TOP -noiopad -run begin:map_bram; write_json ram.json; \
+      debug memory_libmap -lib +/gatemate/brams.txt" >/dev/null 2>&1
+  local rc=$?
+  [ $rc -eq 0 ] && [ -s ram.json ] && grep -q 'Executing MEMORY_LIBMAP' ram.log ||
+    { failed ram "exit $rc, memory_libmap not reached"; return; }
+  "$PYTHON" "$HERE/run-lint-ram.py" ram.log ram.json > ram.out 2>> ram.log ||
+    { failed ram "log check failed"; return; }
+  found ram < <(sed -E 's#^(\.\./)+[^ ]*/(2\.rtl|csr)/#\2/#' ram.out)
+}
+
 run_slang() {
   [ -z "$SIM" ] || { skip slang "sim view: the SerDes BFM is behavioural, not for synthesis tools"; return; }
   have "$YOSYS" || { skip slang "$YOSYS not found"; return; }
@@ -329,8 +351,8 @@ run_verible() {
 
 for ph in $PHASES; do
   case $ph in
-    tags|verilator|yosys|reset|slang|verible) echo "== $ph"; run_$ph ;;
-    *) echo "unknown phase: $ph (tags verilator yosys reset slang verible)"; exit 2 ;;
+    tags|verilator|yosys|reset|ram|slang|verible) echo "== $ph"; run_$ph ;;
+    *) echo "unknown phase: $ph (tags verilator yosys reset ram slang verible)"; exit 2 ;;
   esac
 done
 

@@ -19,109 +19,24 @@ typedef struct __attribute__ ((__packed__)) {
     uint32_t mem[2048];
 } opencologne_pcie__imem_t;
 
-// reg - csr::tx::header0
-#define CSR__TX__HEADER0__HDR_bm 0xffffffff
-#define CSR__TX__HEADER0__HDR_bp 0
-#define CSR__TX__HEADER0__HDR_bw 32
-#define CSR__TX__HEADER0__HDR_reset 0x0
+// reg - csr::tx::send
+#define CSR__TX__SEND__GO_bm 0x1
+#define CSR__TX__SEND__GO_bp 0
+#define CSR__TX__SEND__GO_bw 1
+#define CSR__TX__SEND__GO_reset 0x0
 typedef union {
     struct __attribute__ ((__packed__)) {
-        uint32_t hdr :32;
+        uint32_t go :1;
+        uint32_t :31;
     } f;
     uint32_t w;
-} csr__tx__header0_t;
-
-// reg - csr::tx::header1
-#define CSR__TX__HEADER1__HDR_bm 0xffffffff
-#define CSR__TX__HEADER1__HDR_bp 0
-#define CSR__TX__HEADER1__HDR_bw 32
-#define CSR__TX__HEADER1__HDR_reset 0x0
-typedef union {
-    struct __attribute__ ((__packed__)) {
-        uint32_t hdr :32;
-    } f;
-    uint32_t w;
-} csr__tx__header1_t;
-
-// reg - csr::tx::header2
-#define CSR__TX__HEADER2__HDR_bm 0xffffffff
-#define CSR__TX__HEADER2__HDR_bp 0
-#define CSR__TX__HEADER2__HDR_bw 32
-#define CSR__TX__HEADER2__HDR_reset 0x0
-typedef union {
-    struct __attribute__ ((__packed__)) {
-        uint32_t hdr :32;
-    } f;
-    uint32_t w;
-} csr__tx__header2_t;
-
-// reg - csr::tx::data
-#define CSR__TX__DATA__PAYLOAD_bm 0xffffffff
-#define CSR__TX__DATA__PAYLOAD_bp 0
-#define CSR__TX__DATA__PAYLOAD_bw 32
-#define CSR__TX__DATA__PAYLOAD_reset 0x0
-typedef union {
-    struct __attribute__ ((__packed__)) {
-        uint32_t payload :32;
-    } f;
-    uint32_t w;
-} csr__tx__data_t;
+} csr__tx__send_t;
 
 // regfile - csr::tx
 typedef struct __attribute__ ((__packed__)) {
-    csr__tx__header0_t header0;
-    csr__tx__header1_t header1;
-    csr__tx__header2_t header2;
-    csr__tx__data_t data;
+    uint8_t RESERVED_0_b[0xc];
+    csr__tx__send_t send;
 } csr__tx_t;
-
-// reg - csr::rx::header0
-#define CSR__RX__HEADER0__HDR_bm 0xffffffff
-#define CSR__RX__HEADER0__HDR_bp 0
-#define CSR__RX__HEADER0__HDR_bw 32
-#define CSR__RX__HEADER0__HDR_reset 0x0
-typedef union {
-    struct __attribute__ ((__packed__)) {
-        uint32_t hdr :32;
-    } f;
-    uint32_t w;
-} csr__rx__header0_t;
-
-// reg - csr::rx::header1
-#define CSR__RX__HEADER1__HDR_bm 0xffffffff
-#define CSR__RX__HEADER1__HDR_bp 0
-#define CSR__RX__HEADER1__HDR_bw 32
-#define CSR__RX__HEADER1__HDR_reset 0x0
-typedef union {
-    struct __attribute__ ((__packed__)) {
-        uint32_t hdr :32;
-    } f;
-    uint32_t w;
-} csr__rx__header1_t;
-
-// reg - csr::rx::header2
-#define CSR__RX__HEADER2__HDR_bm 0xffffffff
-#define CSR__RX__HEADER2__HDR_bp 0
-#define CSR__RX__HEADER2__HDR_bw 32
-#define CSR__RX__HEADER2__HDR_reset 0x0
-typedef union {
-    struct __attribute__ ((__packed__)) {
-        uint32_t hdr :32;
-    } f;
-    uint32_t w;
-} csr__rx__header2_t;
-
-// reg - csr::rx::data
-#define CSR__RX__DATA__PAYLOAD_bm 0xffffffff
-#define CSR__RX__DATA__PAYLOAD_bp 0
-#define CSR__RX__DATA__PAYLOAD_bw 32
-#define CSR__RX__DATA__PAYLOAD_reset 0x0
-typedef union {
-    struct __attribute__ ((__packed__)) {
-        uint32_t payload :32;
-    } f;
-    uint32_t w;
-} csr__rx__data_t;
 
 // reg - csr::rx::valid
 #define CSR__RX__VALID__VALID_bm 0x1
@@ -138,41 +53,19 @@ typedef union {
 
 // regfile - csr::rx
 typedef struct __attribute__ ((__packed__)) {
-    csr__rx__header0_t header0;
-    csr__rx__header1_t header1;
-    csr__rx__header2_t header2;
-    csr__rx__data_t data;
+    uint8_t RESERVED_0_f[0x10];
     csr__rx__valid_t valid;
 } csr__rx_t;
 
-// reg - csr::status::err
-#define CSR__STATUS__ERR__MSG_ERR_FATAL_bm 0x10000
-#define CSR__STATUS__ERR__MSG_ERR_FATAL_bp 16
-#define CSR__STATUS__ERR__MSG_ERR_FATAL_bw 1
-#define CSR__STATUS__ERR__MSG_ERR_FATAL_reset 0x0
-typedef union {
-    struct __attribute__ ((__packed__)) {
-        uint32_t :16;
-        uint32_t msg_err_fatal :1;
-        uint32_t :15;
-    } f;
-    uint32_t w;
-} csr__status__err_t;
-
 // reg - csr::status::phy
-#define CSR__STATUS__PHY__TX_BUF_AVAIL_bm 0x3f
-#define CSR__STATUS__PHY__TX_BUF_AVAIL_bp 0
-#define CSR__STATUS__PHY__TX_BUF_AVAIL_bw 6
-#define CSR__STATUS__PHY__TX_BUF_AVAIL_reset 0x0
-#define CSR__STATUS__PHY__TX_STATE_bm 0xc0
-#define CSR__STATUS__PHY__TX_STATE_bp 6
-#define CSR__STATUS__PHY__TX_STATE_bw 2
-#define CSR__STATUS__PHY__TX_STATE_reset 0x0
+#define CSR__STATUS__PHY__TX_BUSY_bm 0x1
+#define CSR__STATUS__PHY__TX_BUSY_bp 0
+#define CSR__STATUS__PHY__TX_BUSY_bw 1
+#define CSR__STATUS__PHY__TX_BUSY_reset 0x0
 typedef union {
     struct __attribute__ ((__packed__)) {
-        uint32_t tx_buf_avail :6;
-        uint32_t tx_state :2;
-        uint32_t :24;
+        uint32_t tx_busy :1;
+        uint32_t :31;
     } f;
     uint32_t w;
 } csr__status__phy_t;
@@ -204,7 +97,7 @@ typedef union {
 
 // regfile - csr::status
 typedef struct __attribute__ ((__packed__)) {
-    csr__status__err_t err;
+    uint8_t RESERVED_0_3[0x4];
     csr__status__phy_t phy;
     csr__status__result_t result;
     csr__status__cfg_id_t cfg_id;

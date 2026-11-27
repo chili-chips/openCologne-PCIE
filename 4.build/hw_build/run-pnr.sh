@@ -14,6 +14,9 @@
 #         BOARD=m2 bash run-pnr.sh
 #
 # NEXTPNR and GMPACK override the commands, SEED the placer seed (default 1).
+# PNR_OPTS the placer and router; it replaces the default "--placer static
+# --tmg-ripup" (24.54 MHz in 44 min). "--router router2": 23.08 MHz in 7 min,
+# for a quick look; it needs OSS CAD Suite 2026-11-26 or later (diverged before).
 # The work directory is SYNTH_WORK, as for run-synth.sh (default
 # ~/.cache/opencologne-pcie/synth); it gets:
 #   top.txt       the placed and routed design
@@ -26,6 +29,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 NEXTPNR=${NEXTPNR:-nextpnr-himbaechel}
 GMPACK=${GMPACK:-gmpack}
 SEED=${SEED:-1}
+PNR_OPTS=${PNR_OPTS:---placer static --tmg-ripup}
 W=${SYNTH_WORK:-$HOME/.cache/opencologne-pcie/synth}
 BOARD=${BOARD:-evb}
 
@@ -42,8 +46,9 @@ done
 
 cd "$W"
 echo "run-pnr: BOARD=$BOARD, $CCF, $SDC"
+# shellcheck disable=SC2086  # PNR_OPTS is several options
 "$NEXTPNR" --device CCGM1A1 --json top.json --vopt ccf="$HERE/$CCF" --sdc "$HERE/$SDC" \
-  --vopt out=top.txt --tmg-ripup --seed "$SEED" --report report.json -l nextpnr.log >/dev/null 2>&1
+  --vopt out=top.txt $PNR_OPTS --seed "$SEED" --report report.json -l nextpnr.log >/dev/null 2>&1
 rc=$?
 if [ $rc -ne 0 ]; then
   echo "run-pnr: nextpnr failed, see $W/nextpnr.log" >&2
