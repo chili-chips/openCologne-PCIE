@@ -50,7 +50,8 @@ module packet_handler
 
     output logic sdp_detected,  // SDP detected flag
     output logic stp_detected,  // STP detected flag
-    output logic end_detected,  // END detected flag
+    output logic end_detected,  // END or EDB detected flag
+    output logic nullified,  // with end_detected: the TLP ended with EDB (#29)
     output logic [PATTERN_WIDTH-1:0] data_dllp,  // Extracted DLLP
     output pipe_data_t data_tl,  // Data forwarded to Transaction Layer
     output tlp_seq_t sequence_number,  // Sequence number
@@ -198,6 +199,7 @@ module packet_handler
       sdp_detected    <= 1'b0;
       stp_detected    <= 1'b0;
       end_detected    <= 1'b0;
+      nullified       <= 1'b0;
       data_dllp       <= {PATTERN_WIDTH{1'b0}};
       data_tl         <= {DATA_WIDTH{1'b0}};
       tlp_valid       <= 1'b0;
@@ -213,6 +215,7 @@ module packet_handler
       sdp_detected    <= 1'b0;
       stp_detected    <= 1'b0;
       end_detected    <= 1'b0;
+      nullified       <= 1'b0;
       data_dllp       <= {PATTERN_WIDTH{1'b0}};
       data_tl         <= {DATA_WIDTH{1'b0}};
       tlp_valid       <= 1'b0;
@@ -222,8 +225,12 @@ module packet_handler
 
       if (in_tlp) begin
         word_cnt <= word_cnt + 1'b1;
-        if (HALF_WORDS && end_half == K_END && end_half_k) begin  // Half word TLP
+        // A TLP ends with END, or with EDB when the sender nullified it
+        // (PCIe 2.1, 3.5.3.1, #29); EDB is one symbol too, in END's place.
+        // Half word TLP:
+        if (HALF_WORDS && end_half_k && (end_half == K_END || end_half == K_EDB)) begin
           end_detected <= 1'b1;
+          nullified    <= (end_half == K_EDB);
           data_tl      <= {{(DATA_WIDTH / 2) {1'b0}}, tlp_data[DATA_WIDTH/2-1:0]};
           tlp_valid    <= 1'b1;
           tlp_half     <= 1'b1;
@@ -232,8 +239,9 @@ module packet_handler
           // = 4 byte LCRC + 1 byte END + 4 bytes of the last half word - DATA_BYTES
           ptr          <= POS_WIDTH'(stp_pos) + POS_WIDTH'(Q0 + 9 - DATA_BYTES);
         end
-        else if (end_full == K_END && end_full_k) begin  // Full word TLP
+        else if (end_full_k && (end_full == K_END || end_full == K_EDB)) begin  // Full word TLP
           end_detected <= 1'b1;
+          nullified    <= (end_full == K_EDB);
           data_tl      <= tlp_data;
           tlp_valid    <= 1'b1;
           lcrc         <= lcrc_full;

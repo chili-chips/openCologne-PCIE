@@ -88,9 +88,9 @@ External: nothing is stored, the write starts the FSM.</p>
 - Base Offset: 0x10
 - Size: 0x14
 
-<p>TLP Receive CSR (PCIe link --&gt; CPU). An incoming TLP is captured
-as it is, every DWORD in rx_payload (entry i is DW i). The
-firmware decodes it, then clears rx.valid to take the next TLP.</p>
+<p>TLP Receive CSR (PCIe link --&gt; CPU). Incoming TLPs queue up in
+a ring, as they are. rx_payload shows the oldest, the head:
+entry i is its DW i. The firmware decodes it, then frees it.</p>
 
 |Offset|Identifier|    Name    |
 |------|----------|------------|
@@ -104,15 +104,15 @@ firmware decodes it, then clears rx.valid to take the next TLP.</p>
 
 <p>Receive Status Register</p>
 
-|Bits|Identifier|  Access |Reset|       Name       |
-|----|----------|---------|-----|------------------|
-|  0 |   valid  |rw, woclr| 0x0 |csr.rx.valid.valid|
+|Bits|Identifier|Access|Reset|       Name       |
+|----|----------|------|-----|------------------|
+|  0 |   valid  |  rw  | 0x0 |csr.rx.valid.valid|
 
 #### valid field
 
-<p>Set by hardware when a TLP has been captured. While it is
-set, the link is held off (m_axis_rx.tready low). Software
-writes 1 to clear it once it has read the TLP.</p>
+<p>Reads 1 while a TLP is waiting in rx_payload. Writing 1
+frees it, and the next TLP in the ring takes its place.
+External: nothing is stored, the ring is the state.</p>
 
 ## status register file
 
@@ -191,11 +191,11 @@ a direct link.</p>
 
 - Absolute Address: 0x30001000
 - Base Offset: 0x1000
-- Size: 0x100
+- Size: 0x1000
 
-<p>DWORDs of the received TLP, header first, captured with
-rx.valid: entry i is DW i. DWORDs past the last entry are
-dropped.</p>
+<p>The head TLP of the RX ring, header first, while rx.valid
+reads 1: entry i is its DW i. The window spans the ring:
+entries past the head show the TLPs behind it.</p>
 
 No supported members.
 

@@ -35,10 +35,10 @@ The versions this repo has been run with so far. "Runs" means the step completes
 | xPack RISC-V GCC | 15.2.0-1 | firmware (`sw_build`), `-Os -flto`: 1,248 bytes of code, 3,228 at `-O0` | builds |
 | GCC | 15.2 | co-sim C/C++: VProc, pcieVHost, the RC model; `-O0`/`-O2`, UBSan, ASan | builds |
 | Yosys | 0.70, with `read_slang` | 8b/10b proofs, standalone SerDes test synthesis, `run-synth.sh`, `run-lint.sh`, `run-leq.sh` | runs |
-| Verible | v0.0-4296-g0f262651 | `run-lint.sh`, `run-format.sh` | runs |
+| Verible | v0.0-4302-gc6b29d62 | `run-lint.sh`, `run-format.sh` | runs |
 | Icarus Verilog | 14.0 (devel, master `addeab31d`, 2026-11-23) | PHY and DLL-over-PHY simulations, co-sim (`make SIM=icarus run`); 14 or later for the PIPE, MAC and DLL interface ports | runs |
-| Verilator | 5.055 (devel, `v5.054-260-gb9f22851`) | co-sim (`make run`, default), SOC lint; its FST writer needs `liblz4-dev` | runs, checks |
-| JanusHDL | 0.22.0 | co-sim (`make SIM=janushdl run`): `EP=model`; `EP=rtl` waits on [#24](https://github.com/chili-chips/openCologne-PCIE/issues/24); free, closed source | runs |
+| Verilator | 5.055 (devel, master `v5.054-420-g1b3f232f`, 2026-11-27; CI builds the same) | co-sim (`make run`, default), SOC lint; its FST writer needs `liblz4-dev` | runs, checks |
+| JanusHDL | 0.24.0 | co-sim (`make SIM=janushdl run`): `EP=model`; `EP=rtl` waits on [#30](https://github.com/chili-chips/openCologne-PCIE/issues/30); free, closed source | runs |
 | OSS CAD Suite | 2026-11-26 | Cologne Chip's toolchain package ([UG1002](../0.doc/4.build/ug1002-GateMate-toolchain.May2026.pdf)): nextpnr-himbaechel `nextpnr-0.11.1-127-gc54af70b`, GateMate chipdb 1.15, for `run-pnr.sh` (`NEXTPNR=`); router2 converges since [nextpnr#1943](https://github.com/YosysHQ/nextpnr/pull/1943). Its Yosys is a development build, not used | places and routes; timing fails |
 | gmpack | OSS CAD Suite, or Project Peppercorn v1.14 | bitstream (`run-pnr.sh`) | not yet run: P&R stops on timing |
 | openFPGALoader | 1.2.0 | loading the bitstream over JTAG | not yet used on the board |
@@ -57,6 +57,8 @@ The versions this repo has been run with so far. "Runs" means the step completes
 | 2026-11-13 | the same RTL (renames and formatting only), OSS CAD Suite 2026-11-12 | 21,536 (52%) | 7,076 (17%) | 22 / 64 | 13.07 MHz | routes; fails setup ([#15](https://github.com/chili-chips/openCologne-PCIE/issues/15)) |
 | 2026-11-25 | eduBOS5 register file in block RAM, `packet_handler` rewrite, OSS CAD Suite 2026-11-12, default router with `--tmg-ripup` | 19,608 (47%) | 6,199 (15%) | 24 / 64 | 22.28 MHz | routes; fails setup ([Timing closure difficulties](#timing-closure-difficulties)) |
 | 2026-11-26 | the same netlist, OSS CAD Suite 2026-11-26, static placer with `--tmg-ripup` | 19,608 (47%) | 6,199 (15%) | 24 / 64 | 24.54 MHz | routes; fails setup ([Timing closure difficulties](#timing-closure-difficulties)) |
+| 2026-11-27 | TL taken over, before the SOC RX ring; static placer | 17,240 (42%) | 5,050 (12%) | 20 / 64 | 19.46 MHz | routes; fails setup ([Timing closure difficulties](#timing-closure-difficulties)) |
+| 2026-11-27 | SOC RX ring, DLL fixes, four register cuts; router2 | 17,555 (42%) | 5,199 (12%) | 20 / 64 | 22.67 MHz | routes; fails setup ([Timing closure difficulties](#timing-closure-difficulties)) |
 
 Out of 40,960 CPE_LT and CPE_FF, and 64 RAM_HALF.
 
@@ -77,8 +79,10 @@ Neither Yosys nor nextpnr reports a flat build per block. These numbers come fro
 > **At a glance**
 > - **Routing-bound at half full.** Ours and Goran's pci_eerie port both use about 50% of CPE_LT, yet routing takes most of each clock period.
 > - **The routed ceiling is about 33 MHz.** The PCLK target is 31.25 MHz, so the margin is thin for anyone.
-> - **We went from 12.2 to 24.54 MHz in November.** The next 7 MHz starts with the TL TX arbiter.
+> - **We went from 12.2 to 24.54 MHz in November.** The TX arbiter, the LCRC check and the TL RX handler are now cut (2026-11-27): logic depth fell from 24.5 to 17 levels.
+> - **The worst path is 81% routing again.** It is the DLL retry ring's write pointer, after the LCRC check ([logic depth](#logic-depth-2026-11-27)).
 > - **nextpnr fixed router2 for us.** Since OSS CAD Suite 2026-11-26 it converges in 65 iterations (7 min), where it diverged before (the chart below).
+> - **Asked upstream for placement help:** nextpnr's `timing_opt` pass on GateMate ([prjpeppercorn#42](https://github.com/YosysHQ/prjpeppercorn/issues/42)) and a post-route pass ([nextpnr#1954](https://github.com/YosysHQ/nextpnr/issues/1954)). A local nextpnr patch stays our last resort.
 > - **A true Gen2 is hardly possible on the A1.** A "fake Gen2", with only the PIPE at 128 bits, can still test CC_SERDES training at 5 GT/s ([details](#gen2-on-the-a1)).
 
 <div align="center"><img src="../0.doc/4.build/router2-divergence-heatmap.png" width="100%" alt="router2 overused wires per iteration for seeds 2 and 3: both fall to a minimum, then rise again. Below, seed 2 congestion maps at iterations 133 and 220: the overuse spreads over the left 60% of the chip"></div>
@@ -92,7 +96,7 @@ Neither Yosys nor nextpnr reports a flat build per block. These numbers come fro
 | CPE_LT | 19,608 (47%) | 20,662 (50%) |
 | Routed PCLK | **24.54 MHz** (static placer, router1, `--tmg-ripup`, 44 min)<br>24.22 MHz (HeAP placer, router1, `--tmg-ripup`, 49 min)<br>23.08 MHz (HeAP placer, router2, 7 min) | **31.35 to 34.65 MHz** |
 | Placer estimate | 16.06 MHz; it was 37.31 MHz before nextpnr#1943 fixed GateMate's delay estimate | |
-| Worst path | TL TX arbiter credit check: 40.8 ns, of which **28.4 ns (70%) is routing** | closed |
+| Worst path | 2026-11-26: TL TX arbiter credit check, 40.8 ns, **70% routing**<br>2026-11-27: DLL `tlp_rx_buffer` LCRC `crc_ok` to `write_ptr`, 44.1 ns, **81% routing** (router2) | closed |
 
 ### Routing, not logic
 
@@ -110,16 +114,37 @@ Neither Yosys nor nextpnr reports a flat build per block. These numbers come fro
 | 2026-11-25 | register file in block RAM, `packet_handler` rewrite, `--tmg-ripup` | 22.28 MHz | **+9.21** | `███████░░░` 71% |
 | 2026-11-26 | OSS CAD Suite 2026-11-26 (nextpnr#1943) | 24.22 MHz | +1.94 | `████████░░` 78% |
 | 2026-11-26 | static placer | **24.54 MHz** | +0.32 | `████████░░` 79% |
+| 2026-11-27 | TL taken over, before the SOC RX ring (static) | 19.46 MHz | −5.08 | `██████░░░░` 62% |
+| 2026-11-27 | SOC RX ring, DLL fixes, four register cuts (router2) | 22.67 MHz | +3.21 | `███████░░░` 73% |
 
-6.71 MHz to go. Same netlist since 2026-11-25: the last two rows are tool gains only.
+6.71 MHz to go from the best. The 2026-11-26 rows are tool gains on the 2026-11-25 netlist. The 2026-11-27 netlist before the ring is 12% smaller, yet 5 MHz slower; the cause is not isolated yet. Router2 gave 18.07 MHz on it, so the cuts are worth +4.6 MHz on router2.
 
 ### What helps
 
 1. **An up-to-date nextpnr and the static placer**, with `--tmg-ripup`: +2.26 MHz on the same netlist, and 40 min faster. `run-pnr.sh` uses them; `PNR_OPTS="--router router2"` gives 23.08 MHz in 7 min, for a quick look.
 2. **No asynchronous-read memories.** GateMate has no LUT RAM, so such a memory becomes flip-flops and wide muxes, all of which must be routed. Moving eduBOS5's register file to block RAM cut DFF from 1,490 to 466 and MX from 1,101 to 405.
 3. **Fewer logic levels and lower fan-out.** Goran duplicates high-fan-out registers, decodes K symbols a clock early, and uses prefix ANDs, popcount trees, flat matrices and a CRC precomputed from the RAM output. He measures each change on its own, in a shift-register harness.
-4. **Register cuts on the worst paths.** The `packet_handler` rewrite took the DLL off the worst path. The TL TX arbiter is next.
+4. **Register cuts on the worst paths.** The `packet_handler` rewrite took the DLL off the worst path. On 2026-11-27, four more cuts ([logic depth](#logic-depth-2026-11-27)).
 5. **Aim at the big blocks.** The DLL is 32% of the logic (2026-11-03). The LCRC is only about 6%, and its form hardly matters: 1,113 cells flat, 1,197 chained.
+
+### Logic depth, 2026-11-27
+
+**nextpnr shows one critical path per clock.** Each fix only shows the next path, at 7 to 45 min a run; `--detailed-timing-report` gives net delays, not paths. We asked for N paths ([nextpnr#1953](https://github.com/YosysHQ/nextpnr/issues/1953)). Meanwhile we rank endpoints by LUT levels in the mapped netlist, as a proxy.
+
+| Cut | Where | How |
+|---|---|---|
+| LCRC check | DLL `tlp_rx_buffer` | sequence and room checks computed for both `crc_ok` outcomes, then muxed |
+| Duplicate check | DLL `tlp_rx_buffer` | the same, for the duplicate test |
+| TX arbiter | TL `tlp_tx_arbiter` | credit verdict registered. Safe: a limit only grows, and our own consume drops that clock's verdict |
+| RX handler | TL `tlp_rx_handler` | one register stage on the word and its header decode |
+
+Depth fell from 24.5 to 17 levels, for 149 more flip-flops. Routed (router2): 18.07 to **22.67 MHz**.
+
+**Still deepest:** the MAC scrambler and descrambler (17 levels), the DLL ring `write_ptr` (16.25, also the worst routed path), the TL `rx_dispatch` (16).
+
+**No multicycle path here.** The RX handler's first-word decode also feeds single-cycle uses. Its deep path only exists when the first word is also the last, which a TLP never is: a false path, not a multicycle one. GateMate nextpnr has no multicycle constraint anyway ([nextpnr#1910](https://github.com/YosysHQ/nextpnr/issues/1910)).
+
+**Faster SOC traffic found two DLL bugs**, both fixed: the retry ring counted the TLP being read against its descriptor limit and lost a clock between TLPs, and an Ack due while an Ack DLLP was going out was lost.
 
 ### Block RAM without read-first
 

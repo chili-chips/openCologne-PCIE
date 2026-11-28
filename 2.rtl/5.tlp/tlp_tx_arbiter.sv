@@ -85,6 +85,7 @@ module tlp_tx_arbiter
   logic      app_allowed;
   logic      app_head;
   logic      app_ok;
+  logic [3:0] app_fc_ok;  // the app head fits each class's credits (FC_RSVD: never)
   logic      int_head;
   logic      int_blocked;
   logic      int_ok;
@@ -93,6 +94,13 @@ module tlp_tx_arbiter
   src_e      sel;
   src_e      last_sel;
   logic      app_half_r;
+
+  // last clock's verdicts (see below)
+  logic      app_ok_q;
+  logic      int_ok_q;
+  fc_class_e app_class_q;
+  fc_data_t  app_credits_q;
+  logic      app_half_q;
 
   logic      can_start;
   logic      pick_app;
@@ -114,16 +122,47 @@ module tlp_tx_arbiter
                     | (app_kind == K_ATOMIC);
   assign app_allowed = ~app_is_req | bus_master_enable;
   assign app_head = app_tx.valid & app_tx.first & app_allowed;
-  assign app_ok = app_head & credit_ok(tx_fc[app_class], app_credits);
+  // the head's credits against each class at once, then its class picks
+  for (genvar c = 0; c < 3; c++) begin : g_app_fc
+    assign app_fc_ok[c] = credit_ok(tx_fc[c], app_credits);
+  end
+  assign app_fc_ok[FC_RSVD] = 1'b0;
+  assign app_ok = app_head & app_fc_ok[app_class];
   assign int_head = int_src.valid & int_src.first;
-  assign int_blocked = (int_src.fc_class == FC_CPL) & app_head & (app_class == FC_P) & ~app_ok;
+  // a Completion must not pass a posted request that waits for credits; a
+  // posted head that shows up now has no verdict yet, so it blocks too
+  assign int_blocked = (int_src.fc_class == FC_CPL) & app_head & (app_class == FC_P) & ~app_ok_q;
   assign int_ok = int_head
                 & credit_ok(tx_fc[int_src.fc_class], int_src.data_credits)
                 & ~int_blocked;
 
+  // The decode and the credit check take a clock: app_ok_q and int_ok_q
+  // are last clock's verdict on a head that is still there (the critical
+  // path ran from the queue's RAM through the decode, the credit adders and
+  // the pick into the FSM: 24.5 levels). A late verdict is safe: a limit
+  // only grows, and consumed changes only by our own consume, at the end of
+  // its clock (fc_credit), so the verdict of that clock is dropped. A head
+  // shows up in WAIT_LOW at the latest, so back-to-back TLPs lose no clock.
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      app_ok_q      <= 1'b0;
+      int_ok_q      <= 1'b0;
+      app_class_q   <= FC_P;
+      app_credits_q <= 12'd0;
+      app_half_q    <= 1'b0;
+    end
+    else begin
+      app_ok_q      <= app_ok & ~consume.valid;
+      int_ok_q      <= int_ok & ~consume.valid;
+      app_class_q   <= app_class;
+      app_credits_q <= app_credits;
+      app_half_q    <= tlp_last_half(app_hdr_dw01.dw0);
+    end
+  end
+
   assign can_start = (state == IDLE) & tx_ready;
-  assign pick_app = app_ok & (~int_ok | last_sel == SRC_INT);
-  assign pick_int = int_ok & ~pick_app;
+  assign pick_app = app_ok_q & app_head & (~(int_ok_q & int_head) | last_sel == SRC_INT);
+  assign pick_int = int_ok_q & int_head & ~pick_app;
 
   assign src_valid = (sel == SRC_APP) ? app_tx.valid : int_src.valid;
   assign src_last = (sel == SRC_APP) ? app_tx.last : int_src.last;
@@ -149,10 +188,10 @@ module tlp_tx_arbiter
           if (can_start && (pick_app || pick_int)) begin
             sel              <= pick_app ? SRC_APP : SRC_INT;
             last_sel         <= pick_app ? SRC_APP : SRC_INT;
-            app_half_r       <= tlp_last_half(app_hdr_dw01.dw0);
+            app_half_r       <= app_half_q;
             consume.valid    <= 1'b1;
-            consume.fc_class <= pick_app ? app_class : int_src.fc_class;
-            consume.data     <= pick_app ? app_credits : int_src.data_credits;
+            consume.fc_class <= pick_app ? app_class_q : int_src.fc_class;
+            consume.data     <= pick_app ? app_credits_q : int_src.data_credits;
             state            <= SEND;
           end
         end

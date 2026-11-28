@@ -24,7 +24,7 @@ fails=0
 
 # the runs that fail today, and why
 declare -A KNOWN=(
-    [rtl-tester]="#3 #13 #29"  # #4 (back to back) fixed 2026-11-27
+    [rtl-tester]="#3 #13"  # #4 (back to back) and #29 (nullified TLP) fixed 2026-11-27
     [dll-stp]="#3"
     [dll-end]="#3"
     [fault-nocpl]="by design"                  # SIM_FAULT=nocpl: the request is never completed
@@ -129,6 +129,9 @@ bench dll-stp ../2.rtl/4.dll/sim   "run-dll-phy.sh --inject=stp" 'TEST PASSED'
 bench dll-end ../2.rtl/4.dll/sim   "run-dll-phy.sh --inject=end" 'TEST PASSED'
 bench rx-ring ../2.rtl/4.dll/sim   "run-rx-ring.sh"    'TEST PASSED'  # TLPs back to back (#4)
 bench tl      ../2.rtl/5.tlp/sim   "run-tl.sh"         'TEST PASSED'
+bench soc-tx  ../2.rtl/7.soc/sim   "run-soc.sh tx"     'TEST PASSED'  # TX batch
+bench soc-rx  ../2.rtl/7.soc/sim   "run-soc.sh rx"     'TEST PASSED'  # RX ring, burst loopback
+bench soc-cpl ../2.rtl/7.soc/sim   "run-soc.sh cpl"    'TEST PASSED'  # EP: split CplDs, UR
 
 echo "regression: $fails unexpected"
 [ $fails = 0 ]

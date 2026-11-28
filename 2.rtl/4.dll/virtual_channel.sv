@@ -135,6 +135,7 @@ module virtual_channel
   logic  fsm_state_changed;
   assign fsm_state_changed = (fsm_state != fsm_state_d);
 
+  logic  nullified;  // the TLP that ends now ended with EDB
   logic  end_lost;
   assign end_lost = 1'b0;  // no source yet; packet_handler also ends a TLP at MAX_TLP_WORDS
 
@@ -147,6 +148,7 @@ module virtual_channel
       .sdp_detected    (sdp_detected),
       .stp_detected    (stp_detected),
       .end_detected    (end_detected),
+      .nullified       (nullified),
       .data_dllp       (data_dllp),
       .data_tl         (data_tl),
       .sequence_number (sequence_number),
@@ -167,6 +169,7 @@ module virtual_channel
       .tlp_data        (data_tl),
       .stp_detected    (stp_detected),
       .end_detected    (end_detected),
+      .nullified       (nullified),
       .sequence_number (sequence_number),
       .lcrc            (lcrc),
       .tlp_valid       (tlp_valid),

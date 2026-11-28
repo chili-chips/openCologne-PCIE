@@ -4,7 +4,7 @@
 
 | File | What it is |
 |---|---|
-| [`soc_top.sv`](soc_top.sv) | CPU, 8 KB RAM, address decode, Tx FSM and Rx capture around the CSR block |
+| [`soc_top.sv`](soc_top.sv) | CPU, 8 KB RAM, address decode, Tx fetch + FIFO and Rx ring around the CSR block |
 | [`soc_csr.sv`](soc_csr.sv) | bridges the CPU bus to the PeakRDL-generated register block |
 | [`mem_if.sv`](mem_if.sv) | the CPU memory bus: valid / addr / wdata / wstrb, ready / rdata |
 | [`4.build/csr_build/csr.rdl`](../../4.build/csr_build/csr.rdl) | the register map, the single source of the CSR RTL, C headers and docs |
@@ -28,26 +28,29 @@
 |---|---|---|
 | 0x0C | `tx.send` | writing N sends the N TLPs in `tx_payload`, in order |
 | 0x10 – 0x1C | – | free |
-| 0x20 | `rx.valid` | a TLP is waiting; write 1 to clear |
-| 0x28 | `status.phy` | `tx_busy`: the Tx FSM is sending |
+| 0x20 | `rx.valid` | reads 1 while a TLP waits at the RX ring's head; writing 1 frees it |
+| 0x28 | `status.phy` | `tx_busy`: the Tx side is reading or sending |
 | 0x2C | `status.result` | firmware result marker, write-only; 0x0000_FACE lights `fw_pass` |
 | 0x30 | `status.cfg_id` | our own Bus/Device/Function |
-| 0x1000 – 0x10FC | `rx_payload` | the last TLP received, as it came, header first, 64 DWORDs: entry i is DW i |
+| 0x1000 – 0x1FFC | `rx_payload` | the RX ring's head TLP, as it came, header first: entry i is DW i; 1024 DWORDs |
 | 0x2000 – 0x2FFC | `tx_payload` | a batch of TLPs to send, back to back from entry 0, header first, 1024 DWORDs: entry i is DW i |
 
 Things worth knowing:
 
 - **The Rx window takes any TLP as-is.** The RC version decoded only Completions; an EP must see Memory requests. Every incoming TLP lands in `rx_payload`, header first, up to a MemWr of Max_Payload_Size (128 bytes) behind a 4-DW header, and the firmware decodes it. So the window is generic: the same RTL could serve the RC too.
-- **The payload windows are RAMs.** `rx_payload` and `tx_payload` are PeakRDL external memories, each two banks of 32 DWORDs, odd and even entries, so that a 64-bit beat writes (Rx) or reads (Tx) both its DWORDs in one clock. Their read is registered, so they fit block RAM.
-- **`rx.valid` is the flow control.** Set at the end of a TLP, it holds `m_axis_rx.tready` low until the firmware clears it: a slow CPU never loses a request; the PCIE core waits.
+- **The payload windows are RAMs.** `rx_payload` and `tx_payload` are PeakRDL external memories, each one true-dual-port block RAM of 1024 DWORDs: a 64-bit beat writes (Rx) or reads (Tx) both its DWORDs in one clock, one on each port.
+- **Rx is a ring.** TLPs queue up in it at link speed, each from an even entry; `m_axis_rx.tready` drops only while it is full (511 of its 512 beats; one stays free), and the PCIE core waits, so nothing is lost. A TLP longer than 511 beats would never fit: a simulation check flags it. `rx.valid` reads 1 while the oldest TLP, the head, is there; writing 1 frees it, and the next one takes its place. The hardware reads the head's DW0 for its length.
+- **Rx drives the RAM from flops.** `rx_full` is a flop, so `tready` is too; a firmware read of `rx_payload` is taken into flops and served a clock later; the head's DW0 is flopped before its length is worked out. From openPCIE, where these paths missed x4 Gen2's 250 MHz.
 - **Configuration requests never get here.** The TL answers them itself, as the AMD hard macro does. `status.cfg_id` is the Bus/Device/Function the host gave us, captured from its Type 0 Configuration Writes (UG477 `cfg_bus_number`, `cfg_device_number`, `cfg_function_number`); every Completion carries it as the Completer ID.
-- **`tx.send` is a trigger.** Its write starts the Tx FSM (an external register: nothing is stored), so the firmware writes the whole batch into `tx_payload` first and `tx.send` last, with the number of TLPs. Each TLP's DW0 gives its length, so the next starts right after it, at any entry; a MemRd sends all its Completions in one batch. The Tx FSM sends as many DWORDs as the header's Fmt and Length say. The payload must not exceed Max_Payload_Size (32 DWORDs): the hardware does not check it, the simulation assertion `a_tx_max_payload` does. A longer TLP would reach the host as a Malformed TLP.
+- **`tx.send` is a trigger.** Its write starts the Tx side (an external register: nothing is stored), so the firmware writes the whole batch into `tx_payload` first and `tx.send` last, with the number of TLPs. Each TLP's DW0 gives its length, so the next starts right after it, at any entry; a MemRd sends all its Completions in one batch. The Tx side sends as many DWORDs as the header's Fmt and Length say. The payload must not exceed Max_Payload_Size (32 DWORDs): the hardware does not check it, the simulation assertion `a_tx_max_payload` does. A longer TLP would reach the host as a Malformed TLP.
+- **Tx reads ahead.** A fetch side reads `tx_payload` beat by beat into a 4-beat FIFO, and `s_axis_tx` takes from the FIFO, so `tready` reaches no RAM address. From openPCIE, where `tready` into the RAM address missed x4 Gen2's 250 MHz.
+- **Every RAM port is a plain `always`**, not `always_ff`: an `always_ff` variable may have no other writer (IEEE 1800 9.2.2.4), and the RAMs have two (both Rx ports; `$readmemh` for the CPU RAM).
 
 ### What the firmware needs to know
 
-**The handshake:** one TLP at a time each way; the firmware polls `rx.valid` and `status.phy`.
+**The handshake:** Rx one TLP at a time, from the ring's head; Tx a batch per `tx.send`. The firmware polls `rx.valid` and `status.phy`.
 
-<div align="center"><img src="../../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></div>
+<div align="center"><img src="../../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake between the firmware and the SOC's Tx and Rx sides"></div>
 
 **The headers**, in entries 0 to 2 (3 for a 4-DW header) of `rx_payload` and `tx_payload`, one DW each: H0 first, byte 0 of every DW in bits [31:24], payload included. The firmware decodes requests and builds completions:
 
@@ -71,7 +74,11 @@ The SOC adds none: it is the user side, which the spec does not cover. The depar
 
 [`sim/run-soc.sh`](sim/run-soc.sh) runs the SOC alone (`tb_soc`, Verilator, 20 µs): eduBOS5 starts the firmware, which then waits for the host. Open [`sim/tb_soc.RISCV-ISA.wavecrux`](sim/tb_soc.RISCV-ISA.wavecrux) in WaveCrux: the disassembly and the RVFI Commit Inspector come bound to `tb_soc.cpu_view` ([`soc_cpu_view.sv`](CPU.eduBOS5/wavecrux/soc_cpu_view.sv), from openPCIE).
 
-`bash sim/run-soc.sh tx` tests the Tx path instead: the [`soc_tx`](../../3.sw/tests/soc_tx/main.c) firmware sends 3-DW and 4-DW MWr and MRd, and `tb_soc` checks every `s_axis_tx` beat (data, `tkeep`, `tlast`).
+`bash sim/run-soc.sh tx` tests the Tx path instead: the [`soc_tx`](../../3.sw/tests/soc_tx/main.c) firmware sends 3-DW and 4-DW MWr and MRd, and `tb_soc` checks every `s_axis_tx` beat (data, `tkeep`, `tlast`). In the Tx, Rx and Completion tests, `tb_soc` stalls `tready` (one clock in three, plus 4 in a row every 16), so beats wait in the Tx FIFO; a run without a stall fails.
+
+`bash sim/run-soc.sh rx` tests both in a loopback: `tb_soc` sends 96 TLPs back to back (576 beats, more than the ring holds), the [`soc_rx`](../../3.sw/tests/soc_rx/main.c) firmware sends each one back in TX batches, and `tb_soc` checks they come out as they went in.
+
+`bash sim/run-soc.sh cpl` runs the EP firmware itself: `tb_soc` writes 32 DWORDs, then sends MemRds that cross the 64-byte Read Completion Boundary, with partial byte enables and a 4-DW header, and an IORd. It works out each CplD (Byte Count, Lower Address, data) from the Base Specification, not from the firmware, and expects UR for the IORd.
 
 - `soc_top` carries the CPU's retired instructions on [`rvfi_if`](rvfi_if.sv) (`// KEEPME`): the standard [RVFI](https://github.com/YosysHQ/riscv-formal) signals, one `rvfi_valid` per instruction.
 - No RTL reads them; they are for WaveCrux and formal checks.

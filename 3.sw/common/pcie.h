@@ -43,8 +43,8 @@
 //
 //   The TL answers the host's Configuration requests itself, as the AMD
 //   PCIE_2_1 hard macro does; only Memory requests (and anything the TL
-//   passes on) reach the firmware, one TLP at a time through the CSR Rx
-//   window: every DWORD, header first, in rx_payload. A Completion goes
+//   passes on) reach the firmware. The SOC queues them in a ring; the
+//   oldest shows in rx_payload, every DWORD, header first. A Completion goes
 //   out the same way, through tx_payload and tx.send.
 //==========================================================================
 
@@ -120,15 +120,20 @@ typedef struct {
 } tlp_t;
 
 __attribute__((noreturn)) void halt(uint32_t marker);
-void     send_tlp(uint32_t h0, uint32_t h1, uint32_t h2, uint32_t data);
+void     wait_tx_ready(void);
+void     send_tlp(uint32_t h0, uint32_t h1, uint32_t h2, const uint32_t *data, uint32_t n);
 void     wait_for_request(tlp_t *req);
 void     release_request(void);
 uint32_t completer_id(void);
 void     send_completion(const tlp_t *req, uint32_t status, int with_data, uint32_t data);
 void     send_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
                    const uint32_t *data, uint32_t n);
-// A batch: several TLPs into tx_payload, then one tx.send for them all
+// A batch: any number of tx_add() / tx_cpld(), then tx_go() sends them with
+// one tx.send. A full batch goes out by itself; tx_begin() drops one not
+// sent yet. send_tlp() and send_completion() write entry 0: not inside a batch
+#define TX_BATCH_MAX 255  // tx.send.count is 8 bits
 void     tx_begin(void);
+void     tx_add(uint32_t h0, uint32_t h1, uint32_t h2, const uint32_t *data, uint32_t n);
 void     tx_cpld(const tlp_t *req, uint32_t byte_count, uint32_t lower_addr,
                  const uint32_t *data, uint32_t n);
 void     tx_go(void);

@@ -259,9 +259,9 @@ The same TLPs on both sides of `trn_bridge` ([byte order](5.tlp/README.md#byte-o
 ## 7) CSR, HAL and SW Interface
 The CSR block (`soc_csr`, at 0x3000_0000 on the CPU bus) is where the firmware meets the PCIE side: the `tx` registers (0x00) for the TLP to send, the `rx` window (0x10) for the received one, and `status` (0x24).
 
-**Handshake:** one TLP at a time each way, the firmware polls.
+**Handshake:** the firmware polls.
 
-- **Rx:** the SOC captures a TLP into `rx_payload`, header first, and sets `rx.valid` at its last beat. While `rx.valid` is set, `tready` is low and the next TLP waits in the TL's queues (posted/completion 128 × 64 bit, non-posted 64 × 64 bit, 8 header credits each), its credits held, so nothing is lost. The firmware reads the window, answers, and writes 1 to `rx.valid` to open it again.
+- **Rx:** the SOC writes each TLP into its RX ring (`rx_payload`, 1024 DWORDs), header first, at link speed. Only while the ring is full is `tready` low; the next TLP then waits in the TL's queues (posted/completion 128 × 64 bit, non-posted 64 × 64 bit, 8 header credits each), its credits held, so nothing is lost. `rx.valid` reads 1 while the oldest TLP, the head, is there; the firmware reads it, answers, and writes 1 to `rx.valid` to free it.
 - **Tx:** the firmware waits for the Tx FSM to be idle (`status.phy`), writes one or more TLPs into `tx_payload`, back to back, header first, then their number into `tx.send`. That write starts the FSM, which sends them in order, two DWORDs a beat. A full TL Tx queue (64 × 64 bit, 3 TLPs) holds the FSM, so it also waits for room.
 
 <div align="center"><img src="../0.doc/2.rtl/csr-handshake.drawio.png" width="90%" alt="CSR handshake: Rx capture fills the rx window and sets rx.valid, which holds the bridge off until the firmware clears it; the firmware polls status.phy, writes the tx registers, and the tx.data write starts the Tx FSM"></div>
@@ -372,7 +372,7 @@ Lint finds what tests miss: undriven signals, truncated widths, unintended latch
 
 | Script | Does | Why |
 |---|---|---|
-| `run-lint.sh` | Verilator, Yosys, slang, Verible; `/*LINT:OK*/` only on outputs | each tool has blind spots; together they see more |
+| `run-lint.sh` | Verilator, Yosys, slang, Verible; the reset, RAM and IOB-flop rules; `/*LINT:OK*/` only on outputs | each tool has blind spots; together they see more |
 | `run-format.sh` | `begin`/`end`, Verible format | diffs show only real changes |
 | `run-leq.sh` | Yosys formal equivalence, old vs new RTL | proves a cleanup changes nothing |
 | `run-synth.sh` | Yosys `synth_gatemate` | the RTL maps to GateMate; cell count |

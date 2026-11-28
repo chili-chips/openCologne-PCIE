@@ -269,9 +269,13 @@ module soc_top
     $readmemh("firmware.hex", ram);
   end
 
+  // Plain always, not always_ff, for every RAM port here: ram is also
+  // written by $readmemh, and an always_ff variable may have no other writer
+  // (IEEE 1800 9.2.2.4; VCS rejects it). One process per port, as block RAM
+  // inference expects.
 `ifndef SOC_CPU_VPROC
   // eduBOS5's instruction port: read-only, one cycle
-  always_ff @(posedge clk) begin
+  always @(posedge clk) begin
     for (int b = 0; b < 4; b++) begin  // a byte that meets its store reads X
       imem_rdat[8*b+:8] <= (ram_wr[b] & (addr.word == imem_addr[12:2])) ? 'x :
           ram[imem_addr[12:2]][8*b+:8];
@@ -279,7 +283,8 @@ module soc_top
   end
 `endif
 
-  always_ff @(posedge clk) begin
+  // the data port
+  always @(posedge clk) begin
     if (mem.valid && !addr.bridge) begin
       if (mem.wstrb == '0) begin
         ram_rdata <= ram[addr.word];
@@ -329,14 +334,6 @@ module soc_top
   logic [31:0] bridge_rdat;
   logic        bridge_rdy;
 
-  typedef enum logic [1:0] {
-    IDLE = 2'd0,
-    PREP = 2'd1,  // beat 0 is out of the RAM: decode DW0, load beat 0
-    SEND = 2'd2,  // beats out, one per take
-    NEXT = 2'd3   // read beat 0 of the next TLP of the batch
-  } tx_state_e;
-  tx_state_e tx_state;
-
   // PeakRDL-generated CSR ports (u_soc_csr below)
   csr__in_t  csr_in;
   csr__out_t csr_out;
@@ -346,7 +343,7 @@ module soc_top
   //
   // The register storage, the read mux and the bus handshake live in the
   // generated block. What stays here is the logic that the registers
-  // drive and that drives them back: the Tx FSM and the Rx capture.
+  // drive and that drives them back: the Tx side and the Rx ring.
   //=========================================================================
 
   soc_csr #(
@@ -371,131 +368,203 @@ module soc_top
   // Each TLP's DW0 gives its length, so the next one starts right after it.
   // One true-dual-port RAM of 32-bit entries: the CPU writes on port A; a
   // beat's DW 2k is read on port A, DW 2k+1 on port B, so a TLP may start at
-  // any entry, odd or even. The read is registered: beat tx_ra is read a
-  // clock ahead.
-  localparam int PAYLOAD_DW = 64;             // csr.rdl: rx_payload entries
-  localparam int TX_DW      = 1024;           // csr.rdl: tx_payload entries
-  localparam int TX_AW      = $clog2(TX_DW);
+  // any entry, odd or even.
+  // The RAM is read ahead of the stream: the fetch side reads beat after beat
+  // from flopped addresses into a 4-entry FIFO, and s_axis_tx takes them out
+  // of it. tready reaches only the FIFO, never a RAM address (in openPCIE,
+  // tready into the RAM address missed x4 Gen2's 250 MHz by 2.2 ns).
+  localparam int TX_DW = 1024;  // csr.rdl: tx_payload entries
+  localparam int TX_AW = $clog2(TX_DW);
+  localparam int TX_FD = 4;  // FIFO entries; at most 3 are used
 
   typedef logic [TX_AW-1:0] tx_addr_t;
 
-  logic            tx_start;
-  logic     [ 7:0] tx_left;  // TLPs of the batch still to send, this one too
-  tx_addr_t        tx_base;  // entry of the DW0 of the TLP being sent
-  logic     [31:0] tx_pl_a_q;  // DW 2k of beat tx_ra, a clock later
-  logic     [31:0] tx_pl_b_q;  // DW 2k+1
-  tlp_dws_t        tx_dws;  // DWORDs in the TLP
-  tlp_dws_t        tx_dws_now;  // the same, from DW0 itself in PREP
-  logic     [ 5:0] tx_beats;  // beats in the TLP, at most 18 (a_tx_max_payload)
-  logic     [ 5:0] tx_beats_now;
-  logic     [ 5:0] tx_nb;  // next beat to load
-  logic     [ 5:0] tx_ra;  // beat whose two DWORDs are read
-  logic            tx_take;
-  logic            tx_adv;  // load beat tx_nb
-  logic            tx_pl_we;
-  tx_addr_t        tx_pl_waddr;
-  tx_addr_t        tx_a_raddr;  // DW 2k of beat tx_ra
-  tx_addr_t        tx_b_raddr;  // DW 2k+1
-  tx_addr_t        tx_a_addr;  // port A: the CPU's write, else DW 2k
+  typedef enum logic [2:0] {
+    F_IDLE = 3'd0,
+    F_HDR  = 3'd1,  // read beat 0 of the TLP at f_base
+    F_WAIT = 3'd2,  // beat 0 out of the RAM: into the FIFO, its DW0 into f_dw0
+    F_DEC  = 3'd3,  // the TLP's length, from f_dw0
+    F_BODY = 3'd4   // read its other beats, while the FIFO has room
+  } tx_fetch_e;
 
-  assign tx_start = csr_out.tx.send.req & csr_out.tx.send.req_is_wr;  // no storage
+  typedef struct packed {
+    logic [63:0] data;  // [72:9]
+    logic [7:0]  keep;  // [8:1]
+    logic        last;  // [0]
+  } tx_beat_t;
+
+  tx_fetch_e        f_state;
+  logic      [ 7:0] f_left;  // TLPs of the batch still to read, this one too
+  tx_addr_t         f_base;  // entry of the DW0 of the TLP being read
+  tx_addr_t         f_addr;  // entry of DW 2k of the next beat to read
+  logic      [31:0] f_dw0;
+  tlp_dws_t         f_dws;  // DWORDs in the TLP
+  tlp_words_t       f_beats;  // beats in the TLP: 18 within Max_Payload_Size, 514 at most
+  tlp_words_t       f_nb;  // the next beat to read
+  logic             f_room;  // the FIFO takes one more read
+  logic             f_rd;  // read beat f_nb now
+  logic             f_rd_q;  // its two DWORDs are out of the RAM
+  logic      [ 7:0] f_keep;  // keep and last of the beat read now
+  logic             f_last;
+  logic      [ 7:0] f_keep_q;
+  logic             f_last_q;
+  logic             tx_start;
+  logic             tx_pl_we;
+  tx_addr_t         tx_pl_waddr;
+  tx_addr_t         tx_a_addr;  // port A: the CPU's write, else DW 2k
+  tx_addr_t         tx_b_addr;  // port B: DW 2k+1
+  logic      [31:0] tx_pl_a_q;  // DW 2k of the beat read, a clock later
+  logic      [31:0] tx_pl_b_q;  // DW 2k+1
+
+  tx_beat_t         q[TX_FD];
+  logic      [ 1:0] q_wp;
+  logic      [ 1:0] q_rp;
+  logic      [ 2:0] q_cnt;
+  logic             q_pop;
+
+  assign tx_start    = csr_out.tx.send.req & csr_out.tx.send.req_is_wr;  // no storage
 
   assign csr_in.tx.send.wr_ack = tx_start;
 
-  // Fmt[0]: 4-DW header; Fmt[1]: with data, Length DWORDs (0: 1024)
-  assign tx_dws_now = (tx_state == PREP) ? tlp_body_dw(tx_pl_a_q) : tx_dws;  // no digest
-  assign tx_beats_now = (tx_state == PREP) ? 6'((tx_dws_now + 12'd1) >> 1) : tx_beats;
+  // a read is issued only while the FIFO, with the read in flight, holds two
+  // beats at most: then the beat it brings has a place
+  assign f_room      = (q_cnt + 3'(f_rd_q)) < 3'd3;
+  assign f_rd        = f_room & ((f_state == F_HDR) | ((f_state == F_BODY) & (f_nb < f_beats)));
 
-  assign tx_take = s_axis_tx.tvalid & s_axis_tx.tready;
-  assign tx_adv = (tx_state == PREP) | ((tx_state == SEND) & tx_take & (tx_nb < tx_beats));
-  assign tx_ra = tx_adv ? tx_nb + 6'd1 : tx_nb;
-  assign tx_a_raddr = tx_base + tx_addr_t'({tx_ra, 1'b0});
-  assign tx_b_raddr = tx_a_raddr + 1'b1;
-  assign tx_pl_we = csr_out.tx_payload.req & csr_out.tx_payload.req_is_wr;
+  // beat 0 has both DWORDs (every header has 3 or 4) and is never the last;
+  // beat k has DW 2k+1 when the TLP is longer
+  assign f_keep      = ((f_state != F_BODY) | ({f_nb, 1'b1} < f_dws)) ? KEEP_ALL : KEEP_LO;
+  assign f_last      = (f_state == F_BODY) & (f_nb == f_beats - 11'd1);
+
+  assign tx_pl_we    = csr_out.tx_payload.req & csr_out.tx_payload.req_is_wr;
   assign tx_pl_waddr = csr_out.tx_payload.addr[TX_AW+1:2];
-  assign tx_a_addr = tx_pl_we ? tx_pl_waddr : tx_a_raddr;
+  assign tx_a_addr   = tx_pl_we ? tx_pl_waddr : f_addr;
+  assign tx_b_addr   = f_addr + 1'b1;
 
   logic [31:0] tx_pl[TX_DW];
 
   // Port A: the CPU's write, else DW 2k. The firmware writes tx_payload only
-  // while the FSM is idle, so no read it needs is lost
-  always_ff @(posedge clk) begin
+  // while the Tx side is idle (tx_busy), so no read it needs is lost. Plain
+  // always, one process per port, as for the other RAMs here
+  always @(posedge clk) begin
     if (tx_pl_we) begin
       tx_pl[tx_a_addr] <= csr_out.tx_payload.wr_data;
     end
-    else begin
+    else if (f_rd) begin
       tx_pl_a_q <= tx_pl[tx_a_addr];
     end
   end
 
-  // Port B: DW 2k+1. A read that meets a CPU write is one the idle FSM does
-  // not use; it reads X, as the RAM does, so Yosys needs no read-first logic
-  // (4.build/README.md, "Block RAM without read-first")
-  always_ff @(posedge clk) begin
-    tx_pl_b_q <= (tx_pl_we & (tx_pl_waddr == tx_b_raddr)) ? 'x : tx_pl[tx_b_raddr];
+  // Port B: DW 2k+1. A read that meets a CPU write is one the idle Tx side
+  // does not use; it reads X, as the RAM does, so Yosys needs no read-first
+  // logic (4.build/README.md, "Block RAM without read-first")
+  always @(posedge clk) begin
+    if (f_rd) begin
+      tx_pl_b_q <= (tx_pl_we & (tx_pl_waddr == tx_b_addr)) ? 'x : tx_pl[tx_b_addr];
+    end
   end
 
   assign csr_in.tx_payload.wr_ack  = tx_pl_we;
   assign csr_in.tx_payload.rd_ack  = 1'b0;  // write-only
   assign csr_in.tx_payload.rd_data = '0;
 
-  // NEXT reads beat 0 of the TLP at tx_base, so it is out of the RAM in PREP
+  // the fetch side
   always_ff @(posedge clk or negedge resetn) begin
     if (!resetn) begin
-      tx_state         <= IDLE;
-      s_axis_tx.tvalid <= 1'b0;
-      s_axis_tx.tdata  <= '0;
-      s_axis_tx.tkeep  <= '0;
-      s_axis_tx.tlast  <= 1'b0;
-      tx_left          <= '0;
-      tx_base          <= '0;
-      tx_dws           <= '0;
-      tx_beats         <= '0;
-      tx_nb            <= '0;
+      f_state  <= F_IDLE;
+      f_left   <= '0;
+      f_base   <= '0;
+      f_addr   <= '0;
+      f_dw0    <= '0;
+      f_dws    <= '0;
+      f_beats  <= '0;
+      f_nb     <= '0;
+      f_rd_q   <= 1'b0;
+      f_keep_q <= '0;
+      f_last_q <= 1'b0;
     end
     else begin
-      if (tx_adv) begin
-        s_axis_tx.tdata  <= {tx_pl_b_q, tx_pl_a_q};
-        s_axis_tx.tkeep  <= (12'({tx_nb, 1'b1}) < tx_dws_now) ? KEEP_ALL : KEEP_LO;  // DW 2k+1?
-        s_axis_tx.tlast  <= (tx_nb == tx_beats_now - 6'd1);
-        s_axis_tx.tvalid <= 1'b1;
-        tx_nb            <= tx_nb + 6'd1;
-      end
+      f_rd_q   <= f_rd;
+      f_keep_q <= f_keep;
+      f_last_q <= f_last;
 
-      unique case (tx_state)
-        IDLE: begin
+      unique case (f_state)
+        F_IDLE: begin
           if (tx_start && (csr_out.tx.send.wr_data.count != '0)) begin
-            tx_left  <= csr_out.tx.send.wr_data.count;
-            tx_base  <= '0;
-            tx_state <= NEXT;
+            f_left  <= csr_out.tx.send.wr_data.count;
+            f_base  <= '0;
+            f_addr  <= '0;
+            f_state <= F_HDR;
           end
         end
-        NEXT: begin
-          tx_state <= PREP;
+        F_HDR: begin
+          if (f_rd) begin
+            f_state <= F_WAIT;
+          end
         end
-        PREP: begin
-          tx_dws   <= tx_dws_now;
-          tx_beats <= tx_beats_now;
-          tx_state <= SEND;
+        F_WAIT: begin
+          f_dw0   <= tx_pl_a_q;
+          f_state <= F_DEC;
         end
-        SEND: begin
-          if (tx_take && (tx_nb == tx_beats)) begin  // the last beat is taken
-            s_axis_tx.tvalid <= 1'b0;
-            s_axis_tx.tlast  <= 1'b0;
-            tx_nb            <= '0;
-            if (tx_left > 8'd1) begin  // the next TLP of the batch
-              tx_left  <= tx_left - 8'd1;
-              tx_base  <= tx_base + tx_addr_t'(tx_dws);
-              tx_state <= NEXT;
+        F_DEC: begin
+          f_dws   <= tlp_body_dw(f_dw0);  // no digest
+          f_beats <= tlp_words_t'((tlp_body_dw(f_dw0) + 12'd1) >> 1);
+          f_nb    <= 11'd1;
+          f_addr  <= f_base + tx_addr_t'(2);
+          f_state <= F_BODY;
+        end
+        F_BODY: begin
+          if (f_rd) begin
+            f_nb   <= f_nb + 11'd1;
+            f_addr <= f_addr + tx_addr_t'(2);
+          end
+          else if (f_nb == f_beats) begin  // every beat read
+            if (f_left > 8'd1) begin  // the next TLP of the batch
+              f_left  <= f_left - 8'd1;
+              f_base  <= f_base + tx_addr_t'(f_dws);
+              f_addr  <= f_base + tx_addr_t'(f_dws);
+              f_state <= F_HDR;
             end
             else begin
-              tx_left  <= '0;
-              tx_state <= IDLE;
+              f_left  <= '0;
+              f_state <= F_IDLE;
             end
           end
         end
-        default: tx_state <= IDLE;
+        default: f_state <= F_IDLE;
       endcase
+    end
+  end
+
+  // the FIFO: a beat goes in a clock after its read, out on a take
+  assign q_pop            = s_axis_tx.tvalid & s_axis_tx.tready;
+
+  assign s_axis_tx.tvalid = (q_cnt != 3'd0);
+  assign s_axis_tx.tdata  = q[q_rp].data;
+  assign s_axis_tx.tkeep  = q[q_rp].keep;
+  assign s_axis_tx.tlast  = q[q_rp].last;
+
+  // the beats are data: no reset (the pointers and the count have one)
+  always_ff @(posedge clk) begin
+    if (f_rd_q) begin
+      q[q_wp] <= '{data: {tx_pl_b_q, tx_pl_a_q}, keep: f_keep_q, last: f_last_q};
+    end
+  end
+
+  always_ff @(posedge clk or negedge resetn) begin
+    if (!resetn) begin
+      q_wp  <= '0;
+      q_rp  <= '0;
+      q_cnt <= '0;
+    end
+    else begin
+      if (f_rd_q) begin
+        q_wp <= q_wp + 2'd1;
+      end
+      if (q_pop) begin
+        q_rp <= q_rp + 2'd1;
+      end
+      q_cnt <= q_cnt + 3'(f_rd_q) - 3'(q_pop);
     end
   end
 
@@ -506,34 +575,64 @@ module soc_top
   // and past the last entry the index wraps. Clocked checks, not an assert
   // property, which Icarus does not support (iverilog#120)
   always @(posedge clk) begin : a_tx_max_payload
-    if ((tx_state == PREP) && tlp_has_data(tx_pl_a_q) && (tlp_length_dw(tx_pl_a_q) > 11'd32)) begin
-      $error("SOC_TX_CHECK: payload of %0d DWORDs, over Max_Payload_Size (32)", tlp_length_dw(
-             tx_pl_a_q));
+    if ((f_state == F_DEC) && tlp_has_data(f_dw0) && (tlp_length_dw(f_dw0) > 11'd32)) begin
+      $error("SOC_TX_CHECK: payload of %0d DWORDs, over Max_Payload_Size (32)",
+             tlp_length_dw(f_dw0));
     end
-    if ((tx_state == PREP) && (32'(tx_base) + 32'(tx_dws_now) > 32'(TX_DW))) begin
+    if ((f_state == F_DEC) && (32'(f_base) + 32'(tlp_body_dw(f_dw0)) > 32'(TX_DW))) begin
       $error("SOC_TX_CHECK: the batch runs past tx_payload (%0d entries)", TX_DW);
+    end
+    if (f_rd_q && (q_cnt == 3'(TX_FD)) && !q_pop) begin
+      $error("SOC_TX_CHECK: Tx FIFO overflow");
     end
   end
 `endif
 
-  // ---- Rx: a TLP written into rx_payload as-is ----------------------------
-  // Beat k carries DW 2k (low half) and DW 2k+1, so entry i of rx_payload is
-  // DW i, header first. One true-dual-port RAM of 32-bit entries takes a
-  // beat in one clock: DW 2k on port A, DW 2k+1 on port B. The firmware reads
-  // one DWORD on port A, so there is no bank mux on the read. DWORDs past the
-  // last entry are dropped. rx.valid is set at the end of the TLP and holds
-  // the link off until the firmware clears it.
-  localparam int RX_BEATS = PAYLOAD_DW / 2;  // beats the RAM holds
+  // ---- Rx: a ring of TLPs, which the firmware reads one at a time -------
+  // Each TLP goes in as-is, header first, from an even entry: beat k is
+  // entries 2k (DW 2k, port A) and 2k+1 (port B) past its start. The link
+  // is held off only while the ring is full, so a burst of TLPs is taken at
+  // link speed while the firmware works on the oldest, the head. rx_payload
+  // entry i is DW i of the head. rx.valid says the head is there; writing
+  // it 1 frees the head, and the next TLP becomes the head.
+  // Port A is the RX beat's write, else a read: the firmware's, else the
+  // head's DW0 for its length. A read never meets a write, so the RAM needs
+  // no read-first logic. A read an RX beat holds off waits a clock.
+  localparam int RX_DW = 1024;  // csr.rdl: rx_payload entries
+  localparam int RX_AW = $clog2(RX_DW);
+  localparam int RX_BW = RX_AW - 1;  // the ring in beats
 
-  logic        rx_valid;
-  logic        rx_beat;
-  logic        rx_we;
-  logic [ 5:0] rx_k;  // beat k of the TLP, held at RX_BEATS past the last
+  typedef logic [RX_AW-1:0] rx_addr_t;
+  typedef logic [RX_BW-1:0] rx_beat_t;
 
-  logic [31:0] rx_pl_q;
-  logic        rx_pl_rd;
-  logic        rx_pl_ack;
-  logic [ 5:0] rx_pl_aaddr;  // port A: the beat's DW 2k, or the firmware's read
+  rx_beat_t        rx_wp;  // the next beat to write
+  rx_beat_t        rx_rp;  // the head's first beat
+  rx_beat_t        rx_head_beats;  // the head's length, from its DW0
+  logic            rx_head_ok;  // the head is there: rx.valid
+  logic     [ 7:0] rx_tlps;  // whole TLPs in the ring, the head too
+  logic            rx_full;  // flopped: tready comes from it
+  rx_beat_t        rx_wp_nx;
+  rx_beat_t        rx_rp_nx;
+  rx_beat_t        rx_rp_free;  // the head's end: rx_rp once it is freed
+  logic            rx_free_now;
+  rx_addr_t        rx_ra_idx;  // the firmware read's entry in the RAM: a flop
+  logic            rx_beat;
+  logic            rx_last;  // the last beat of a TLP is written
+  logic            rx_free;  // the firmware frees the head
+
+  logic            rx_pl_rd;  // the firmware's read, a one-clock request
+  logic            rx_rd_q;  // a firmware read taken, not yet served
+  rx_addr_t        rx_rd_idx;  // its entry in the head, kept while it waits
+  logic            rx_rd_now;
+  logic            rx_fetch_ok;  // the head's DW0 is to be read, from flops
+  logic            rx_fetch;  // read it now: no RX beat holds port A
+  logic            rx_fetch_q;  // its data is in rx_pl_q
+  logic            rx_fetch_q2;  // and now in rx_head_dw0
+  dw0_t            rx_head_dw0;  // the head's DW0: its length a clock later
+  rx_addr_t        rx_ra;  // the read's entry in the RAM
+  rx_addr_t        rx_aaddr;  // port A
+  logic     [31:0] rx_pl_q;
+  logic            rx_pl_ack;
 
   // an RX beat: DW 2k in the low half, an even entry; DW 2k+1, an odd one
   typedef struct packed {
@@ -542,65 +641,125 @@ module soc_top
   } rx_pl_pair_t;
 
   rx_pl_pair_t rx_data;
-  assign rx_data  = m_axis_rx.tdata;
+  assign rx_data = m_axis_rx.tdata;
 
-  assign rx_valid = csr_out.rx.valid.valid.value;
-  assign rx_beat  = m_axis_rx.tvalid & m_axis_rx.tready;
-  assign rx_we    = rx_beat & (rx_k < 6'(RX_BEATS));
+  // The ring is full when one more beat would meet the head. The flag is a
+  // flop, made from the next pointers, so tready is a flop output (as in
+  // openPCIE, where the compare did not fit 250 MHz)
+  assign rx_wp_nx         = rx_wp + rx_beat_t'(rx_beat);
+  assign rx_free_now      = ~rx_fetch_q2 & rx_free;
+  assign rx_rp_free       = rx_rp + rx_head_beats;
+  assign rx_rp_nx         = rx_free_now ? rx_rp_free : rx_rp;
+  assign m_axis_rx.tready = ~rx_full;
+  assign rx_beat          = m_axis_rx.tvalid & ~rx_full;
+  assign rx_last          = rx_beat & m_axis_rx.tlast;
 
-  always_ff @(posedge clk or negedge resetn) begin
-    if (!resetn) begin
-      rx_k <= '0;
-    end
-    else if (rx_beat && m_axis_rx.tlast) begin
-      rx_k <= '0;
-    end
-    else if (rx_we) begin
-      rx_k <= rx_k + 6'd1;
-    end
-  end
+  assign rx_pl_rd  = csr_out.rx_payload.req & ~csr_out.rx_payload.req_is_wr;
+  // A firmware read is taken into rx_rd_q and rx_rd_idx, and served from
+  // them a clock later, or later still while RX beats hold port A: the CPU's
+  // request decode never reaches the RAM address
+  assign rx_rd_now   = rx_rd_q & ~rx_beat;
+  assign rx_fetch_ok = ~rx_rd_q & ~rx_head_ok & ~rx_fetch_q & ~rx_fetch_q2 & (rx_tlps != 8'd0);
+  assign rx_fetch    = rx_fetch_ok & ~rx_beat;
+  // the address picks from flops only; rx_beat, late, only in rx_aaddr
+  assign rx_ra       = rx_fetch_ok ? {rx_rp, 1'b0} : rx_ra_idx;
+  assign rx_aaddr    = rx_beat ? {rx_wp, 1'b0} : rx_ra;
 
-  assign rx_pl_rd    = csr_out.rx_payload.req & ~csr_out.rx_payload.req_is_wr;
-  assign rx_pl_aaddr = rx_we ? {5'(rx_k), 1'b0} : csr_out.rx_payload.addr[7:2];
+  assign rx_free = csr_out.rx.valid.req & csr_out.rx.valid.req_is_wr
+                 & csr_out.rx.valid.wr_data.valid & csr_out.rx.valid.wr_biten.valid
+                 & rx_head_ok;
 
-  logic [31:0] rx_pl[PAYLOAD_DW];
+  logic [31:0] rx_pl[RX_DW];
 
-  // Port A: write, else read. The firmware reads only while rx.valid holds
-  // the link off, so no read meets a write, and Yosys sees the two ports
-  // never collide
-  always_ff @(posedge clk) begin
-    if (rx_we) begin
-      rx_pl[rx_pl_aaddr] <= rx_data.even;
+  // Port A: the beat's DW 2k, else a read. Plain always: both ports write
+  // rx_pl, and an always_ff variable has one writer (IEEE 1800 9.2.2.4)
+  always @(posedge clk) begin
+    if (rx_beat) begin
+      rx_pl[rx_aaddr] <= rx_data.even;
     end
     else begin
-      rx_pl_q <= rx_pl[rx_pl_aaddr];
+      rx_pl_q <= rx_pl[rx_aaddr];
     end
   end
 
   // Port B: DW 2k+1 of the beat
-  always_ff @(posedge clk) begin
-    if (rx_we) begin
-      rx_pl[{5'(rx_k), 1'b1}] <= rx_data.odd;
+  always @(posedge clk) begin
+    if (rx_beat) begin
+      rx_pl[{rx_wp, 1'b1}] <= rx_data.odd;
     end
   end
 
   always_ff @(posedge clk or negedge resetn) begin
     if (!resetn) begin
-      rx_pl_ack <= 1'b0;
+      rx_wp         <= '0;
+      rx_rp         <= '0;
+      rx_full       <= 1'b0;
+      rx_head_beats <= '0;
+      rx_head_ok    <= 1'b0;
+      rx_tlps       <= '0;
+      rx_rd_q       <= 1'b0;
+      rx_rd_idx     <= '0;
+      rx_ra_idx     <= '0;
+      rx_fetch_q    <= 1'b0;
+      rx_fetch_q2   <= 1'b0;
+      rx_head_dw0   <= '0;
+      rx_pl_ack     <= 1'b0;
     end
     else begin
-      rx_pl_ack <= rx_pl_rd;
+      rx_wp   <= rx_wp_nx;
+      rx_rp   <= rx_rp_nx;
+      // both compares in parallel, the late rx_free picks (9 bits: wraps)
+      rx_full <= rx_free_now ? (rx_wp_nx + 1'b1 == rx_rp_free) : (rx_wp_nx + 1'b1 == rx_rp);
+      rx_tlps <= rx_tlps + 8'(rx_last) - 8'(rx_free);
+
+      // the firmware's read: taken now, served in the next clock without a beat
+      if (rx_pl_rd) begin
+        rx_rd_idx <= csr_out.rx_payload.addr[RX_AW+1:2];
+      end
+      rx_rd_q    <= rx_pl_rd | (rx_rd_q & rx_beat);
+      // its entry in the RAM, ready when it is served; the head does not
+      // move under a read (the firmware frees it only after its reads)
+      rx_ra_idx  <= {rx_rp_nx, 1'b0} + (rx_pl_rd ? csr_out.rx_payload.addr[RX_AW+1:2] : rx_rd_idx);
+      rx_pl_ack  <= rx_rd_now;
+
+      // the head: its length from its DW0, then freed by the firmware
+      rx_fetch_q  <= rx_fetch;
+      rx_fetch_q2 <= rx_fetch_q;
+      if (rx_fetch_q) begin
+        rx_head_dw0 <= rx_pl_q;
+      end
+      if (rx_fetch_q2) begin
+        rx_head_beats <= rx_beat_t'(tlp_words(rx_head_dw0));
+        rx_head_ok    <= 1'b1;
+      end
+      else if (rx_free) begin
+        rx_head_ok <= 1'b0;
+      end
     end
   end
 
-  assign csr_in.rx_payload.rd_ack       = rx_pl_ack;
-  assign csr_in.rx_payload.rd_data      = rx_pl_q;
-  assign csr_in.rx_payload.wr_ack       = 1'b0;  // read-only
+  assign csr_in.rx_payload.rd_ack     = rx_pl_ack;
+  assign csr_in.rx_payload.rd_data    = rx_pl_q;
+  assign csr_in.rx_payload.wr_ack     = 1'b0;  // read-only
 
-  assign csr_in.rx.valid.valid.hwset    = rx_beat & m_axis_rx.tlast;
+  // rx.valid: external, read straight from rx_head_ok; writing 1 frees
+  assign csr_in.rx.valid.rd_ack       = csr_out.rx.valid.req & ~csr_out.rx.valid.req_is_wr;
+  assign csr_in.rx.valid.rd_data.valid = rx_head_ok;
+  assign csr_in.rx.valid.wr_ack       = csr_out.rx.valid.req & csr_out.rx.valid.req_is_wr;
+
+`ifndef SYNTHESIS
+  // Simulation-only check (Icarus has no concurrent assertions): the ring
+  // full with no whole TLP in it, a TLP longer than the ring, stalls RX for
+  // good. Checked on the write side: such a TLP never reaches the head
+  always @(posedge clk) begin
+    if (rx_full && (rx_tlps == 8'd0)) begin
+      $error("soc_top: an RX TLP longer than the ring (%0d beats) stalls RX", RX_DW / 2 - 1);
+    end
+  end
+`endif
 
   // ---- Status: straight from the PCIe core, no shadow registers ----------
-  assign csr_in.status.phy.tx_busy.next = (tx_state != IDLE);
+  assign csr_in.status.phy.tx_busy.next = (f_state != F_IDLE) | f_rd_q | (q_cnt != 3'd0);
   assign csr_in.status.cfg_id.id.next   = cfg.id;
 
   // ---- Firmware result: the marker the firmware writes when it stops ------
@@ -620,8 +779,6 @@ module soc_top
       fw_pass <= (csr_out.status.result.wr_data.marker == FW_RESULT_PASS);
     end
   end
-
-  assign m_axis_rx.tready = ~rx_valid;
 
   // Per-packet transmit qualifiers (tx_tuser_t, UG477 table 2-9), none
   // of which this design uses. Left undriven they are X in simulation, and

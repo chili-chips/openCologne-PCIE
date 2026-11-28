@@ -106,12 +106,13 @@ module csr (
         decoded_reg_strb.tx.send = cpuif_req_masked & (cpuif_addr == 14'hc) & cpuif_req_is_wr;
         is_external |= cpuif_req_masked & (cpuif_addr == 14'hc) & cpuif_req_is_wr;
         decoded_reg_strb.rx.valid = cpuif_req_masked & (cpuif_addr == 14'h20);
+        is_external |= cpuif_req_masked & (cpuif_addr == 14'h20);
         decoded_reg_strb.status.phy = cpuif_req_masked & (cpuif_addr == 14'h28) & !cpuif_req_is_wr;
         decoded_reg_strb.status.result = cpuif_req_masked & (cpuif_addr == 14'h2c) & cpuif_req_is_wr;
         is_external |= cpuif_req_masked & (cpuif_addr == 14'h2c) & cpuif_req_is_wr;
         decoded_reg_strb.status.cfg_id = cpuif_req_masked & (cpuif_addr == 14'h30) & !cpuif_req_is_wr;
-        decoded_reg_strb.rx_payload = cpuif_req_masked & (cpuif_addr >= 14'h1000) & (cpuif_addr <= 14'h1000 + 14'hff) & !cpuif_req_is_wr;
-        is_external |= cpuif_req_masked & (cpuif_addr >= 14'h1000) & (cpuif_addr <= 14'h1000 + 14'hff) & !cpuif_req_is_wr;
+        decoded_reg_strb.rx_payload = cpuif_req_masked & (cpuif_addr >= 14'h1000) & (cpuif_addr <= 14'h1000 + 14'hfff) & !cpuif_req_is_wr;
+        is_external |= cpuif_req_masked & (cpuif_addr >= 14'h1000) & (cpuif_addr <= 14'h1000 + 14'hfff) & !cpuif_req_is_wr;
         decoded_reg_strb.tx_payload = cpuif_req_masked & (cpuif_addr >= 14'h2000) & (cpuif_addr <= 14'h2000 + 14'hfff) & cpuif_req_is_wr;
         is_external |= cpuif_req_masked & (cpuif_addr >= 14'h2000) & (cpuif_addr <= 14'h2000 + 14'hfff) & cpuif_req_is_wr;
         decoded_err = '0;
@@ -144,28 +145,9 @@ module csr (
     //--------------------------------------------------------------------------
     // Field logic
     //--------------------------------------------------------------------------
-    typedef struct {
-        struct {
-            struct {
-                struct {
-                    logic next;
-                    logic load_next;
-                } valid;
-            } valid;
-        } rx;
-    } field_combo_t;
-    field_combo_t field_combo;
+    
 
-    typedef struct {
-        struct {
-            struct {
-                struct {
-                    logic value;
-                } valid;
-            } valid;
-        } rx;
-    } field_storage_t;
-    field_storage_t field_storage;
+    
 
     // External register: csr.tx.send
 
@@ -173,32 +155,11 @@ module csr (
     assign hwif_out.tx.send.req_is_wr = decoded_req_is_wr;
     assign hwif_out.tx.send.wr_data = decoded_wr_data;
     assign hwif_out.tx.send.wr_biten = decoded_wr_biten;
-    // Field: csr.rx.valid.valid
-    always_comb begin
-        automatic logic [0:0] next_c;
-        automatic logic load_next_c;
-        next_c = field_storage.rx.valid.valid.value;
-        load_next_c = '0;
-        if(decoded_reg_strb.rx.valid && decoded_req_is_wr) begin // SW write 1 clear
-            next_c = field_storage.rx.valid.valid.value & ~(decoded_wr_data[0:0] & decoded_wr_biten[0:0]);
-            load_next_c = '1;
-        end else if(hwif_in.rx.valid.valid.hwset) begin // HW Set
-            next_c = '1;
-            load_next_c = '1;
-        end
-        field_combo.rx.valid.valid.next = next_c;
-        field_combo.rx.valid.valid.load_next = load_next_c;
-    end
-    always_ff @(posedge clk or negedge arst_n) begin
-        if(~arst_n) begin
-            field_storage.rx.valid.valid.value <= 1'h0;
-        end else begin
-            if(field_combo.rx.valid.valid.load_next) begin
-                field_storage.rx.valid.valid.value <= field_combo.rx.valid.valid.next;
-            end
-        end
-    end
-    assign hwif_out.rx.valid.valid.value = field_storage.rx.valid.valid.value;
+    // External register: csr.rx.valid
+    assign hwif_out.rx.valid.req = decoded_reg_strb.rx.valid;
+    assign hwif_out.rx.valid.req_is_wr = decoded_req_is_wr;
+    assign hwif_out.rx.valid.wr_data = decoded_wr_data;
+    assign hwif_out.rx.valid.wr_biten = decoded_wr_biten;
     // External register: csr.status.result
 
     assign hwif_out.status.result.req = decoded_req_is_wr ? decoded_reg_strb.status.result : '0;
@@ -207,7 +168,7 @@ module csr (
     assign hwif_out.status.result.wr_biten = decoded_wr_biten;
     // External region: csr.rx_payload
     assign hwif_out.rx_payload.req = decoded_reg_strb.rx_payload;
-    assign hwif_out.rx_payload.addr = decoded_addr[7:0];
+    assign hwif_out.rx_payload.addr = decoded_addr[11:0];
     assign hwif_out.rx_payload.req_is_wr = decoded_req_is_wr;
     assign hwif_out.rx_payload.wr_data = decoded_wr_data;
     assign hwif_out.rx_payload.wr_biten = decoded_wr_biten;
@@ -225,6 +186,7 @@ module csr (
         automatic logic wr_ack;
         wr_ack = '0;
         wr_ack |= hwif_in.tx.send.wr_ack;
+        wr_ack |= hwif_in.rx.valid.wr_ack;
         wr_ack |= hwif_in.status.result.wr_ack;
         wr_ack |= hwif_in.rx_payload.wr_ack;
         wr_ack |= hwif_in.tx_payload.wr_ack;
@@ -241,6 +203,7 @@ module csr (
     always_comb begin
         automatic logic rd_ack;
         rd_ack = '0;
+        rd_ack |= hwif_in.rx.valid.rd_ack;
         rd_ack |= hwif_in.rx_payload.rd_ack;
         rd_ack |= hwif_in.tx_payload.rd_ack;
         readback_external_rd_ack_c = rd_ack;
@@ -269,7 +232,7 @@ module csr (
         automatic logic [31:0] readback_data_var;
         readback_data_var = '0;
         if(rd_mux_addr == 14'h20) begin
-            readback_data_var[0] = field_storage.rx.valid.valid.value;
+            readback_data_var = hwif_in.rx.valid.rd_data;
         end
         if(rd_mux_addr == 14'h28) begin
             readback_data_var[0] = hwif_in.status.phy.tx_busy.next;
@@ -277,7 +240,7 @@ module csr (
         if(rd_mux_addr == 14'h30) begin
             readback_data_var[15:0] = hwif_in.status.cfg_id.id.next;
         end
-        if((rd_mux_addr >= 14'h1000) && (rd_mux_addr <= 14'h1000 + 14'hff)) begin
+        if((rd_mux_addr >= 14'h1000) && (rd_mux_addr <= 14'h1000 + 14'hfff)) begin
             readback_data_var = hwif_in.rx_payload.rd_data;
         end
         if((rd_mux_addr >= 14'h2000) && (rd_mux_addr <= 14'h2000 + 14'hfff)) begin

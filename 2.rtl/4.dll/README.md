@@ -147,8 +147,8 @@ Field layout: `type | Reserved | AckNak_Seq_Num | 16-bit CRC`.
   - LCRC mismatch, or a new STP before END → discarded, a NAK is scheduled.
   - LCRC match → the control data is removed and the TLP is forwarded to the TL: the DLL marks the start and end of the TLP, `NEXT_RCV_SEQ` is incremented, and an ACK is scheduled.
 - A NAK is scheduled for every bad TLP: there is no `NAK_SCHEDULED` flag holding back a second one.
-- An ACK is sent as soon as it is scheduled; there is no `AckNak_LATENCY_TIMER` yet.
-- The RX buffer is a ring: an STP is taken in the clock after the END before it, while the TLPs before it are forwarded; a TLP with a bad LCRC is rewound ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4), fixed). A nullified TLP (EDB) is Naked, not dropped ([#29](https://github.com/chili-chips/openCologne-PCIE/issues/29)).
+- An ACK is sent as soon as it is scheduled; there is no `AckNak_LATENCY_TIMER` yet. An ACK scheduled while another goes out is sent after it (2026-11-27: it was dropped, so under back-to-back TLPs the last one waited for the next TLP, `DL.ACK-LAT`).
+- The RX buffer is a ring: an STP is taken in the clock after the END before it, while the TLPs before it are forwarded, back to back, with no gap between them; a TLP with a bad LCRC is rewound ([#4](https://github.com/chili-chips/openCologne-PCIE/issues/4), fixed). A nullified TLP (EDB) is Naked, not dropped ([#29](https://github.com/chili-chips/openCologne-PCIE/issues/29)).
 - Nullification of a TLP with `EDB` is **not** supported in this first version.
 
 ## DLLP Handler

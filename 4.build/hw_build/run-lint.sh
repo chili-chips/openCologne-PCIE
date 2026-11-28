@@ -19,13 +19,20 @@
 #   ram        Yosys memory_libmap and run-lint-ram.py: a memory mapped to block
 #              RAM with read-first or transparency logic built in fabric
 #              (GateMate block RAM has neither: write, else read)
+#   iob        the reset phase's netlist and run-lint-iob.py: every data pin of
+#              top reaches its flop directly (input: pin to D; output: Q to pin
+#              and nothing else), so the flop can sit in the I/O cell; the
+#              SerDes and clock pins are skipped, the slow pins (the link LED,
+#              PERST#) waived by name
 #   slang      read_slang -Wextra: strict IEEE parse, second opinion
 #   verible    Verible style rules (run-lint.verible) on all RTL (not the BFM, csr.sv, eduBOS5): our case
 #              rule -- signals and ports lower case, constants UPPER case --
 #              and Verible's defaults
 #
-# There is no opensource CDC checker mature enough to replace openPCIE's
-# Vivado cdc phase.
+# The phase names and helpers are those of openPCIE and wireguard-fpga. Their
+# Vivado phases (cdc, check-timing, methodology) do not apply: GateMate has no
+# Vivado, and there is no opensource CDC checker mature enough to replace
+# report_cdc. Their ghdl phases lint VHDL: there is none here.
 #
 # usage:  bash run-lint.sh [phase ...]    default: all phases
 #         VIEW=sim bash run-lint.sh        lint the simulation view of phy_top
@@ -84,12 +91,18 @@ case $VIEW in
 esac
 
 WAIVERS=${LINT_WAIVERS:-$HERE/run-lint-waivers.txt}
-PHASES=${*:-tags verilator yosys reset ram slang verible}
+PHASES=${*:-tags verilator yosys reset ram iob slang verible}
 W=${LINT_WORK:-$(mktemp -d)}
 mkdir -p "$W"
+PHASE_NAMES="tags verilator yosys reset ram iob slang verible"
+for ph in $PHASES; do  # every name first, before any phase runs
+  case " $PHASE_NAMES " in *" $ph "*) ;; *) echo "unknown phase: $ph ($PHASE_NAMES)"; exit 2 ;; esac
+done
 
 # ---- work copy ----------------------------------------------------------------
-rm -rf "$W/2.rtl" "$W/csr" "$W/bb.v"   # a reused LINT_WORK keeps no stale sources or stubs
+# a reused LINT_WORK keeps no stale sources, stubs or netlists (iob reads
+# reset's netlist when both run)
+rm -rf "$W/2.rtl" "$W/csr" "$W/bb.v" "$W"/reset*.json "$W"/ram*.json
 (cd "$REPO" && cp -r --parents 2.rtl/*.sv 2.rtl/1.phy/phy_top.sv 2.rtl/1.phy/2.openSERDES_BFM/1.gatemate/1.model \
    2.rtl/2.pipe/*.sv 2.rtl/3.mac/*.sv 2.rtl/4.dll/*.sv 2.rtl/5.tlp 2.rtl/6.trn_bridge 2.rtl/7.soc \
    "$W/")
@@ -139,13 +152,10 @@ found() {  # $1 phase; one finding per line on stdin (not a pipe: RESULT must st
   echo "-- $1: $n finding(s), $((t - n)) waived ($((t - i)) inline)"
 }
 
-# /*LINT:OK*/ on anything but an output port; the port directions come from the
-# module headers of the design and the primitive stubs, plus the SerDes model:
-# its ports are those of the synthesis wrapper
 # A tool that fails, or stops before the step its findings come from, fails its
 # phase: "0 finding(s)" must not stand for "not checked"
-failed() {  # $1 phase, $2 reason
-  RESULT[$1]="FAILED ($2), see $W/$1.log"
+failed() {  # $1 phase, $2 reason, $3 its log (default $W/<phase>.log)
+  RESULT[$1]="FAILED ($2), see ${3:-$W/$1.log}"
   echo "-- $1: FAILED, $2"
 }
 
@@ -155,6 +165,9 @@ exit_check() {  # $1 phase, $2 exit status
   if [ "$2" -ne 0 ] && [ ! -s "$1.all" ]; then failed "$1" "exit $2, nothing reported"; fi
 }
 
+# /*LINT:OK*/ on anything but an output port; the port directions come from the
+# module headers of the design and the primitive stubs, plus the SerDes model:
+# its ports are those of the synthesis wrapper
 run_tags() {
   bb || { skip tags "no GateMate stubs (yosys-config)"; return; }
   "$PYTHON" - 2.rtl/1.phy/2.openSERDES_BFM/1.gatemate/1.model/ccfpga_serdes.BFM.sv -- bb.v $SV > tags.log <<'EOF'
@@ -322,6 +335,26 @@ run_ram() {
   found ram < <(sed -E 's#^(\.\./)+[^ ]*/(2\.rtl|csr)/#\2/#' ram.out)
 }
 
+# IOB flops: every data pin of top reaches its flop directly, so nextpnr can
+# put the flop in the I/O cell (run-lint-iob.py). Uses the reset phase's
+# netlist when this run made one
+run_iob() {
+  [ -z "$SIM" ] || { skip iob "sim view: the SerDes BFM is behavioural, not for synthesis tools"; return; }
+  have "$YOSYS" || { skip iob "$YOSYS not found"; return; }
+  bb || { skip iob "no GateMate stubs"; return; }
+  local rc
+  if [[ " $PHASES " != *" reset "* ]] || [ ! -s reset.json ]; then
+    "$YOSYS" $YOSYS_ARGS -q -l iob.log -p "read_slang $SL_DEFS --top $TOP bb.v $SV; \
+        hierarchy -check -top $TOP; proc; flatten; opt_expr; opt_clean; opt_dff; opt_clean; \
+        write_json reset.json" >/dev/null 2>&1
+    rc=$?
+    [ $rc -eq 0 ] && [ -s reset.json ] || { failed iob "exit $rc, no netlist"; return; }
+  fi
+  "$PYTHON" "$HERE/run-lint-iob.py" reset.json > iob.out 2>> iob.log ||
+    { failed iob "netlist check failed"; return; }
+  found iob < <(sed -E 's#^(\.\./)+[^ ]*/(2\.rtl|csr)/#\2/#' iob.out | sort -u)
+}
+
 run_slang() {
   [ -z "$SIM" ] || { skip slang "sim view: the SerDes BFM is behavioural, not for synthesis tools"; return; }
   have "$YOSYS" || { skip slang "$YOSYS not found"; return; }
@@ -350,16 +383,13 @@ run_verible() {
 }
 
 for ph in $PHASES; do
-  case $ph in
-    tags|verilator|yosys|reset|ram|slang|verible) echo "== $ph"; run_$ph ;;
-    *) echo "unknown phase: $ph (tags verilator yosys reset ram slang verible)"; exit 2 ;;
-  esac
+  echo "== $ph"; run_${ph//-/_}  # names checked at start-up
 done
 
 echo; echo "== summary  ($VIEW view, $W)"
 FAIL=0
 for ph in $PHASES; do
-  printf '  %-10s %s\n' "$ph" "${RESULT[$ph]}"
+  printf '  %-14s %s\n' "$ph" "${RESULT[$ph]}"
   case ${RESULT[$ph]} in skipped*|"0 finding"*) ;; *) FAIL=1 ;; esac
 done
 exit $FAIL

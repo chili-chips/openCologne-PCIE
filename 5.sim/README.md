@@ -91,7 +91,7 @@ Open-source simulators: Verilator (default) or Icarus Verilog. [JanusHDL](https:
 ```sh
 make run                     # Verilator
 make SIM=icarus run          # Icarus Verilog
-make SIM=janushdl run        # JanusHDL (jhdl 0.22 or later); EP=rtl waits on #24
+make SIM=janushdl run        # JanusHDL (jhdl 0.22 or later); EP=rtl waits on #30
 make DUMP=1 run              # also write tb.fst
 make IFACE=serial run        # the EP model and the host on the serial line
 make EP=rtl run              # our EP RTL + firmware, the host at the PIPE
@@ -157,8 +157,8 @@ The model also found that our DLL's InitFC advertised P 32/1008 and NP 32/1, whi
 
 | Switch | Values | Selects | Today |
 |---|---|---|---|
-| `SIM` | `verilator` (default), `icarus`, `janushdl` | the simulator; the C/C++ models talk DPI-C to Verilator and JanusHDL (`VProc.so`, `--sv-lib`), VPI to Icarus (no DPI-C) | all three, with `EP=model`; `EP=rtl` on Verilator (JanusHDL: [#24](https://github.com/chili-chips/openCologne-PCIE/issues/24)) |
-| `EP` | `model` (default), `rtl` | the EP: a second pcieVHost in EP mode (`EPPIPEx1__pcieVHost_DUT`, node 1), or our MAC + DLL + TL RTL with firmware | `model` passes; `rtl` passes with `A7RC=1`, fails the default tester mode, [above](#the-host-openpcies-artix-7-rc-model); `rtl` on Verilator (JanusHDL: [#24](https://github.com/chili-chips/openCologne-PCIE/issues/24)); Icarus does not parse the generated `csr_pkg.sv` (unpacked structs) |
+| `SIM` | `verilator` (default), `icarus`, `janushdl` | the simulator; the C/C++ models talk DPI-C to Verilator and JanusHDL (`VProc.so`, `--sv-lib`), VPI to Icarus (no DPI-C) | all three, with `EP=model`; `EP=rtl` on Verilator (JanusHDL: [#30](https://github.com/chili-chips/openCologne-PCIE/issues/30)) |
+| `EP` | `model` (default), `rtl` | the EP: a second pcieVHost in EP mode (`EPPIPEx1__pcieVHost_DUT`, node 1), or our MAC + DLL + TL RTL with firmware | `model` passes; `rtl` passes with `A7RC=1`, fails the default tester mode, [above](#the-host-openpcies-artix-7-rc-model); `rtl` on Verilator (JanusHDL: [#30](https://github.com/chili-chips/openCologne-PCIE/issues/30)); Icarus does not parse the generated `csr_pkg.sv` (unpacked structs) |
 | `IFACE` | `pipe` (default), `serial`, `phy` | where the host meets the EP: the PIPE (`RCPIPEx1__pcieVHost`, node 2; with `EP=rtl` in the `phy_top` socket), or the serial line (`PcieVhostSerial`), which adds the PHY: the real one with `EP=rtl`, the EP model's own with `EP=model`; `phy`: the serial line, the EP model behind the real PHY (`EP=model`, Verilator only) | all four `EP` x `IFACE` work; `EP=rtl` gives the same results on both, [above](#running-the-co-simulation); `phy` passes, tester and `A7RC=1`, 20 seeds |
 | `CPU` | `rtl`, `vproc`, `iss` | the SOC CPU, with `EP=rtl`: eduBOS5 RTL, a native C/C++ program at node 0, or the rv32 ISS ([below](#the-cpu-node-three-ways-to-run-the-socs-software)) | all three, with `EP=rtl` |
 | `A7RC` | `0` (default), `1` | the host's mode: the tester (the lab RC's sequence, then a config space sweep and back-to-back requests), or literal, only what the lab RC sends ([above](#the-host-openpcies-artix-7-rc-model)) | both pass with `EP=model` |
@@ -219,6 +219,7 @@ make SIM_FAULT=crs run; make SIM_FAULT=late run; make SIM_FAULT=nocpl run  # the
 (cd ../2.rtl/1.phy/3.sim && bash run-phy.sh pipe64 && bash run-phy.sh equiv)
 (cd ../2.rtl/4.dll/sim && bash run-dll-phy.sh && bash run-dll-phy.sh --inject=stp && bash run-dll-phy.sh --inject=end)
 (cd ../2.rtl/5.tlp/sim && bash run-tl.sh)
+(cd ../2.rtl/7.soc/sim && bash run-soc.sh tx && bash run-soc.sh rx && bash run-soc.sh cpl)  # TX batch; RX ring in a loopback; EP split CplDs
 ```
 
 | Run | Time | Today (2026-11-02) |
@@ -437,7 +438,7 @@ The same test bench on the three simulators, `EP=model`, tester (2026-11-23, WSL
 | Simulation built | once, to a native executable | once, to `vvp` code | at every run (analysis and elaboration: 30 ms) |
 | C models reached via | DPI-C | VPI | VPI, the Icarus build of the models |
 | Waveform, `DUMP=1` | `--trace-fst`, the signals `tb.sv` picks | `vvp -fst`, the same | `--fst`, every signal |
-| `EP=rtl` | yes | no: Icarus 13 parsed neither our interface ports nor `csr_pkg.sv`; not retried on 14 | no: 0.22.0 stops on a hierarchical name with a select and a member, [#24](https://github.com/chili-chips/openCologne-PCIE/issues/24) |
+| `EP=rtl` | yes | no: Icarus 13 parsed neither our interface ports nor `csr_pkg.sv`; not retried on 14 | no: 0.24.0 elaborates it ([#24](https://github.com/chili-chips/openCologne-PCIE/issues/24) fixed), but every LCRC is X: a constant function's local array has its dimensions swapped, [#30](https://github.com/chili-chips/openCologne-PCIE/issues/30) |
 | Electrical idle on the line | `NOSIG` (the K flag and `0xFF`) per symbol on the PIPE; constant 0 on the serial line | the same | the same |
 | Open source | yes | yes | no: free of charge, closed source |
 

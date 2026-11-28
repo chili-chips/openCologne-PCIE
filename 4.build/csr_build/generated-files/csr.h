@@ -105,7 +105,7 @@ typedef struct __attribute__ ((__packed__)) {
 
 // mem - csr::rx_payload
 typedef struct __attribute__ ((__packed__)) {
-    uint32_t mem[64];
+    uint32_t mem[1024];
 } csr__rx_payload_t;
 
 // mem - csr::tx_payload
@@ -120,7 +120,6 @@ typedef struct __attribute__ ((__packed__)) {
     csr__status_t status;
     uint8_t RESERVED_34_fff[0xfcc];
     csr__rx_payload_t rx_payload;
-    uint8_t RESERVED_1100_1fff[0xf00];
     csr__tx_payload_t tx_payload;
 } csr_t;
 

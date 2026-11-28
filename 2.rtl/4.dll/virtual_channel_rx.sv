@@ -52,6 +52,7 @@ module virtual_channel_rx
     input  pipe_data_t        tlp_data,
     input  logic              stp_detected,
     input  logic              end_detected,
+    input  logic              nullified,
     input  tlp_seq_t          sequence_number,
     input  logic       [31:0] lcrc,
     input  logic              tlp_valid,
@@ -158,6 +159,7 @@ module virtual_channel_rx
 
       .stp_detected    (stp_detected),
       .end_detected    (end_detected),
+      .nullified       (nullified),
       .data_tl_in      (tlp_data),
       .sequence_number (sequence_number),
       .lcrc            (lcrc),

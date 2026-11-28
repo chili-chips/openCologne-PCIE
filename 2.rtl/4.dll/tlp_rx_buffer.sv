@@ -51,6 +51,7 @@ module tlp_rx_buffer
 
     input  logic              stp_detected,
     input  logic              end_detected,
+    input  logic              nullified,  // with end_detected: it ended with EDB
     input  pipe_data_t        data_tl_in,
     input  tlp_seq_t          sequence_number,
     input  logic       [31:0] lcrc,
@@ -99,14 +100,24 @@ module tlp_rx_buffer
   bram_addr_t tlp_start;  // first word of the TLP being stored
   bram_addr_t word_cnt;  // its words so far
   bram_addr_t base;  // where an STP's word goes: write_ptr, or the rewound start
-  bram_addr_t free_words;  // the ring's free words from base on
-  logic       crc_ok;  // in W_CHECK: the stored TLP's LCRC is good
+  seq_num_t   exp_bad;  // the next sequence number if no good TLP ends now
+  logic       check_ok;  // a good TLP ends now
+  logic       seq_if_ok;  // the STP's sequence number is the next one, if check_ok
+  logic       seq_if_bad;  // the same, if not
+  logic       room_if_ok;  // room from write_ptr on
+  logic       room_if_bad;  // room from the rewound start on
+  logic       crc_ok;  // in W_CHECK: the stored TLP's LCRC is good, and it ended with END
+  logic       rx_null;  // the stored TLP ended with EDB
+  logic       null_ok;  // and its LCRC is the inverted one: nullified, dropped quietly
   logic       stp_take;  // an STP the writer looks at
   logic       seq_next;  // its sequence number is the next one expected
   logic       room_ok;  // and the ring has room for it
   logic       we;
   bram_addr_t waddr;
-  seq_num_t   exp_seq;  // the next sequence number, with the TLPs just accepted
+  seq_num_t   last_seq;  // the last good sequence number, the TLPs just accepted too
+  logic       dup;  // the STP's sequence number is an old one: a duplicate
+  logic       dup_if_ok;
+  logic       dup_if_bad;
 
   // CRC also takes sequence number into account
   // Feed sequence number first
@@ -162,35 +173,50 @@ module tlp_rx_buffer
   bram_addr_t rd_ptr;  // next word to read
   bram_addr_t r_len;  // words of the TLP being forwarded
   bram_addr_t r_cnt;  // the word out now, from 1
-  logic r_go;  // a checked TLP waits: start it
+  logic r_go;  // a checked TLP waits: start it, right after the last word of the one before
   logic r_last;
   pipe_data_t buffer_data;
 
-  bram_addr_t desc_len[DESC_N];  // the checked TLPs' lengths, oldest first
+  bram_addr_t desc_len[DESC_N];  // the lengths of the checked TLPs not started yet, oldest first
   logic [1:0] desc_wr;
   logic [1:0] desc_rd;
   logic [2:0] desc_cnt;
   logic push;
   logic pop;
 
-  assign crc_ok = (crc_computed == rx_lcrc);
-  assign exp_seq    = next_rcv_seq
-                    + seq_num_t'(new_tlp_accepted)
-                    + seq_num_t'((w_state == W_CHECK) & crc_ok);
+  // A nullified TLP (EDB, PCIe 2.1, 3.5.3.1, #29) is never good: it is
+  // rewound like a bad one. With the inverted LCRC it is dropped with no Nak
+  // and no Ack; with any other LCRC it is a bad TLP, and Naked
+  assign crc_ok  = (crc_computed == rx_lcrc) & ~rx_null;
+  assign null_ok = rx_null & (crc_computed == ~rx_lcrc);
   assign base = ((w_state == W_CHECK) & ~crc_ok) ? tlp_start : write_ptr;
-  assign free_words = rd_ptr - base - 1'b1;
   assign stp_take = stp_detected & link_active & (w_state != W_STORE);
-  assign seq_next = (sequence_number.num == exp_seq);
-  assign room_ok = (free_words >= bram_addr_t'(ROOM)) & (desc_cnt < 3'(DESC_N - 1));
+  // Both outcomes of the LCRC check side by side, so that crc_ok only picks
+  // one, last: the compare and the adds are not behind the LCRC (the
+  // critical path to the RAM's write enable, 18 MHz, 2026-11-27)
+  assign check_ok    = (w_state == W_CHECK) & crc_ok;
+  assign exp_bad     = next_rcv_seq + seq_num_t'(new_tlp_accepted);
+  assign seq_if_bad  = (sequence_number.num == exp_bad);
+  assign seq_if_ok   = (sequence_number.num == exp_bad + 1'b1);
+  assign seq_next    = check_ok ? seq_if_ok : seq_if_bad;
+  // (NEXT_RCV_SEQ - sequence number) mod 4096 <= 2048, both ways too
+  assign dup_if_bad  = (exp_bad - sequence_number.num <= SEQ_HALF);
+  assign dup_if_ok   = (exp_bad + 1'b1 - sequence_number.num <= SEQ_HALF);
+  assign dup         = check_ok ? dup_if_ok : dup_if_bad;
+  assign last_seq    = check_ok ? exp_bad : exp_bad - 1'b1;
+  assign room_if_ok  = (rd_ptr - write_ptr - 1'b1 >= bram_addr_t'(ROOM));
+  assign room_if_bad = (rd_ptr - tlp_start - 1'b1 >= bram_addr_t'(ROOM));
+  assign room_ok     = (((w_state == W_CHECK) & ~crc_ok) ? room_if_bad : room_if_ok)
+                     & (desc_cnt < 3'(DESC_N - 1));
 
   assign we         = tlp_valid
                     & ((stp_take & seq_next & room_ok) | ((w_state == W_STORE) & ~stp_detected));
   assign waddr = (w_state == W_STORE) ? write_ptr : base;
 
   assign push = (w_state == W_CHECK) & crc_ok;
-  assign r_go = (r_state == R_IDLE) & (desc_cnt != '0);
   assign r_last = (r_state == R_SEND) & (r_cnt == r_len);
-  assign pop = r_last;
+  assign r_go = ((r_state == R_IDLE) | r_last) & (desc_cnt != '0);
+  assign pop = r_go;  // its length is in r_len from now on
 
   // GateMate block RAM has no read-first mode, so a read that meets a write
   // of the same word reads X here, as it does in the RAM: Yosys then needs
@@ -277,7 +303,8 @@ module tlp_rx_buffer
 
   // ---- Reader FSM: a checked TLP out, word by word ---------------------------
   // r_go reads its first word; the next clocks put one word a clock out while
-  // the following one is read. On the last, rd_ptr is the next TLP's start
+  // the following one is read. On the last, rd_ptr is the next TLP's start,
+  // so a waiting TLP follows with no gap
   always_ff @(posedge clk or posedge reset) begin
     if (reset) begin
       r_state <= R_IDLE;
@@ -296,7 +323,12 @@ module tlp_rx_buffer
           end
         end
         R_SEND: begin
-          if (r_last) begin
+          if (r_go) begin  // the last word: the next TLP follows
+            r_len  <= desc_len[desc_rd];
+            r_cnt  <= bram_addr_t'(1);
+            rd_ptr <= rd_ptr + 1'b1;
+          end
+          else if (r_last) begin
             r_state <= R_IDLE;
           end
           else begin
@@ -317,6 +349,7 @@ module tlp_rx_buffer
       tlp_start        <= '0;
       word_cnt         <= '0;
       rx_lcrc          <= {LFSR_WIDTH{1'b0}};
+      rx_null          <= 1'b0;
       rx_seq_num       <= 12'b0;
       nak_scheduled    <= 1'b0;
       nak_seq_num      <= 12'b0;
@@ -337,9 +370,9 @@ module tlp_rx_buffer
           ack_seq_num      <= rx_seq_num;
           new_tlp_accepted <= 1'b1;
         end
-        else begin  // crc wrong: rewind
-          nak_scheduled <= 1'b1;
-          nak_seq_num   <= exp_seq - 1'b1;
+        else begin  // crc wrong, or nullified: rewind
+          nak_scheduled <= ~null_ok;
+          nak_seq_num   <= last_seq;
           write_ptr     <= tlp_start;
         end
         w_state <= W_IDLE;
@@ -353,20 +386,19 @@ module tlp_rx_buffer
           rx_seq_num <= sequence_number.num;
           w_state    <= W_STORE;
         end
-        else if (!seq_next && ((exp_seq - sequence_number.num) <= SEQ_HALF)) begin
-          // (NEXT_RCV_SEQ - sequence number) mod 4096 <= 2048: a duplicate, Ack it
+        else if (!seq_next && dup) begin  // a duplicate: Ack it
           ack_scheduled <= 1'b1;
-          ack_seq_num   <= exp_seq - 1'b1;
+          ack_seq_num   <= last_seq;
         end
         else begin  // out of sequence, or no room
           nak_scheduled <= 1'b1;
-          nak_seq_num   <= exp_seq - 1'b1;
+          nak_seq_num   <= last_seq;
         end
       end
       else if (w_state == W_STORE) begin
         if (stp_detected) begin  // detect STP before END: rewind
           nak_scheduled <= 1'b1;
-          nak_seq_num   <= exp_seq - 1'b1;
+          nak_seq_num   <= last_seq;
           write_ptr     <= tlp_start;
           w_state       <= W_IDLE;
         end
@@ -377,6 +409,7 @@ module tlp_rx_buffer
           end
           if (end_detected) begin
             rx_lcrc <= lcrc;
+            rx_null <= nullified;
             w_state <= W_CHECK;
           end
           // TODO: What if END has not been detected and buffer is full

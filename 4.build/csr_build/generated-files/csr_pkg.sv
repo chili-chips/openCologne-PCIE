@@ -19,16 +19,19 @@ package csr_pkg;
         csr__tx__send__external__in_t send;
     } csr__tx__in_t;
 
-    typedef struct {
-        logic hwset;
-    } csr__rx__valid__valid__in_t;
+    typedef struct packed {
+        logic [30:0] _reserved_31_1;
+        logic valid;
+    } csr__rx__valid__external__fields__in_t;
 
     typedef struct {
-        csr__rx__valid__valid__in_t valid;
-    } csr__rx__valid__in_t;
+        logic rd_ack;
+        csr__rx__valid__external__fields__in_t rd_data;
+        logic wr_ack;
+    } csr__rx__valid__external__in_t;
 
     typedef struct {
-        csr__rx__valid__in_t valid;
+        csr__rx__valid__external__in_t valid;
     } csr__rx__in_t;
 
     typedef struct {
@@ -93,16 +96,20 @@ package csr_pkg;
         csr__tx__send__external__out_t send;
     } csr__tx__out_t;
 
-    typedef struct {
-        logic value;
-    } csr__rx__valid__valid__out_t;
+    typedef struct packed {
+        logic [30:0] _reserved_31_1;
+        logic valid;
+    } csr__rx__valid__external__fields__out_t;
 
     typedef struct {
-        csr__rx__valid__valid__out_t valid;
-    } csr__rx__valid__out_t;
+        logic req;
+        logic req_is_wr;
+        csr__rx__valid__external__fields__out_t wr_data;
+        csr__rx__valid__external__fields__out_t wr_biten;
+    } csr__rx__valid__external__out_t;
 
     typedef struct {
-        csr__rx__valid__out_t valid;
+        csr__rx__valid__external__out_t valid;
     } csr__rx__out_t;
 
     typedef struct packed {
@@ -122,7 +129,7 @@ package csr_pkg;
 
     typedef struct {
         logic req;
-        logic [7:0] addr;
+        logic [11:0] addr;
         logic req_is_wr;
         logic [31:0] wr_data;
         logic [31:0] wr_biten;

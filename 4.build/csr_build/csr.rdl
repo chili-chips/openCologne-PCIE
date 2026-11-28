@@ -48,7 +48,7 @@
 //     0x3000_0000  -               free (was tx.header0..2)
 //     0x3000_000C  tx.send         send N TLPs from tx_payload (W, triggers)
 //     0x3000_0010  -               free (was rx.header0..2, rx.data)
-//     0x3000_0020  rx.valid        a TLP is waiting          (R, W1C)
+//     0x3000_0020  rx.valid        a TLP waits; writing 1 frees it (R, W)
 //     0x3000_0024  -               free (was status.err)
 //     0x3000_0028  status.phy      Tx FSM busy               (R)
 //     0x3000_002C  status.result   firmware result marker    (W)
@@ -95,23 +95,21 @@ addrmap csr {
    //-----------------------------------------------------------------------
    regfile rx {
       name = "csr.rx";
-      desc = "TLP Receive CSR (PCIe link --> CPU). An incoming TLP is captured
-              as it is, every DWORD in rx_payload (entry i is DW i). The
-              firmware decodes it, then clears rx.valid to take the next TLP.";
+      desc = "TLP Receive CSR (PCIe link --> CPU). Incoming TLPs queue up in
+              a ring, as they are. rx_payload shows the oldest, the head:
+              entry i is its DW i. The firmware decodes it, then frees it.";
 
-      reg {
+      external reg {
          name = "csr.rx.valid";
          desc = "Receive Status Register";
 
          field {
             name = "csr.rx.valid.valid";
-            desc = "Set by hardware when a TLP has been captured. While it is
-                    set, the link is held off (m_axis_rx.tready low). Software
-                    writes 1 to clear it once it has read the TLP.";
+            desc = "Reads 1 while a TLP is waiting in rx_payload. Writing 1
+                    frees it, and the next TLP in the ring takes its place.
+                    External: nothing is stored, the ring is the state.";
             sw = rw;
-            onwrite = woclr;
             hw = r;
-            hwset;
          } valid[0:0] = 0;
       } valid @ 0x10;  // 0x10 to 0x1C: free, they held the header
    } rx @ 0x10;
@@ -177,10 +175,10 @@ addrmap csr {
    //-----------------------------------------------------------------------
    external mem {
       name = "csr.rx_payload";
-      desc = "DWORDs of the received TLP, header first, captured with
-              rx.valid: entry i is DW i. DWORDs past the last entry are
-              dropped.";
-      mementries = 64;
+      desc = "The head TLP of the RX ring, header first, while rx.valid
+              reads 1: entry i is its DW i. The window spans the ring:
+              entries past the head show the TLPs behind it.";
+      mementries = 1024;
       memwidth = 32;
       sw = r;
    } rx_payload @ 0x1000;

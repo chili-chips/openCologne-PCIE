@@ -5,7 +5,7 @@
 # Accepted lint findings, read by run-lint.sh.
 #
 # One waiver per line:  <phase> <regex>
-#   <phase>  tags | verilator | yosys | reset | slang | verible
+#   <phase>  tags | verilator | yosys | reset | ram | iob | slang | verible
 #   <regex>  extended regex (grep -E), matched against one finding line as it
 #            appears in <phase>.all of a run-lint.sh work directory
 # A finding that matches is waived. Put the reason on a comment line above it.
@@ -79,13 +79,28 @@ slang ^2\.rtl/.*\.sv:[0-9]+:[0-9]+: warning: .case[zx]?. marked .(unique|priorit
 # address, ALU result and operand signs; the instruction word from the RAM
 reset 'u_pcie_top\.u_soc\.cpu\.(rs1_reg|ls_offset_reg|dmem_addr|u_alu\.(alu_minus_reg|aluin_[12]_31_reg))'
 reset 'u_pcie_top\.u_soc\.imem_rdat'
-# the Tx payload RAM's output: DW0 is decoded for the TLP length in PREP only,
-# a clock after LOAD read it
+# Block RAM outputs. GateMate's CC_BRAM_20K/40K have no output reset or set
+# value (UG1001 Mar 2025, Table 6.3: DI, BM, ADDR, EN, WE, CLK, DO; the
+# optional DO register has none either; F_RST_N resets only the FIFO
+# controller), unlike Xilinx RAMB18/36 (RSTRAM/RSTREG, SRVAL). A reset here
+# would move the register into the fabric, so these are safe by design:
+# the Tx payload RAM's output: beat 0's DW0 goes into f_dw0 (which has a
+# reset) in F_WAIT only, a clock after F_HDR read it
 reset 'u_pcie_top\.u_soc\.tx_pl_a_q'
-# eduBOS5's store data: tx.send's TLP count, loaded into tx_left (which has
+# the Rx ring's output: the head's DW0 goes into rx_head_dw0 (which has a
+# reset) only a clock after the fetch read it (rx_fetch_q, which has a reset)
+reset 'u_pcie_top\.u_soc\.rx_pl_q'
+# eduBOS5's store data: tx.send's TLP count, loaded into f_left (which has
 # a reset) only on the tx.send write strobe
 reset 'u_pcie_top\.u_soc\.cpu\.dmem_wdat'
 # eduBOS5 checked alone (USE_HW_MUL=1, EN_COUNTERS=1), as on openPCIE: the
 # same data flops, plus rs2_reg and the RV32M divider's data path
 reset '(rs1_reg|rs2_reg|ls_offset_reg|dmem_addr|g_md\.(div_res|dvs|r_sh))'
 reset 'u_alu\.(alu_minus_reg|aluin_[12]_31_reg)'
+
+# ---- iob (added 2026-11-27, with the phase) ----
+# iob: PERST# is a reset, not data: it is ANDed with the user reset into
+# perst_por_n, then synchronized (clk_rst_gen.sv)
+iob ^2\.rtl/clk_rst_gen\.sv:[0-9]+: 'perst_n' input: no flop takes it directly
+# iob: link_up drives an LED, a slow status pin, not data (pcie_core.sv)
+iob ^2\.rtl/pcie_core\.sv:[0-9]+: 'link_up' output: driven by logic

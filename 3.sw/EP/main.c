@@ -103,7 +103,9 @@ static void mem_read(const tlp_t *req) {
     uint32_t addr = req_addr(req) & ~0x3u;
     uint32_t fbe  = REQ_FIRST_BE(req->dw1);
     uint32_t lbe  = (len == 1) ? fbe : REQ_LAST_BE(req->dw1);
-    uint32_t lo   = be_first(fbe);
+    // A zero-length read (1 DW, no byte enabled): Byte Count 1, Lower
+    // Address [1:0] 00 (Base 2.1 table 2-32)
+    uint32_t lo   = (fbe == 0) ? 0 : be_first(fbe);
     uint32_t hi   = (fbe == 0 && len == 1) ? 0 : be_last(lbe);
     uint32_t left = len * 4 - lo - (3 - hi);  // Byte Count of the whole read
     uint32_t dw   = 0;

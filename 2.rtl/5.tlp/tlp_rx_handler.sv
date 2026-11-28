@@ -84,6 +84,8 @@ module tlp_rx_handler
 
   state_e     state;
   rx_ctx_t    d_ctx;  // from the first word's header
+  tl_beat_t   rxq;  // the word, a clock later
+  rx_ctx_t    d_ctx_q;  // its decode, with it
   rx_ctx_t    ctx_r;  // held for the rest of the TLP
   rx_ctx_t    cur;
   tlp_words_t words_seen_r;
@@ -154,15 +156,32 @@ module tlp_rx_handler
                    & (rx_hdr_dw01.dw0.tc != 3'd0);
   assign d_ctx.static_bad = d_bad_cfg_io | d_bad_mps | d_bad_msg;
 
-  assign first_word = rx.valid & rx.first;
+  // One register stage in front: the word and its header decode go into
+  // flops together, so the credit check, the accept/drop decision and the
+  // queue controls below start from flops, not from the decode (the TL's
+  // deepest logic, 18 to 21 LUT levels, 2026-11-27)
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      rxq     <= '0;
+      d_ctx_q <= '0;
+    end
+    else begin
+      rxq <= rx;
+      if (rx.valid && rx.first) begin
+        d_ctx_q <= d_ctx;
+      end
+    end
+  end
+
+  assign first_word = rxq.valid & rxq.first;
   assign in_tlp = first_word | (state == RECEIVE);
-  assign cur = first_word ? d_ctx : ctx_r;
+  assign cur = first_word ? d_ctx_q : ctx_r;
   assign cur_np = (cur.fc_class == FC_NP);
   assign cur_seen = first_word ? 11'd1 : words_seen_r + 11'd1;
   assign cur_qfull = cur_np ? np_full : p_full;
 
-  assign write = rx.valid & in_tlp & cur.known;
-  assign last_word = rx.valid & rx.last & in_tlp;
+  assign write = rxq.valid & in_tlp & cur.known;
+  assign last_word = rxq.valid & rxq.last & in_tlp;
   assign full_now = full_r | (write & cur_qfull);
 
   assign alloc = cur_np ? np_alloc : p_alloc;
@@ -182,13 +201,13 @@ module tlp_rx_handler
 
   assign p_wr.en = write & ~cur_np;
   assign p_wr.drop = drop & ~cur_np;
-  assign p_wr.word.last = rx.last;
-  assign p_wr.word.data = rx.data;
+  assign p_wr.word.last = rxq.last;
+  assign p_wr.word.data = rxq.data;
 
   assign np_wr.en = write & cur_np;
   assign np_wr.drop = drop & cur_np;
-  assign np_wr.word.last = rx.last;
-  assign np_wr.word.data = rx.data;
+  assign np_wr.word.last = rxq.last;
+  assign np_wr.word.data = rxq.data;
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -197,11 +216,11 @@ module tlp_rx_handler
       words_seen_r <= 11'd0;
       full_r       <= 1'b0;
     end
-    else if (rx.valid && in_tlp) begin
+    else if (rxq.valid && in_tlp) begin
       ctx_r        <= cur;
       words_seen_r <= cur_seen;
-      full_r       <= full_now & ~rx.last;
-      state        <= rx.last ? IDLE : RECEIVE;
+      full_r       <= full_now & ~rxq.last;
+      state        <= rxq.last ? IDLE : RECEIVE;
     end
   end
 

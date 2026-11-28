@@ -2,17 +2,23 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
-# RTL lint gate: 4.build/hw_build/run-lint.sh on top, chip and simulation
-# views; phases tags, verilator, yosys, reset and ram (chip view only) and slang. The
-# verible phase is gated in verible.yml. Tools come from the OSS CAD Suite
-# (Yosys with the yosys-slang plugin, Verilator); the project's own runs use
-# the versions in 4.build/README.md (Tool versions).
+# RTL lint gate: 4.build/hw_build/run-lint.sh on top. Chip view: phases tags,
+# verilator, yosys, reset, ram, iob and slang; simulation view: tags and
+# verilator. The verible phase is gated in verible.yml. Tools: OSS CAD Suite
+# 2026-11-26 for Yosys with the yosys-slang plugin, and Verilator built from
+# master at VERILATOR_REV (cached), the revision of the local runs
+# (4.build/README.md, Tool versions), as its newer checks are not in the
+# suite yet.
 
 name: lint
 
 on:
   push:
   pull_request:
+
+env:
+  VERILATOR_REV: v5.054-420-g1b3f232f   # git describe; built from its hash
+  VERILATOR_SHA: 1b3f232f
 
 jobs:
   run-lint:
@@ -26,17 +32,42 @@ jobs:
         uses: YosysHQ/setup-oss-cad-suite@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          version: '2026-11-26'
+
+      - name: Cache Verilator
+        id: verilator-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/verilator
+          key: verilator-${{ runner.os }}-${{ env.VERILATOR_REV }}
+
+      - name: Build Verilator ${{ env.VERILATOR_REV }}
+        if: steps.verilator-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q autoconf flex bison help2man libfl-dev zlib1g-dev
+          git clone -q --filter=blob:none https://github.com/verilator/verilator.git "$RUNNER_TEMP/verilator-src"
+          cd "$RUNNER_TEMP/verilator-src"
+          git checkout -q "$VERILATOR_SHA"
+          autoconf
+          ./configure --prefix="$HOME/verilator"
+          make -j"$(nproc)"
+          make install
+
+      - name: Verilator first on PATH
+        run: echo "$HOME/verilator/bin" >> "$GITHUB_PATH"
 
       - name: Tool versions
         run: |
           yosys -V
           verilator --version
+          verilator --version | grep -q -- "$VERILATOR_REV"
 
       - name: run-lint (chip view)
         env:
           YOSYS_ARGS: -m slang
           LINT_WORK: ${{ runner.temp }}/lint/chip
-        run: bash 4.build/hw_build/run-lint.sh tags verilator yosys reset ram slang
+        run: bash 4.build/hw_build/run-lint.sh tags verilator yosys reset ram iob slang
 
       - name: run-lint (simulation view)
         if: always()

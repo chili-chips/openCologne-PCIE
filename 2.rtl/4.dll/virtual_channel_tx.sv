@@ -98,6 +98,7 @@ module virtual_channel_tx
   logic             ack_scheduled;
   logic             nak_scheduled;
   seq_num_t         nack_sequence_number;
+  logic             acknak_again;  // a newer Ack/Nak came while one went out
 
 
   logic       [2:0] fc_needed;
@@ -256,13 +257,28 @@ module virtual_channel_tx
       nak_scheduled        <= 1'b1;
       nack_sequence_number <= nak_sequence_number;
     end
-    else if (dllp_sent) begin
+    else if (dllp_sent && !acknak_again) begin
       if (ack_sending) begin
         ack_scheduled <= 1'b0;
       end
       else if (nak_sending) begin
         nak_scheduled <= 1'b0;
       end
+    end
+  end
+
+  // The Ack/Nak DLLP takes nack_sequence_number as it starts. A trigger after
+  // that, before dllp_sent, is not in it: keep it scheduled, or that TLP's Ack
+  // waits for the next TLP (DL.ACK-LAT under back-to-back TLPs)
+  always_ff @(posedge clk or posedge reset) begin
+    if (reset) begin
+      acknak_again <= 1'b0;
+    end
+    else if (dllp_sent) begin
+      acknak_again <= 1'b0;
+    end
+    else if ((ack_trigger || nak_trigger) && (ack_sending || nak_sending)) begin
+      acknak_again <= 1'b1;
     end
   end
 

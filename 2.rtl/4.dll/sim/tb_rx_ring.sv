@@ -25,7 +25,7 @@ module tb_rx_ring;
   always #2 clk = ~clk;
 
   // DUT inputs
-  logic       stp, endd, valid;
+  logic       stp, endd, nul, valid;
   pipe_data_t din;
   tlp_seq_t   seqn;
   logic [31:0] lcrc;
@@ -43,6 +43,7 @@ module tb_rx_ring;
       .link_active     (1'b1),
       .stp_detected    (stp),
       .end_detected    (endd),
+      .nullified       (nul),
       .data_tl_in      (din),
       .sequence_number (seqn),
       .lcrc            (lcrc),
@@ -108,17 +109,19 @@ module tb_rx_ring;
   endtask
 
   // drive TLPs t0..t1 back to back: each STP right after the END before it
-  task automatic drive(input int t0, input int t1, input logic bad_first);
+  // bad_first: the first TLP gets the inverted LCRC; null_first: it ends with EDB
+  task automatic drive(input int t0, input int t1, input logic bad_first, input logic null_first = 1'b0);
     @(negedge clk);
     for (int t = t0; t <= t1; t++) begin
       for (int w = 0; w < len[t]; w++) begin
         stp = (w == 0); endd = (w == len[t] - 1); valid = 1'b1; din = words[t][w];
+        nul = endd && null_first && (t == t0);
         seqn = '{rsvd: 4'h0, num: sq[t]};
         lcrc = (bad_first && (t == t0)) ? ~crc[t] : crc[t];
         @(negedge clk);
       end
     end
-    stp = 1'b0; endd = 1'b0; valid = 1'b0;
+    stp = 1'b0; endd = 1'b0; nul = 1'b0; valid = 1'b0;
   endtask
 
   // ---- checks --------------------------------------------------------------
@@ -150,7 +153,7 @@ module tb_rx_ring;
   end
 
   initial begin
-    stp = 0; endd = 0; valid = 0; din = '0; seqn = '0; lcrc = '0; r_en = 0; r_seq = 0; r_data = '0; r_seqb = '0;
+    stp = 0; endd = 0; nul = 0; valid = 0; din = '0; seqn = '0; lcrc = '0; r_en = 0; r_seq = 0; r_data = '0; r_seqb = '0;
     // 8 TLPs of 3 to 8 words, sequence 0 to 7, then TLP 8 (seq 8) twice: bad, then good
     for (int t = 0; t < 9; t++) begin
       len[t] = 3 + (t * 5) % 6;
@@ -159,9 +162,16 @@ module tb_rx_ring;
     end
     len[9] = len[8]; sq[9] = sq[8];
     for (int w = 0; w < MAXW; w++) words[9][w] = words[8][w];
+    // TLPs 10/11 (seq 9) and 12/13 (seq 10): each nullified, then sent good
+    for (int t = 10; t < 14; t++) begin
+      len[t] = 4 + t % 3;
+      sq[t]  = seq_num_t'(9 + (t - 10) / 2);
+      for (int w = 0; w < MAXW; w++) words[t][w] = {16'(t), 16'(w), 32'hBEEF_0000 + 32'(t * 16 + w)};
+    end
+    len[11] = len[10]; len[13] = len[12];
     repeat (4) @(negedge clk);
     reset = 1'b0;
-    for (int t = 0; t < 10; t++) ref_crc(t);
+    for (int t = 0; t < 14; t++) ref_crc(t);
 
     $display("=== 1: 8 TLPs back to back ===");
     for (int t = 0; t < 8; t++) expect_tlp.push_back(t);
@@ -181,6 +191,26 @@ module tb_rx_ring;
     if (naks != 1) begin errors++; $display("ERROR: %0d Naks, expected 1", naks); end
     if (acks != 1) begin errors++; $display("ERROR: %0d Acks, expected 1", acks); end
     if (next_rcv_seq != 9) begin errors++; $display("ERROR: next_rcv_seq %0d, expected 9", next_rcv_seq); end
+
+    $display("=== 3: a nullified TLP (EDB, inverted LCRC), then the TLP: no Nak (#29) ===");
+    got = 0; naks = 0; acks = 0;
+    expect_tlp.push_back(11);
+    drive(10, 11, 1'b1, 1'b1);
+    repeat (40) @(negedge clk);
+    if (got != 1) begin errors++; $display("ERROR: %0d TLPs out, expected 1", got); end
+    if (naks != 0) begin errors++; $display("ERROR: %0d Naks, expected none", naks); end
+    if (acks != 1) begin errors++; $display("ERROR: %0d Acks, expected 1", acks); end
+    if (next_rcv_seq != 10) begin errors++; $display("ERROR: next_rcv_seq %0d, expected 10", next_rcv_seq); end
+
+    $display("=== 4: EDB with a good LCRC is a bad TLP: Nak, then the TLP ===");
+    got = 0; naks = 0; acks = 0;
+    expect_tlp.push_back(13);
+    drive(12, 13, 1'b0, 1'b1);
+    repeat (40) @(negedge clk);
+    if (got != 1) begin errors++; $display("ERROR: %0d TLPs out, expected 1", got); end
+    if (naks != 1) begin errors++; $display("ERROR: %0d Naks, expected 1", naks); end
+    if (acks != 1) begin errors++; $display("ERROR: %0d Acks, expected 1", acks); end
+    if (next_rcv_seq != 11) begin errors++; $display("ERROR: next_rcv_seq %0d, expected 11", next_rcv_seq); end
 
     $display("  SUMMARY: %0d errors", errors);
     if (errors == 0) $display("  TEST PASSED");
